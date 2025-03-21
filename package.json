@@ -377,7 +377,7 @@
         "test-compile": "npm run webpack"
     },
     "dependencies": {
-        "@vscode/debugadapter": "^1.59.0",
+        "@vscode/debugadapter": "^1.68.0",
         "@vscode/extension-telemetry": "^0.6.2",
         "@vscode/webview-ui-toolkit": "^1.2.2",
         "assert": "^2.0.0",
