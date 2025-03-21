@@ -26,15 +26,29 @@ jobs:
         with:
           node-version: 22.x
       - run: npm install
-      - name: Build VSIX package
-        run: |
-          npm install @vscode/vsce -g
-          npm run build
+      
+      # Update version in package.json
+      - name: Update version
+        run: npm version ${{ github.event.inputs.tags }} --no-git-tag-version
+        
+      - name: Install VSCE
+        run: npm install @vscode/vsce -g
+        
+      - name: Build Extension
+        run: npm run build
+      
+      # Prerelease flow
       - name: Build Prerelease VSIX package
         if: ${{ github.event.inputs.prerelease == 'true' }}
         run: |
-          vsce package --pre-release -o rde-ros-2-dev.vsix
-      - name: Create Prerelease
+          vsce package --pre-release -o rde-urdf-${{ github.event.inputs.tags }}-pre.vsix
+      
+      - name: Publish Prerelease to Marketplace
+        if: ${{ github.event.inputs.prerelease == 'true' }}
+        run: |
+          vsce publish --pre-release -p ${{ secrets.VSCE_PAT }}
+      
+      - name: Create GitHub Prerelease
         if: ${{ github.event.inputs.prerelease == 'true'}}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,12 +59,20 @@ jobs:
               --title="Prerelease ${{ github.event.inputs.tags }}" \
               --generate-notes \
               --prerelease \
-              rde-ros-2-dev.vsix
+              rde-urdf-${{ github.event.inputs.tags }}-pre.vsix
+      
+      # Release flow
       - name: Build Release VSIX package
         if: ${{ github.event.inputs.prerelease == 'false' }}
         run: |
-          vsce package -o rde-ros-2.vsix
-      - name: Create Release
+          vsce package -o rde-urdf-${{ github.event.inputs.tags }}.vsix
+      
+      - name: Publish Release to Marketplace
+        if: ${{ github.event.inputs.prerelease == 'false' }}
+        run: |
+          vsce publish -p ${{ secrets.VSCE_PAT }}
+      
+      - name: Create GitHub Release
         if: ${{ github.event.inputs.prerelease == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -60,4 +82,4 @@ jobs:
               --repo="$GITHUB_REPOSITORY" \
               --title="Release ${{ github.event.inputs.tags }}" \
               --generate-notes \
-              rde-ros-2.vsix
+              rde-urdf-${{ github.event.inputs.tags }}.vsix
