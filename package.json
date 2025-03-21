@@ -8,8 +8,8 @@
     "author": {
         "name": "Ranchhand Robotics"
     },
-    "displayName": "RDE for ROS 2",
-    "description": "Robot Developer Environment for developing Robot Operating System (ROS) 2 with Visual Studio Code.",
+    "displayName": "Robot Developer Extensions for ROS 2",
+    "description": "Robot Developer Extensions for developing Robot Operating System (ROS) 2 with Visual Studio Code.",
     "icon": "media/icon.png",
     "aiKey": "AIF-d9b70cd4-b9f9-4d70-929b-a071c400b217",
     "categories": [
