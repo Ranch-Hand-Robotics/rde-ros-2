@@ -1,7 +1,7 @@
 # Robotics Development Extensions for ROS 2 within Visual Studio Code
-This is a Visual Studio Code Extension that  provides debugging support for [Robot Operating System 2 (ROS 2)][http://ros.org] development ROS 2 on Windows, Linux and MacOS. The Robot Operating System is a trademark of Open Robotics.
+This is a Visual Studio Code Extension that  provides debugging support for [Robot Operating System 2 (ROS 2)](http://ros.org) development ROS 2 on Windows, Linux and MacOS. The Robot Operating System is a trademark of Open Robotics.
 
-> NOTE: This extension is rebranded and re-released by Ranch Hand Robotics, owned by the maintainer of the [ms-iot VSCode ROS Extension](https://github.com/ms-iot/vscode-ros) with permission from Microsoft. The source extension was split into 3 parts - [ROS 1](https://ranchhandrobotics.github.io/rde-ros-1/), [ROS 2](https://ranchhandrobotics.github.io/rde-ros-2/) and a [URDF editor](https://ranchhandrobotics.github.io/rde-urdf/).
+> NOTE: This extension is rebranded and re-released by Ranch Hand Robotics, a company owned by the maintainer of the [ms-iot VSCode ROS Extension](https://github.com/ms-iot/vscode-ros) with permission from Microsoft. The source extension was split into 3 parts - [ROS 1](https://ranchhandrobotics.github.io/rde-ros-1/), [ROS 2](https://ranchhandrobotics.github.io/rde-ros-2/) and a [URDF editor](https://ranchhandrobotics.github.io/rde-urdf/).
 
 ## Features
 
@@ -21,7 +21,7 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 
 The VS Code ROS extension will attempt to detect and automatically configure the workspace for the appropriate ROS Distro.
 
-The extension will automatically start when you open a `colcon` workspace.
+The extension will automatically start when you open a `ROS 2` workspace.
 
 ## Documentation, Tutorials, Troubleshooting
 
