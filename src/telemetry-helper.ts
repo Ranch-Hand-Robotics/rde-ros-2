@@ -1,13 +1,13 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import TelemetryReporter from "@vscode/extension-telemetry";
+import { TelemetryReporter } from '@vscode/extension-telemetry';
 
 import * as vscode_utils from "./vscode-utils";
 
-let reporterSingleton: TelemetryReporter;
+let reporterSingleton: TelemetryReporter | undefined = undefined;
 
-function getTelemetryReporter(): TelemetryReporter {
+function getTelemetryReporter(): TelemetryReporter | undefined {
     if (reporterSingleton) {
         return reporterSingleton;
     }
@@ -15,7 +15,7 @@ function getTelemetryReporter(): TelemetryReporter {
     const extensionId = "Ranch-Hand-Robotics.rde-ros-2";
     const packageInfo = vscode_utils.getPackageInfo(extensionId);
     if (packageInfo) {
-        reporterSingleton = new TelemetryReporter(packageInfo.name, packageInfo.version, packageInfo.aiKey);
+        reporterSingleton = new TelemetryReporter(packageInfo.aiKey);
     }
     return reporterSingleton;
 }
