@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
-        "vscode": "^1.69.0"
+        "vscode": "^1.101.0"
     },
     "author": {
         "name": "Ranchhand Robotics"
@@ -51,56 +51,67 @@
     "contributes": {
         "commands": [
             {
-                "command": "RDE.createTerminal",
+                "command": "ROS2.createTerminal",
                 "title": "Create Terminal",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.rosrun",
+                "command": "ROS2.rosrun",
                 "title": "Run a ROS executable (ros2 run)",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.roslaunch",
+                "command": "ROS2.roslaunch",
                 "title": "Run a ROS launch file (ros2 launch)",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.rostest",
+                "command": "ROS2.rostest",
                 "title": "Run a ROS test file (rostest)",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.showCoreStatus",
+                "command": "ROS2.showCoreStatus",
                 "title": "Show Status",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.startCore",
+                "command": "ROS2.startCore",
                 "title": "Start",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.stopCore",
+                "command": "ROS2.stopCore",
                 "title": "Stop",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.updateCppProperties",
+                "command": "ROS2.updateCppProperties",
                 "title": "Update C++ Properties",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.updatePythonPath",
+                "command": "ROS2.updatePythonPath",
                 "title": "Update Python Path",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.rosdep",
+                "command": "ROS2.rosdep",
                 "title": "Install ROS Dependencies for this workspace using rosdep",
-                "category": "RDE"
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.doctor",
+                "title": "Runs ROS 2 Doctor for diagnosing ROS 2 issues",
+                "category": "ROS2"
             }
         ],
+		"mcpServerDefinitionProviders": [
+			{
+				"id": "doctor",
+				"label": "ROS 2 Doctor"
+			}
+		],
         "configuration": {
             "type": "object",
             "title": "RDE",
@@ -411,7 +422,7 @@
         "@types/node": "^22.15.23",
         "@types/shell-quote": "^1.7.5",
         "@types/tmp": "^0.2.6",
-        "@types/vscode": "^1.100.0",
+        "@types/vscode": "^1.101.0",
         "@types/vscode-webview": "^1.57.5",
         "@types/xmlrpc": "^1.3.10",
         "@vscode/test-electron": "^2.5.2",

@@ -49,18 +49,19 @@ export async function resolvedEnv() {
 let subscriptions = <vscode.Disposable[]>[];
 
 export enum Commands {
-    CreateTerminal = "RDE.createTerminal",
-    GetDebugSettings = "RDE.getDebugSettings",
-    Rosrun = "RDE.rosrun",
-    Roslaunch = "RDE.roslaunch",
-    Rostest = "RDE.rostest",
-    Rosdep = "RDE.rosdep",
-    ShowCoreStatus = "RDE.showCoreStatus",
-    StartRosCore = "RDE.startCore",
-    TerminateRosCore = "RDE.stopCore",
-    UpdateCppProperties = "RDE.updateCppProperties",
-    UpdatePythonPath = "RDE.updatePythonPath",
-    PreviewURDF = "RDE.previewUrdf",
+    CreateTerminal = "ROS2.createTerminal",
+    GetDebugSettings = "ROS2.getDebugSettings",
+    Rosrun = "ROS2.rosrun",
+    Roslaunch = "ROS2.roslaunch",
+    Rostest = "ROS2.rostest",
+    Rosdep = "ROS2.rosdep",
+    ShowCoreStatus = "ROS2.showCoreStatus",
+    StartRosCore = "ROS2.startCore",
+    TerminateRosCore = "ROS2.stopCore",
+    UpdateCppProperties = "ROS2.updateCppProperties",
+    UpdatePythonPath = "ROS2.updatePythonPath",
+    PreviewURDF = "ROS2.previewUrdf",
+    Doctor = "ROS2.doctor",
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -158,6 +159,28 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    vscode.commands.registerCommand(Commands.Doctor, () => {
+        ensureErrorMessageOnException(() => {
+            rosApi.doctor();
+        });
+    });
+
+	context.subscriptions.push(vscode.lm.registerMcpConfigurationProvider('exampleGist', {
+		onDidChange: didChangeEmitter.event,
+		provideMcpServerDefinitions: async () => {
+			let output: vscode.McpServerDefinition[] = [];
+			await Promise.all(gists.map(g => fetchGistContents(g).then(content => {
+				const s = JSON.parse(content);
+				if (!Array.isArray(s)) {
+					throw new Error(`Gist content is not an MCP server array: ${g}`);
+				}
+
+				output.push(...s);
+			})));
+
+			return output;
+		}
+	}));    
 
     reporter.sendTelemetryActivate();
 
