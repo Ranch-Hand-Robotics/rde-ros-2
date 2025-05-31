@@ -45,6 +45,7 @@
         "workspaceContains:**/package.xml",
         "onWebviewPanel:ros2Status",
         "onDebug",
+        "onDebugInitialConfigurations:ros2",
         "onDebugResolve:ros2",
         "onDebugDynamicConfigurations:ros2"
     ],
@@ -103,7 +104,7 @@
         ],
         "configuration": {
             "type": "object",
-            "title": "ROS2",
+            "title": "ROS2", 
             "properties": {
                 "ROS2.distro": {
                     "type": "string",
@@ -122,10 +123,11 @@
         },
         "debuggers": [
             {
-                "type": "ROS2",
+                "type": "ros2",
                 "label": "ROS 2",
                 "program": "./out/src/debugger/main.js",
                 "runtime": "node",
+                "languages": ["cpp", "python"],
                 "configurationAttributes": {
                     "launch": {
                         "required": [
@@ -240,7 +242,7 @@
                         "description": "Debug ROS node(s) at launch.",
                         "body": {
                             "name": "ROS2: Launch",
-                            "type": "ROS2",
+                            "type": "ros2",
                             "request": "launch",
                             "target": "absolute path to launch file"
                         }
@@ -250,7 +252,7 @@
                         "description": "Debug a ROS node by attaching to it.",
                         "body": {
                             "name": "ROS2: Attach",
-                            "type": "ROS2",
+                            "type": "ros2",
                             "request": "attach"
                         }
                     }

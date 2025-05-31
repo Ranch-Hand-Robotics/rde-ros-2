@@ -7,7 +7,28 @@ import { rosApi } from "../../../ros/ros";
 
 // interact with the user to create a roslaunch or rosrun configuration
 export class RosDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
+    
+    /**
+     * Provides initial debug configurations for VS Code's debug dropdown
+     * When called, triggers the interactive configuration flow
+     */
     public async provideDebugConfigurations(
+        folder: vscode.WorkspaceFolder | undefined,
+        token?: vscode.CancellationToken): Promise<vscode.DebugConfiguration[]> {
+        
+        if (token?.isCancellationRequested) {
+            return [];
+        }
+
+        // When VS Code asks for initial configurations (user selected "ROS 2" from dropdown),
+        // trigger the interactive flow to find actual packages and launch files
+        return this.provideDebugConfigurationsInteractive(folder, token);
+    }
+
+    /**
+     * Interactive configuration method for when user needs more detailed setup
+     */
+    public async provideDebugConfigurationsInteractive(
         folder: vscode.WorkspaceFolder | undefined,
         token?: vscode.CancellationToken): Promise<vscode.DebugConfiguration[]> {
         const type = await vscode.window.showQuickPick(
