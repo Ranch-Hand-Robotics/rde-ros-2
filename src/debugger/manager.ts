@@ -48,6 +48,6 @@ class RosDebugManager implements vscode.DebugConfigurationProvider {
 
 export function registerRosDebugManager(context: vscode.ExtensionContext): void {
     var rosProvider = new RosDebugManager();
-    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider("ros", rosProvider, vscode.DebugConfigurationProviderTriggerKind.Initial));
-    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider("ros", rosProvider, vscode.DebugConfigurationProviderTriggerKind.Dynamic));
+    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider("ros2", rosProvider, vscode.DebugConfigurationProviderTriggerKind.Initial));
+    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider("ros2", rosProvider, vscode.DebugConfigurationProviderTriggerKind.Dynamic));
 }

@@ -11,7 +11,7 @@
     "displayName": "Robot Developer Extensions for ROS 2",
     "description": "Robot Developer Extensions for developing Robot Operating System (ROS) 2 with Visual Studio Code.",
     "icon": "media/icon.png",
-    "aiKey": "AIF-d9b70cd4-b9f9-4d70-929b-a071c400b217",
+    "aiKey": "",
     "categories": [
         "Debuggers",
         "Other"
@@ -45,76 +45,76 @@
         "workspaceContains:**/package.xml",
         "onWebviewPanel:ros2Status",
         "onDebug",
-        "onDebugResolve:rde2",
-        "onDebugDynamicConfigurations:rde2"
+        "onDebugResolve:ros2",
+        "onDebugDynamicConfigurations:ros2"
     ],
     "contributes": {
         "commands": [
             {
-                "command": "RDE.createTerminal",
+                "command": "ROS2.createTerminal",
                 "title": "Create Terminal",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.rosrun",
+                "command": "ROS2.rosrun",
                 "title": "Run a ROS executable (ros2 run)",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.roslaunch",
+                "command": "ROS2.roslaunch",
                 "title": "Run a ROS launch file (ros2 launch)",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.rostest",
+                "command": "ROS2.rostest",
                 "title": "Run a ROS test file (rostest)",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.showCoreStatus",
+                "command": "ROS2.showCoreStatus",
                 "title": "Show Status",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.startCore",
+                "command": "ROS2.startCore",
                 "title": "Start",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.stopCore",
+                "command": "ROS2.stopCore",
                 "title": "Stop",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.updateCppProperties",
+                "command": "ROS2.updateCppProperties",
                 "title": "Update C++ Properties",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.updatePythonPath",
+                "command": "ROS2.updatePythonPath",
                 "title": "Update Python Path",
-                "category": "RDE"
+                "category": "ROS2"
             },
             {
-                "command": "RDE.rosdep",
+                "command": "ROS2.rosdep",
                 "title": "Install ROS Dependencies for this workspace using rosdep",
-                "category": "RDE"
+                "category": "ROS2"
             }
         ],
         "configuration": {
             "type": "object",
-            "title": "RDE",
+            "title": "ROS2",
             "properties": {
-                "RDE.distro": {
+                "ROS2.distro": {
                     "type": "string",
                     "description": "ROS installation distro to be sourced."
                 },
-                "RDE.rosSetupScript": {
+                "ROS2.rosSetupScript": {
                     "type": "string",
                     "description": "ROS workspace setup script. Overrides ros.distro."
                 },
-                "RDE.isolateEnvironment": {
-                    "type": "bool",
+                "ROS2.isolateEnvironment": {
+                    "type": "boolean",
                     "default": false,
                     "description": "Specify if the extension should not capture the environment VSCode is running in to pass to child processes."
                 }
@@ -122,8 +122,8 @@
         },
         "debuggers": [
             {
-                "type": "RDE",
-                "label": "RDE",
+                "type": "ROS2",
+                "label": "ROS 2",
                 "program": "./out/src/debugger/main.js",
                 "runtime": "node",
                 "configurationAttributes": {
@@ -236,21 +236,21 @@
                 },
                 "configurationSnippets": [
                     {
-                        "label": "RDE: ROS 2 Launch",
+                        "label": "ROS2: ROS 2 Launch",
                         "description": "Debug ROS node(s) at launch.",
                         "body": {
-                            "name": "RDE: Launch",
-                            "type": "RDE",
+                            "name": "ROS2: Launch",
+                            "type": "ROS2",
                             "request": "launch",
                             "target": "absolute path to launch file"
                         }
                     },
                     {
-                        "label": "RDE: ROS 2 Attach",
+                        "label": "ROS2: ROS 2 Attach",
                         "description": "Debug a ROS node by attaching to it.",
                         "body": {
-                            "name": "RDE: Attach",
-                            "type": "RDE",
+                            "name": "ROS2: Attach",
+                            "type": "ROS2",
                             "request": "attach"
                         }
                     }
@@ -338,7 +338,7 @@
         ],
         "taskDefinitions": [
             {
-                "type": "RDE",
+                "type": "ROS2",
                 "required": [
                     "command"
                 ],
