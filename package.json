@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
-        "vscode": "^1.69.0"
+        "vscode": "^1.100.0"
     },
     "author": {
         "name": "Ranchhand Robotics"
