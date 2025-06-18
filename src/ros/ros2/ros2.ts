@@ -166,7 +166,13 @@ export class ROS2 implements ros.ROSApi {
       const terminal = ros_utils.createTerminal(this.context);
       terminal.sendText(`rosdep install --from-paths src --ignore-src -r -y`);
       return terminal;
-  }
+    }
+
+    public doctor(): vscode.Terminal {
+      const terminal = ros_utils.createTerminal(this.context);
+      terminal.sendText(`ros2 doctor`);
+      return terminal;
+    }
 
     public activateCoreMonitor(): vscode.Disposable {
         const coreStatusItem = new daemon.StatusBarItem();

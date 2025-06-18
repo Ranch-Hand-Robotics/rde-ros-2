@@ -3,7 +3,7 @@
     "version": "1.0.2",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
-        "vscode": "^1.100.0"
+        "vscode": "^1.101.0"
     },
     "author": {
         "name": "Ranchhand Robotics"
@@ -99,8 +99,19 @@
                 "command": "ROS2.rosdep",
                 "title": "Install ROS Dependencies for this workspace using rosdep",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.doctor",
+                "title": "Runs ROS 2 Doctor for diagnosing ROS 2 issues",
+                "category": "ROS2"
             }
         ],
+		"mcpServerDefinitionProviders": [
+			{
+				"id": "doctor",
+				"label": "ROS 2 Doctor"
+			}
+		],
         "configuration": {
             "type": "object",
             "title": "ROS2", 
@@ -375,7 +386,10 @@
         "webpack": "webpack --mode development",
         "watch": "webpack --mode development --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
-        "test-compile": "npm run webpack"
+        "test-compile": "npm run webpack",
+		"download-api": "dts dev",
+		"postdownload-api": "dts main",
+		"postinstall": "npm run download-api"        
     },
     "dependencies": {
         "@vscode/debugadapter": "^1.68.0",
@@ -412,10 +426,10 @@
         "@types/node": "^22.15.23",
         "@types/shell-quote": "^1.7.5",
         "@types/tmp": "^0.2.6",
-        "@types/vscode": "^1.100.0",
         "@types/vscode-webview": "^1.57.5",
         "@types/xmlrpc": "^1.3.10",
         "@vscode/test-electron": "^2.5.2",
+        "@vscode/dts": "^0.4.1",
         "glob": "^11.0.2",
         "mocha": "^11.5.0",
         "ts-loader": "^9.5.2",

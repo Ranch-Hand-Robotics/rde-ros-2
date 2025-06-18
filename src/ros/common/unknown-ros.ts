@@ -67,6 +67,11 @@ export class UnknownROS implements ros.ROSApi {
       return;
     }
 
+    public doctor() {
+      console.error("Unknown ROS distro.");
+      return;
+    }
+
     public activateCoreMonitor(): vscode.Disposable {
         console.error("Unknown ROS distro.");
         return;
