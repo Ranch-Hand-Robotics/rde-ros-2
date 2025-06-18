@@ -14,7 +14,7 @@ function getTelemetryReporter(): TelemetryReporter | undefined {
 
     const extensionId = "Ranch-Hand-Robotics.rde-ros-2";
     const packageInfo = vscode_utils.getPackageInfo(extensionId);
-    if (packageInfo) {
+    if (packageInfo && packageInfo.aiKey && packageInfo.aiKey.length > 0) {
         reporterSingleton = new TelemetryReporter(packageInfo.aiKey);
     }
     return reporterSingleton;

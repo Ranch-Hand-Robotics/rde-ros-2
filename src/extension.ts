@@ -409,7 +409,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
                 // Replace all occurrences of '${workspaceFolder}' with the workspace string
                 rosSetupScript = rosSetupScript.replace(regex, vscode.workspace.workspaceFolders[0].uri.fsPath);
             } else {
-                outputChannel.appendLine(`Multiple or no workspaces found, but the ROS setup script setting \"RDE.rosSetupScript\" is configured with '${rosSetupScript}'`);
+                outputChannel.appendLine(`Multiple or no workspaces found, but the ROS setup script setting \"ROS2.rosSetupScript\" is configured with '${rosSetupScript}'`);
             }
         }
 
@@ -450,7 +450,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
                 // dump installedDistros to outputChannel
                 outputChannel.appendLine(`Installed distros: ${installedDistros}`);
 
-                const message = "Unable to determine ROS distribution, please configure this workspace by adding \"RDE.distro\": \"<ROS Distro>\" in settings.json";
+                const message = "Unable to determine ROS distribution, please configure this workspace by adding \"ROS2.distro\": \"<ROS Distro>\" in settings.json";
                 await vscode.window.setStatusBarMessage(message, kWorkspaceConfigTimeout);
             }
         }

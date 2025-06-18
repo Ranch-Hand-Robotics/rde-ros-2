@@ -1,6 +1,6 @@
 {
     "name": "rde-ros-2",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
         "vscode": "^1.101.0"
@@ -11,7 +11,7 @@
     "displayName": "Robot Developer Extensions for ROS 2",
     "description": "Robot Developer Extensions for developing Robot Operating System (ROS) 2 with Visual Studio Code.",
     "icon": "media/icon.png",
-    "aiKey": "AIF-d9b70cd4-b9f9-4d70-929b-a071c400b217",
+    "aiKey": "",
     "categories": [
         "Debuggers",
         "Other"
@@ -35,7 +35,6 @@
     "bugs": {
         "url": "https://github.com/ranchhandrobotics/rde-ros-2/issues"
     },
-    "preview": true,
     "main": "./dist/extension",
     "activationEvents": [
         "onLanguage:cpp",
@@ -45,8 +44,9 @@
         "workspaceContains:**/package.xml",
         "onWebviewPanel:ros2Status",
         "onDebug",
-        "onDebugResolve:rde2",
-        "onDebugDynamicConfigurations:rde2"
+        "onDebugInitialConfigurations:ros2",
+        "onDebugResolve:ros2",
+        "onDebugDynamicConfigurations:ros2"
     ],
     "contributes": {
         "commands": [
@@ -114,17 +114,17 @@
 		],
         "configuration": {
             "type": "object",
-            "title": "RDE",
+            "title": "ROS2", 
             "properties": {
-                "RDE.distro": {
+                "ROS2.distro": {
                     "type": "string",
                     "description": "ROS installation distro to be sourced."
                 },
-                "RDE.rosSetupScript": {
+                "ROS2.rosSetupScript": {
                     "type": "string",
                     "description": "ROS workspace setup script. Overrides ros.distro."
                 },
-                "RDE.isolateEnvironment": {
+                "ROS2.isolateEnvironment": {
                     "type": "boolean",
                     "default": false,
                     "description": "Specify if the extension should not capture the environment VSCode is running in to pass to child processes."
@@ -133,10 +133,11 @@
         },
         "debuggers": [
             {
-                "type": "RDE",
-                "label": "RDE",
+                "type": "ros2",
+                "label": "ROS 2",
                 "program": "./out/src/debugger/main.js",
                 "runtime": "node",
+                "languages": ["cpp", "python"],
                 "configurationAttributes": {
                     "launch": {
                         "required": [
@@ -247,21 +248,21 @@
                 },
                 "configurationSnippets": [
                     {
-                        "label": "RDE: ROS 2 Launch",
+                        "label": "ROS2: ROS 2 Launch",
                         "description": "Debug ROS node(s) at launch.",
                         "body": {
-                            "name": "RDE: Launch",
-                            "type": "RDE",
+                            "name": "ROS2: Launch",
+                            "type": "ros2",
                             "request": "launch",
                             "target": "absolute path to launch file"
                         }
                     },
                     {
-                        "label": "RDE: ROS 2 Attach",
+                        "label": "ROS2: ROS 2 Attach",
                         "description": "Debug a ROS node by attaching to it.",
                         "body": {
-                            "name": "RDE: Attach",
-                            "type": "RDE",
+                            "name": "ROS2: Attach",
+                            "type": "ros2",
                             "request": "attach"
                         }
                     }
@@ -349,7 +350,7 @@
         ],
         "taskDefinitions": [
             {
-                "type": "RDE",
+                "type": "ROS2",
                 "required": [
                     "command"
                 ],

@@ -71,7 +71,7 @@ async function updateCppPropertiesInternal(): Promise<void> {
                     limitSymbolsToIncludedHeaders: false,
                 },
                 includePath: includes,
-                name: "RDE",
+                name: "ros2",
             },
         ],
         version: 4,
@@ -158,6 +158,7 @@ function getCppStandard() {
         case "humble":
         case "iron":
         case "jazzy":
+        case "kilted":
         case "rolling":
             return "c++17"
         default:

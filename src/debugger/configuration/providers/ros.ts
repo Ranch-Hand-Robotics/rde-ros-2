@@ -7,18 +7,39 @@ import { rosApi } from "../../../ros/ros";
 
 // interact with the user to create a roslaunch or rosrun configuration
 export class RosDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
+    
+    /**
+     * Provides initial debug configurations for VS Code's debug dropdown
+     * When called, triggers the interactive configuration flow
+     */
     public async provideDebugConfigurations(
         folder: vscode.WorkspaceFolder | undefined,
         token?: vscode.CancellationToken): Promise<vscode.DebugConfiguration[]> {
+        
+        if (token?.isCancellationRequested) {
+            return [];
+        }
+
+        // When VS Code asks for initial configurations (user selected "ROS 2" from dropdown),
+        // trigger the interactive flow to find actual packages and launch files
+        return this.provideDebugConfigurationsInteractive(folder, token);
+    }
+
+    /**
+     * Interactive configuration method for when user needs more detailed setup
+     */
+    public async provideDebugConfigurationsInteractive(
+        folder: vscode.WorkspaceFolder | undefined,
+        token?: vscode.CancellationToken): Promise<vscode.DebugConfiguration[]> {
         const type = await vscode.window.showQuickPick(
-            ["RDE: ROS 2 Launch", "RDE: Debug ROS 2 Launch File", "RDE: ROS 2 Attach"], { placeHolder: "Choose a request type" });
+            ["ROS2: ROS 2 Launch", "ROS2: Debug ROS 2 Launch File", "ROS2: ROS 2 Attach"], { placeHolder: "Choose a request type" });
         if (!type) {
             return [];
         }
 
         switch (type) {
-            case "RDE: Debug ROS 2 Launch File":
-            case "RDE: ROS 2 Launch": {
+            case "ROS2: Debug ROS 2 Launch File":
+            case "ROS2: ROS 2 Launch": {
                 const packageName = await vscode.window.showQuickPick(rosApi.getPackageNames(), {
                     placeHolder: "Choose a package",
                 });
@@ -34,12 +55,12 @@ export class RosDebugConfigurationProvider implements vscode.DebugConfigurationP
                     return [];
                 }
 
-                if (type === "RDE: Debug ROS 2 Launch File") {
+                if (type === "ROS2: Debug ROS 2 Launch File") {
                     return [{
                         name: type,
                         request: "debug_launch",
                         target: `${launchFilePath}`,
-                        type: "ros",
+                        type: "ros2",
                     }];
                 } else {
                     return [{
@@ -47,15 +68,15 @@ export class RosDebugConfigurationProvider implements vscode.DebugConfigurationP
                         request: "launch",
                         target: `${launchFilePath}`,
                         launch: ["rviz", "gz", "gzclient", "gzserver"],
-                        type: "ros",
+                        type: "ros2",
                     }];
                 }
             }
-            case "RDE: ROS 2 Attach": {
+            case "ROS2: ROS 2 Attach": {
                 return [{
                     name: "ROS: Attach",
                     request: "attach",
-                    type: "ros",
+                    type: "ros2",
                 }];
             }
         }

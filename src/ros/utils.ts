@@ -85,7 +85,7 @@ export function createTerminal(context: vscode.ExtensionContext): vscode.Termina
     const reporter = telemetry.getReporter();
     reporter.sendTelemetryCommand(extension.Commands.CreateTerminal);
 
-    const terminal = vscode.window.createTerminal({ name: 'RDE', env: extension.env })
+    const terminal = vscode.window.createTerminal({ name: 'ros2', env: extension.env })
     terminal.show();
 
     return terminal;
