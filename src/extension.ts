@@ -310,7 +310,7 @@ async function activateEnvironment(context: vscode.ExtensionContext) {
     }
 
     // Start the MCP server if it's not already running and configuration allows it.
-    let mcpServerProcess: child_process.ChildProcess = null;
+    let mcpServerProcess: child_process.ChildProcess | null = null;
     const startMcpServer = async () => {
         if (mcpServerProcess) {
             outputChannel.appendLine("MCP server is already running");
