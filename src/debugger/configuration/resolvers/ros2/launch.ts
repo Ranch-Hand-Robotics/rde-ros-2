@@ -14,6 +14,7 @@ import * as util from "util";
 import * as vscode from "vscode";
 
 import * as extension from "../../../../extension";
+import * as vscode_utils from "../../../../vscode-utils";
 import * as requests from "../../../requests";
 import * as utils from "../../../utils";
 import { rosApi } from "../../../../ros/ros";
@@ -90,9 +91,10 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             }
         }
         let flatten_args = args.join(' ')
-        let ros2_launch_dumper_cmdLine = (process.platform === "win32") ?
-            `python ${ros2_launch_dumper} "${config.target}" ${flatten_args}` :
-            `/usr/bin/env python3 ${ros2_launch_dumper} "${config.target}" ${flatten_args}`;
+        
+        // Use the detected Python command for better virtual environment support
+        const pythonCommands = await vscode_utils.detectPythonCommands(await extension.resolvedEnv());
+        let ros2_launch_dumper_cmdLine = `${pythonCommands.python} ${ros2_launch_dumper} "${config.target}" ${flatten_args}`;
 
         let result = await promisifiedExec(ros2_launch_dumper_cmdLine, rosExecOptions);
 

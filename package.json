@@ -138,6 +138,16 @@
                     "type": "integer",
                     "default": 3002,
                     "description": "(Preview) The port to use for the MCP Server. This is only used if enableMCPServer is true."
+                },
+                "ROS2.autoCreateVirtualEnv": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically prompt to create a virtual environment on Ubuntu 24.04+ systems with externally-managed Python."
+                },
+                "ROS2.preferSystemPackages": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Use --break-system-packages flag when installing Python packages on systems with externally-managed Python (not recommended)."
                 }
             }
         },

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import * as path from "path";
+import * as fs from "fs";
 import * as vscode from "vscode";
 import * as child_process from "child_process";
 
@@ -33,7 +34,6 @@ export let outputChannel: vscode.OutputChannel;
 let onEnvChanged = new vscode.EventEmitter<void>();
 // Use a static flag to track if packages have been installed during this extension launch
 let pythonPackagesInstalled = false;
-
 
 /**
  * Triggered when the env is soured.
@@ -72,10 +72,86 @@ export enum Commands {
  * Registers the MCP server definition provider if enabled in configuration.
  * @param context The VS Code extension context
  */
-function registerMcpServer(context: vscode.ExtensionContext): void {
+async function registerMcpServer(context: vscode.ExtensionContext): Promise<void> {
     const enableMcpServer = vscode_utils.getExtensionConfiguration().get<boolean>("enableMcpServer", false);
 
     if (enableMcpServer) {
+        // Ensure we have a proper environment for Ubuntu 24.04+
+        const canProceed = await vscode_utils.ensureVirtualEnvironmentForUbuntu2404(outputChannel);
+        if (!canProceed) {
+            outputChannel.appendLine("MCP server setup cancelled by user");
+            return;
+        }
+
+        // Only install Python packages once per extension launch
+        if (!pythonPackagesInstalled) {
+            try {
+                let requirements = path.resolve(extPath, path.join("assets", "scripts", "requirements.txt"));
+                await vscode_utils.installPythonRequirements(requirements, env, outputChannel);
+                pythonPackagesInstalled = true;
+            } catch (err) {
+                outputChannel.appendLine(`Failed to install python packages required to run the ROS MCP server: ${err.message}`);
+            }
+        }
+
+        // Start the MCP server if it's not already running and configuration allows it.
+        let mcpServerProcess: child_process.ChildProcess | null = null;
+        const startMcpServer = async () => {
+            if (mcpServerProcess) {
+                outputChannel.appendLine("MCP server is already running");
+                return;
+            }
+            
+            // Check if MCP server should be started based on settings
+            const enableMcpServer = vscode_utils.getExtensionConfiguration().get<boolean>("enableMcpServer", true);
+            if (!enableMcpServer) {
+                outputChannel.appendLine("MCP server is disabled in settings");
+                return;
+            }
+            
+            try {
+                const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+                const serverPath = path.join(extPath, "assets", "scripts", "server.py");
+                
+                if (await pfs.exists(serverPath)) {
+                    outputChannel.appendLine(`Starting MCP server from ${serverPath} on port ${mcpServerPort}`);
+                    
+                    // Use the same Python command detection for consistency
+                    const pythonCommands = await vscode_utils.detectPythonCommands(env, outputChannel);
+                    outputChannel.appendLine(`Starting MCP server with Python: ${pythonCommands.python}`);
+                    
+                    mcpServerProcess = child_process.spawn(
+                        pythonCommands.python, 
+                        [serverPath, "--port", mcpServerPort.toString()], 
+                        { env: env }
+                    );
+                    
+                    mcpServerProcess.on("close", (code) => {
+                        outputChannel.appendLine(`MCP server exited with code ${code}`);
+                        mcpServerProcess = null;
+                    });
+                    
+                    // Add to subscriptions to ensure it's terminated on environment change
+                    subscriptions.push({
+                        dispose: () => {
+                            if (mcpServerProcess) {
+                                mcpServerProcess.kill();
+                                mcpServerProcess = null;
+                            }
+                        }
+                    });
+                } else {
+                    throw new Error(`MCP server script not found at ${serverPath}`);
+                }
+            } catch (err) {
+                outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
+                vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
+            }
+        };
+
+        // Start the MCP server
+        await startMcpServer();
+        
         context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider('ROS MCP', {
             provideMcpServerDefinitions: async () => {
                 let output: vscode.McpHttpServerDefinition[] = [];
@@ -296,85 +372,6 @@ async function activateEnvironment(context: vscode.ExtensionContext) {
         ros_build_utils.createConfigFiles();
     }
 
-    // Only install Python packages once per extension launch
-    if (!pythonPackagesInstalled) {
-        outputChannel.appendLine(`Installing python packages required by the extension.`);
-        try {
-            let requirements = path.resolve(extPath, path.join("assets", "scripts", "requirements.txt"));
-            await new Promise((resolve, reject) => child_process.exec(
-                `pip install -r ${requirements}`, { env: env }, (err, out) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        outputChannel.appendLine(`Installed python packages: ${out}`);
-                        resolve(out);
-                    }
-                }
-            ));
-            outputChannel.appendLine(`Python packages installed successfully.`);
-            pythonPackagesInstalled = true;
-        } catch (err) {
-            outputChannel.appendLine(`Failed to install python packages: ${err.message}`);
-            vscode.window.showErrorMessage(`Failed to install python packages: ${err.message}`);
-        }
-    }
-
-    // Start the MCP server if it's not already running and configuration allows it.
-    let mcpServerProcess: child_process.ChildProcess | null = null;
-    const startMcpServer = async () => {
-        if (mcpServerProcess) {
-            outputChannel.appendLine("MCP server is already running");
-            return;
-        }
-        
-        // Check if MCP server should be started based on settings
-        const enableMcpServer = vscode_utils.getExtensionConfiguration().get<boolean>("enableMcpServer", true);
-        if (!enableMcpServer) {
-            outputChannel.appendLine("MCP server is disabled in settings");
-            return;
-        }
-        
-        try {
-            const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
-            const serverPath = path.join(extPath, "assets", "scripts", "server.py");
-            
-            if (await pfs.exists(serverPath)) {
-                outputChannel.appendLine(`Starting MCP server from ${serverPath} on port ${mcpServerPort}`);
-                
-                const pythonCommand = process.platform === "win32" ? "python" : "python3";
-                mcpServerProcess = child_process.spawn(
-                    pythonCommand, 
-                    [serverPath, "--port", mcpServerPort.toString()], 
-                    { env: env }
-                );
-                
-                mcpServerProcess.on("close", (code) => {
-                    outputChannel.appendLine(`MCP server exited with code ${code}`);
-                    mcpServerProcess = null;
-                });
-                
-                // Add to subscriptions to ensure it's terminated on environment change
-                subscriptions.push({
-                    dispose: () => {
-                        if (mcpServerProcess) {
-                            mcpServerProcess.kill();
-                            mcpServerProcess = null;
-                        }
-                    }
-                });
-            } else {
-                throw new Error(`MCP server script not found at ${serverPath}`);
-            }
-        } catch (err) {
-            outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
-            vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
-        }
-    };
-
-    // Start the MCP server
-    await startMcpServer();
-
-
     processingWorkspace = false;
 }
 
@@ -403,6 +400,14 @@ async function sourceRosAndWorkspace(): Promise<void> {
     if (!isolateEnvironment) {
         // Capture the host environment unless specifically isolated
         newEnv = process.env;
+        
+        // Enhance the environment with virtual environment awareness
+        newEnv = vscode_utils.enhanceEnvironmentForVirtualEnv(newEnv, outputChannel);
+    } else {
+        // Even in isolated mode, we may need to respect virtual environments
+        // Start with a minimal environment but include virtual env paths if detected
+        newEnv = vscode_utils.enhanceEnvironmentForVirtualEnv({}, outputChannel);
+        outputChannel.appendLine("Running in isolated environment mode with virtual environment detection");
     }
 
 
@@ -532,3 +537,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
     // Notify listeners the environment has changed.
     onEnvChanged.fire();
 }
+
+// ...existing code...
+
+// ...existing code...
