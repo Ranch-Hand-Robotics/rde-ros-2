@@ -68,6 +68,35 @@ export enum Commands {
     Doctor = "ROS2.doctor",
 }
 
+/**
+ * Registers the MCP server definition provider if enabled in configuration.
+ * @param context The VS Code extension context
+ */
+function registerMcpServer(context: vscode.ExtensionContext): void {
+    const enableMcpServer = vscode_utils.getExtensionConfiguration().get<boolean>("enableMcpServer", false);
+
+    if (enableMcpServer) {
+        context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider('ROS MCP', {
+            provideMcpServerDefinitions: async () => {
+                let output: vscode.McpHttpServerDefinition[] = [];
+
+                // Get the port from configuration or use default
+                const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+
+                // Use the configured port for the MCP server
+                output.push( 
+                    new vscode.McpHttpServerDefinition(
+                        "ROS MCP",
+                        vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
+                    )
+                )
+
+                return output;
+            }
+        }));    
+    }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
     const reporter = telemetry.getReporter();
     extPath = context.extensionPath;
@@ -93,6 +122,8 @@ export async function activate(context: vscode.ExtensionContext) {
         if (changed) {
             sourceRosAndWorkspace();
         }
+
+        registerMcpServer(context);
 
         config = updatedConfig;
     }));
@@ -167,30 +198,9 @@ export async function activate(context: vscode.ExtensionContext) {
         ensureErrorMessageOnException(() => {
             rosApi.doctor();
         });
-    });
-
-    const enableMcpServer = vscode_utils.getExtensionConfiguration().get<boolean>("enableMcpServer", true);
-
-    if (enableMcpServer) {
-        context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider('doctor', {
-            provideMcpServerDefinitions: async () => {
-                let output: vscode.McpHttpServerDefinition[] = [];
-
-                // Get the port from configuration or use default
-                const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
-
-                // Use the configured port for the MCP server
-                output.push( 
-                    new vscode.McpHttpServerDefinition(
-                        "ROS Doctor",
-                        vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                    )
-                )
-
-                return output;
-            }
-        }));    
-    }
+    });    
+    
+    registerMcpServer(context);
 
     reporter.sendTelemetryActivate();
 

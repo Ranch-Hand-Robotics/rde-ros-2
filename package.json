@@ -128,6 +128,16 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Specify if the extension should not capture the environment VSCode is running in to pass to child processes."
+                },
+                "ROS2.enableMCPServer": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "(Preview) Enable the MCP Server for ROS 2 Doctor and other features."
+                },
+                "ROS2.mcpServerPort": {
+                    "type": "integer",
+                    "default": 3002,
+                    "description": "(Preview) The port to use for the MCP Server. This is only used if enableMCPServer is true."
                 }
             }
         },
