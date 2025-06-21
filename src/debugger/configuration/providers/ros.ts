@@ -67,7 +67,7 @@ export class RosDebugConfigurationProvider implements vscode.DebugConfigurationP
                         name: type,
                         request: "launch",
                         target: `${launchFilePath}`,
-                        launch: ["rviz", "gz", "gzclient", "gzserver"],
+                        launch: ["rviz", "gz"],
                         type: "ros2",
                     }];
                 }

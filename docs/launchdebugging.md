@@ -36,7 +36,7 @@ If you have an existing `launch.json` file (or if there is an extension conflict
           "name": "ROS2: Launch my file",
           "request": "launch",
           "target": "<full path to your launch.py or launch file>",
-          "launch": ["rviz", "gz", "gzserver", "gzclient"],
+          "launch": ["rviz", "gz"],
           "type": "ros2"
       }
     ]

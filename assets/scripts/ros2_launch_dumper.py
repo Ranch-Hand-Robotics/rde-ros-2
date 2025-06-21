@@ -98,7 +98,21 @@ if __name__ == "__main__":
     walker.append(launch_description)
     ros_specific_arguments: Dict[str, Union[str, List[str]]] = {}
     context = LaunchContext(argv=launch_arguments)
-    context._set_asyncio_loop(asyncio.get_event_loop())
+    
+    # Handle asyncio event loop properly for newer Python versions
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop, create a new one
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # No event loop exists, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    
+    context._set_asyncio_loop(loop)
 
     try:
         # * Here we mimic the run loop inside launch_service,

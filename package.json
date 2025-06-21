@@ -108,8 +108,8 @@
         ],
 		"mcpServerDefinitionProviders": [
 			{
-				"id": "doctor",
-				"label": "ROS 2 Doctor"
+				"id": "ROS 2",
+				"label": "ROS 2"
 			}
 		],
         "configuration": {
@@ -124,11 +124,6 @@
                     "type": "string",
                     "description": "ROS workspace setup script. Overrides ros.distro."
                 },
-                "ROS2.isolateEnvironment": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Specify if the extension should not capture the environment VSCode is running in to pass to child processes."
-                },
                 "ROS2.enableMCPServer": {
                     "type": "boolean",
                     "default": false,
@@ -138,16 +133,6 @@
                     "type": "integer",
                     "default": 3002,
                     "description": "(Preview) The port to use for the MCP Server. This is only used if enableMCPServer is true."
-                },
-                "ROS2.autoCreateVirtualEnv": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Automatically prompt to create a virtual environment on Ubuntu 24.04+ systems with externally-managed Python."
-                },
-                "ROS2.preferSystemPackages": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Use --break-system-packages flag when installing Python packages on systems with externally-managed Python (not recommended)."
                 }
             }
         },
