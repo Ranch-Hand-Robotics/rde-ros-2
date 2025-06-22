@@ -104,6 +104,16 @@
                 "command": "ROS2.doctor",
                 "title": "Runs ROS 2 Doctor for diagnosing ROS 2 issues",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.startMcpServer",
+                "title": "Start MCP Server",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.stopMcpServer",
+                "title": "Stop MCP Server",
+                "category": "ROS2"
             }
         ],
 		"mcpServerDefinitionProviders": [
@@ -124,15 +134,10 @@
                     "type": "string",
                     "description": "ROS workspace setup script. Overrides ros.distro."
                 },
-                "ROS2.enableMCPServer": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "(Preview) Enable the MCP Server for ROS 2 Doctor and other features."
-                },
                 "ROS2.mcpServerPort": {
                     "type": "integer",
                     "default": 3002,
-                    "description": "(Preview) The port to use for the MCP Server. This is only used if enableMCPServer is true."
+                    "description": "(Preview) The port to use for the MCP Server."
                 }
             }
         },

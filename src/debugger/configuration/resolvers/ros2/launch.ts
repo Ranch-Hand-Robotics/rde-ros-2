@@ -93,8 +93,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         let flatten_args = args.join(' ')
         
         // Use the detected Python command for better virtual environment support
-        const pythonCommands = await vscode_utils.detectSystemPythonCommands(await extension.resolvedEnv());
-        let ros2_launch_dumper_cmdLine = `${pythonCommands.python} ${ros2_launch_dumper} "${config.target}" ${flatten_args}`;
+        let ros2_launch_dumper_cmdLine = `python3 ${ros2_launch_dumper} "${config.target}" ${flatten_args}`;
 
         let result = await promisifiedExec(ros2_launch_dumper_cmdLine, rosExecOptions);
 
