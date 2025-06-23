@@ -11,3 +11,5 @@ node_modules
 vscode.d.ts
 
 vscode-ros-dev.vsix
+
+**/.venv/**

@@ -1,2 +1,10 @@
 mcp[cli]
 rclpy
+pyyaml
+pydantic
+requests
+numpy
+jinja2
+setuptools
+typeguard
+launch-ros
