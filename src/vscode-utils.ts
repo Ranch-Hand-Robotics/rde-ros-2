@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 
 import * as pfs from "./promise-fs";
 import * as ros_utils from "./ros/utils";
+import * as extension from "./extension";
 
 export interface IPackageInfo {
     name: string;
@@ -115,9 +116,8 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
                             );
 
                             if (selection === 'Install Now') {
-                                // Install python3-venv using ROS terminal
-                                terminal = ros_utils.createTerminal(context);
-                                terminal.show();
+                                // Install python3-venv using MCP terminal
+                                terminal = extension.getMcpTerminal();
                                 terminal.sendText("sudo apt update && sudo apt install -y python3-venv");
                                 
                                 vscode.window.showInformationMessage(
@@ -144,8 +144,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                 if (!terminal) {
                     // Create a terminal if not already created
-                    terminal = ros_utils.createTerminal(context);
-                    terminal.show();
+                    terminal = extension.getMcpTerminal();
                     terminal.sendText(`source ${path.join(venvPath, 'bin', 'activate')}`);
                 }
 

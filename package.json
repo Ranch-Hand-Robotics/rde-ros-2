@@ -114,6 +114,11 @@
                 "command": "ROS2.stopMcpServer",
                 "title": "Stop MCP Server",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.showMcpTerminal",
+                "title": "Show MCP Terminal",
+                "category": "ROS2"
             }
         ],
 		"mcpServerDefinitionProviders": [
