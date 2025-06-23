@@ -35,9 +35,6 @@ export let extensionContext: vscode.ExtensionContext | null = null;
 
 let onEnvChanged = new vscode.EventEmitter<void>();
 
-// Global reference to MCP server process for proper shutdown management
-let mcpServerProcess: child_process.ChildProcess | null = null;
-
 /**
  * Triggered when the env is soured.
  */
@@ -78,10 +75,10 @@ export enum Commands {
  * Shuts down the MCP server if it's currently running.
  */
 function shutdownMcpServer(): void {
-    if (mcpServerProcess) {
+    if (mcpServerTerminal) {
         outputChannel.appendLine("Shutting down MCP server");
-        mcpServerProcess.kill();
-        mcpServerProcess = null;
+        mcpServerTerminal.dispose();
+        mcpServerTerminal = null;
     }
 }
 
@@ -91,7 +88,7 @@ function shutdownMcpServer(): void {
  */
 async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
     // MCP server is already running
-    if (mcpServerProcess) {
+    if (mcpServerTerminal && !mcpServerTerminal.exitStatus) {
         outputChannel.appendLine("MCP server is already running");
         return;
     }
@@ -539,6 +536,13 @@ function showMcpServerTerminal(): void {
 
 export function getMcpTerminal(): vscode.Terminal {
     if (mcpServerTerminal) {
+        return mcpServerTerminal;
+    }
+
+    // Check if there's already a terminal with the same name
+    const existingTerminal = vscode.window.terminals.find(terminal => terminal.name === 'ROS 2 MCP Server');
+    if (existingTerminal) {
+        mcpServerTerminal = existingTerminal;
         return mcpServerTerminal;
     }
 
