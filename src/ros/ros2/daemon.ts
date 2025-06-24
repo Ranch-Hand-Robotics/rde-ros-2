@@ -17,6 +17,7 @@ export async function startDaemon() {
     const exec = util.promisify(child_process.exec);
     extension.outputChannel.appendLine("Attempting to start daemon with " + command);
     await exec(command, { env: env });
+    extension.outputChannel.appendLine("Daemon start command completed");
 }
 
 /**
@@ -25,7 +26,9 @@ export async function startDaemon() {
 export async function stopDaemon() {
     const command: string = "ros2 daemon stop";
     const exec = util.promisify(child_process.exec);
+    extension.outputChannel.appendLine("Attempting to stop daemon with " + command);
     await exec(command, { env: env });
+    extension.outputChannel.appendLine("Daemon stop command completed");
 }
 
 /**

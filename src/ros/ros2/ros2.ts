@@ -150,11 +150,11 @@ export class ROS2 implements ros.ROSApi {
     }
 
     public async startCore() {
-        daemon.startDaemon();
+        await daemon.startDaemon();
     }
 
     public async stopCore() {
-        daemon.stopDaemon();
+        await daemon.stopDaemon();
     }
 
     public async getCoreStatus(): Promise<boolean> {
