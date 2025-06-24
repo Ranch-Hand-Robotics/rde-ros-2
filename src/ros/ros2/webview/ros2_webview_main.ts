@@ -52,9 +52,6 @@ namespace ros2monitor {
         let isDaemonRunning = false;
 
         toggleDaemonBtn.addEventListener("click", () => {
-            //toggleDaemonBtn.disabled = true;
-            
-            // Use cached vscode API
             if (isDaemonRunning) {
                 daemonStatusMessage.textContent = "Stopping daemon...";
                 vscode.postMessage({
