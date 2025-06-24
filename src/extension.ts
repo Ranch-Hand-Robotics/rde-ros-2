@@ -119,7 +119,13 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
                 ? path.join(venvPath, "Scripts", "python3.exe")
                 : path.join(venvPath, "bin", "python3");
 
-            mcpTerminal.sendText(`source ${path.join(venvPath, 'bin', 'activate')}`);
+            if (process.platform === "win32") {
+                mcpTerminal.sendText(`${path.join(venvPath, 'Scripts', 'activate.bat')}`);
+            } else {
+                const shellInfo = ros_utils.detectUserShell();
+                const activateScript = path.join(venvPath, 'bin', 'activate');
+                mcpTerminal.sendText(`${shellInfo.sourceCommand} ${activateScript}`);
+            }
             mcpTerminal.sendText(`${pythonExecutable} ${serverPath} --port ${mcpServerPort}`);
 
             // Add to subscriptions to ensure it's terminated on environment change
@@ -389,13 +395,6 @@ async function sourceRosAndWorkspace(): Promise<void> {
 
     const kWorkspaceConfigTimeout = 30000; // ms
 
-    let setupScriptExt: string;
-    if (process.platform === "win32") {
-        setupScriptExt = ".bat";
-    } else {
-        setupScriptExt = ".bash";
-    }
-
     const config = vscode_utils.getExtensionConfiguration();
 
     let rosSetupScript = config.get("rosSetupScript", "");
@@ -477,7 +476,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
                 setupScript = path.format({
                     dir: globalInstallPath,
                     name: "setup",
-                    ext: setupScriptExt,
+                    ext: ros_utils.getSetupScriptExtension(),
                 });
 
                 outputChannel.appendLine(`Sourcing ROS Distro: ${setupScript}`);
@@ -504,7 +503,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
     let wsSetupScript: string = path.format({
         dir: workspaceOverlayPath,
         name: "setup",
-        ext: setupScriptExt,
+        ext: ros_utils.getSetupScriptExtension(),
     });
 
     if (await pfs.exists(wsSetupScript)) {
