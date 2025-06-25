@@ -3,10 +3,12 @@
 
 import asyncio
 import argparse
+import json
 import os
 import sys
 import subprocess
 from io import StringIO
+from tokenize import Ignore
 from typing import cast
 from typing import Dict
 from typing import List
@@ -34,12 +36,65 @@ from launch.actions import IncludeLaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.launch_context import LaunchContext
 from launch_ros.actions import PushRosNamespace
+from launch_ros.actions import LifecycleNode
 from launch_ros.ros_adapters import get_ros_adapter
+
+
+# Protocol configuration
+USE_JSON_OUTPUT = True  # Set to True to use JSON protocol, False for legacy tab-separated protocol
+
+
+class LaunchDumperOutput:
+    """Handles different output formats for the launch dumper."""
+    
+    def __init__(self, use_json=True):
+        self.use_json = use_json
+        self.processes = []
+        self.lifecycle_nodes = []
+    
+    def add_process(self, command, node_name=None, executable=None, arguments=None):
+        """Add a process to be launched."""
+        if self.use_json:
+            self.processes.append({
+                "type": "process",
+                "command": command,
+                "node_name": node_name,
+                "executable": executable,
+                "arguments": arguments or []
+            })
+        else:
+            # Legacy format: tab-separated command
+            print(f'\t{command}')
+    
+    def add_lifecycle_node(self, node_name, node_namespace, package_name, executable, command=None, arguments=None, parameters=None):
+        """Add a lifecycle node."""
+        lifecycle_info = {
+            "type": "lifecycle_node",
+            "node_name": node_name,
+            "namespace": node_namespace,
+            "package": package_name,
+            "executable": executable,
+            "command": command,  # Full command line (like ExecuteProcess)
+            "arguments": arguments or [],  # Command-line arguments (like ExecuteProcess)  
+            "parameters": parameters or {}  # ROS parameters (specific to lifecycle nodes)
+        }
+        self.lifecycle_nodes.append(lifecycle_info)
+    
+    def finalize_output(self):
+        """Output the final results."""
+        if self.use_json:
+            output = {
+                "version": "1.0",
+                "processes": self.processes,
+                "lifecycle_nodes": self.lifecycle_nodes
+            }
+            print(json.dumps(output, indent=2))
+        # Legacy format outputs as it goes, so no finalization needed
 
 
 def parse_launch_arguments(launch_arguments: List[Text]) -> List[Tuple[Text, Text]]:
     """Parse the given launch arguments from the command line, into list of tuples for launch."""
-    parsed_launch_arguments = {}  # type: ignore; 3.7+ dict is ordered.
+    parsed_launch_arguments = {}  # type: ignore # 3.7+ dict is ordered
     for argument in launch_arguments:
         count = argument.count(':=')
         if count == 0 or argument.startswith(':=') or (count == 1 and argument.endswith(':=')):
@@ -74,17 +129,77 @@ def find_files(file_name):
     return file_name
 
 
+def resolve_executable_path(cmd, context):
+    """Resolve executable path like ExecuteProcess does."""
+    # Handle substitution objects
+    if hasattr(cmd, '__iter__') and not isinstance(cmd, str):
+        try:
+            cmd_resolved = perform_substitutions(context, normalize_to_list_of_substitutions(cmd))
+        except Exception:
+            cmd_resolved = str(cmd)
+    else:
+        cmd_resolved = str(cmd)
+    
+    # Check if executable exists in PATH
+    if os.sep not in cmd_resolved:
+        try:
+            cmd_resolved = find_files(cmd_resolved)
+        except Exception:
+            # If find_files fails, keep the original
+            pass
+    
+    return cmd_resolved
+
+
+def process_execute_process_commands(cmd_list, context):
+    """Process ExecuteProcess command list and return command string, executable, and arguments."""
+    commands = []
+    arguments = []
+    first_cmd_resolved = None
+    
+    if cmd_list:
+        # Handle the first command (executable)
+        first_cmd = cmd_list[0]
+        first_cmd_resolved = resolve_executable_path(first_cmd, context)
+        commands.append(f'"{first_cmd_resolved}"')
+        
+        # Process remaining arguments
+        for cmd in cmd_list[1:]:
+            if hasattr(cmd, '__iter__') and not isinstance(cmd, str):
+                # Handle substitution objects
+                try:
+                    cmd_resolved = perform_substitutions(context, normalize_to_list_of_substitutions(cmd))
+                except Exception:
+                    cmd_resolved = str(cmd)
+            else:
+                cmd_resolved = str(cmd)
+            
+            if cmd_resolved.strip():
+                arguments.append(cmd_resolved.strip())
+                commands.append(f'"{cmd_resolved.strip()}"')
+    
+    return ' '.join(commands), first_cmd_resolved, arguments
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    arg = parser.add_argument(
+    parser = argparse.ArgumentParser(description='Process ROS 2 launch files and extract debugging information.')
+    parser.add_argument(
         'launch_full_path',
         help='Full file path to the launch file')
-    arg = parser.add_argument(
+    parser.add_argument(
         'launch_arguments',
         nargs='*',
         help="Arguments to the launch file; '<name>:=<value>' (for duplicates, last one wins)")
+    parser.add_argument(
+        '--output-format',
+        choices=['json', 'legacy'],
+        default='json',
+        help='Output format: json for structured output, legacy for tab-separated values (default: json)')
 
     args = parser.parse_args()
+
+    # Initialize output handler
+    output_handler = LaunchDumperOutput(use_json=(args.output_format == 'json'))
 
     path = None
     launch_arguments = []
@@ -142,53 +257,84 @@ if __name__ == "__main__":
                 sys.stdout = mystring
                 continue
 
-                   
-            if is_a(entity, ExecuteProcess):
+            # Process LifecycleNode actions FIRST (before ExecuteProcess since LifecycleNode inherits from it)
+            if is_a(entity, LifecycleNode):
+                typed_action = cast(LifecycleNode, entity)
+                sys.stdout = sys.__stdout__
+                
+                try:
+                    # Extract lifecycle node information
+                    node_name = None
+                    namespace = None
+                    package_name = None
+                    executable = None
+                    command = None
+                    arguments = []
+                    parameters = {}
+                    
+                    # Get node name
+                    if hasattr(typed_action, 'node_name') and typed_action.node_name:
+                        node_name = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_name))
+                    
+                    # Get namespace
+                    if hasattr(typed_action, 'node_namespace') and typed_action.node_namespace:
+                        namespace = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_namespace))
+                    
+                    # Get package name
+                    if hasattr(typed_action, 'node_package') and typed_action.node_package:
+                        package_name = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_package))
+                    
+                    # Get executable using the same process as ExecuteProcess
+                    if hasattr(typed_action, 'process_details') and typed_action.process_details:
+                        cmd_list = typed_action.process_details['cmd']
+                        command, executable, arguments = process_execute_process_commands(cmd_list, context)
+                    elif hasattr(typed_action, 'node_executable') and typed_action.node_executable:
+                        # Fallback to node_executable if process_details not available
+                        executable = resolve_executable_path(typed_action.node_executable, context)
+                        # For consistency, generate a basic command when process_details not available
+                        if executable and node_name:
+                            command = f"{executable} --ros-args -r __node:={node_name}"
+                            arguments = ["--ros-args", "-r", f"__node:={node_name}"]
+                    
+                    # Get parameters if available
+                    if hasattr(typed_action, '_Node__parameters') and typed_action._Node__parameters:
+                        for param in typed_action._Node__parameters:
+                            if isinstance(param, dict):
+                                parameters.update(param)
+                    
+                    output_handler.add_lifecycle_node(
+                        node_name=node_name,
+                        node_namespace=namespace,
+                        package_name=package_name,
+                        executable=executable,
+                        command=command,  # Pass the resolved command
+                        arguments=arguments,  # Pass the resolved arguments
+                        parameters=parameters
+                    )
+                    
+                except Exception as e:
+                    print(f"Warning: Error processing LifecycleNode: {e}", file=sys.stderr)
+                
+                sys.stdout = mystring
+
+            # Process ExecuteProcess actions (regular ROS nodes)               
+            elif is_a(entity, ExecuteProcess):
                 typed_action = cast(ExecuteProcess, entity)
                 if typed_action.process_details is not None:
                     sys.stdout = sys.__stdout__
-                    # Prefix this with a tab character so the caller knows this is a line to be processed.
-                    commands = ['\t']
                     
-                    # Process the command properly, handling substitutions
+                    # Process the command using the extracted function
                     cmd_list = typed_action.process_details['cmd']
-                    if cmd_list:
-                        # Handle the first command (executable)
-                        first_cmd = cmd_list[0]
-                        if hasattr(first_cmd, '__iter__') and not isinstance(first_cmd, str):
-                            # Handle substitution objects
-                            try:
-                                first_cmd_resolved = perform_substitutions(context, normalize_to_list_of_substitutions(first_cmd))
-                            except Exception:
-                                first_cmd_resolved = str(first_cmd)
-                        else:
-                            first_cmd_resolved = str(first_cmd)
-                        
-                        # Check if executable exists in PATH
-                        if os.sep not in first_cmd_resolved:
-                            try:
-                                first_cmd_resolved = find_files(first_cmd_resolved)
-                            except Exception:
-                                # If find_files fails, keep the original
-                                pass
-                        
-                        commands.append('"{}"'.format(first_cmd_resolved))
-                        
-                        # Process remaining arguments
-                        for cmd in cmd_list[1:]:
-                            if hasattr(cmd, '__iter__') and not isinstance(cmd, str):
-                                # Handle substitution objects
-                                try:
-                                    cmd_resolved = perform_substitutions(context, normalize_to_list_of_substitutions(cmd))
-                                except Exception:
-                                    cmd_resolved = str(cmd)
-                            else:
-                                cmd_resolved = str(cmd)
-                            
-                            if cmd_resolved.strip():
-                                commands.append('"{}"'.format(cmd_resolved.strip()))
+                    command, executable, arguments = process_execute_process_commands(cmd_list, context)
                     
-                    print(' '.join(commands))
+                    if command:
+                        # Add to output handler
+                        output_handler.add_process(
+                            command=command,
+                            executable=executable,
+                            arguments=arguments
+                        )
+                    
                     sys.stdout = mystring
 
             # Lifecycle node support
@@ -209,6 +355,9 @@ if __name__ == "__main__":
     finally:
         # Ensure stdout is restored
         sys.stdout = sys.__stdout__
+
+    # Output final results
+    output_handler.finalize_output()
 
     # Shutdown the ROS Adapter 
     # so that long running tasks shut down correctly in the debug bootstrap scenario.

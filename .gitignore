@@ -13,3 +13,5 @@ vscode.d.ts
 vscode-ros-dev.vsix
 
 **/.venv/**
+
+**/__pycache__
