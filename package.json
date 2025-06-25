@@ -119,6 +119,26 @@
                 "command": "ROS2.showMcpTerminal",
                 "title": "Show MCP Terminal",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.listNodes",
+                "title": "List Lifecycle Nodes",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.getState",
+                "title": "Get Lifecycle Node State",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.setState",
+                "title": "Set Lifecycle Node State",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.triggerTransition",
+                "title": "Trigger Lifecycle Transition",
+                "category": "ROS2"
             }
         ],
 		"mcpServerDefinitionProviders": [

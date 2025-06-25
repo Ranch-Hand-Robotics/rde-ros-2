@@ -17,6 +17,7 @@ import * as ros_build_utils from "./ros/build-env-utils";
 import * as ros_cli from "./ros/cli";
 import * as ros_utils from "./ros/utils";
 import { rosApi, selectROSApi } from "./ros/ros";
+import * as lifecycle from "./ros/ros2/lifecycle";
 
 import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
@@ -69,6 +70,10 @@ export enum Commands {
     StartMcpServer = "ROS2.startMcpServer",
     StopMcpServer = "ROS2.stopMcpServer",
     ShowMcpTerminal = "ROS2.showMcpTerminal",
+    LifecycleListNodes = "ROS2.lifecycle.listNodes",
+    LifecycleGetState = "ROS2.lifecycle.getState",
+    LifecycleSetState = "ROS2.lifecycle.setState",
+    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
 }
 
 /**
@@ -275,6 +280,124 @@ export async function activate(context: vscode.ExtensionContext) {
         ensureErrorMessageOnException(() => {
             shutdownMcpServer();
             vscode.window.showInformationMessage("MCP server stopped");
+        });
+    });
+
+    // Register Lifecycle commands
+    vscode.commands.registerCommand(Commands.LifecycleListNodes, async () => {
+        ensureErrorMessageOnException(async () => {
+            const nodes = await lifecycle.getLifecycleNodes();
+            if (nodes.length === 0) {
+                vscode.window.showInformationMessage("No lifecycle nodes found.");
+                return;
+            }
+            
+            const nodeInfos = await Promise.all(
+                nodes.map(async (nodeName) => {
+                    const info = await lifecycle.getNodeInfo(nodeName);
+                    return info ? `${nodeName} (${info.currentState.label})` : `${nodeName} (unknown state)`;
+                })
+            );
+            
+            const selected = await vscode.window.showQuickPick(nodeInfos, {
+                placeHolder: "Select a lifecycle node to view details"
+            });
+            
+            if (selected) {
+                const nodeName = selected.split(' ')[0];
+                const info = await lifecycle.getNodeInfo(nodeName);
+                if (info) {
+                    const transitions = info.availableTransitions.map(t => t.label).join(', ');
+                    vscode.window.showInformationMessage(
+                        `Node: ${nodeName}\nState: ${info.currentState.label}\nAvailable transitions: ${transitions}`
+                    );
+                }
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.LifecycleGetState, async () => {
+        ensureErrorMessageOnException(async () => {
+            const nodes = await lifecycle.getLifecycleNodes();
+            if (nodes.length === 0) {
+                vscode.window.showInformationMessage("No lifecycle nodes found.");
+                return;
+            }
+            
+            const selected = await vscode.window.showQuickPick(nodes, {
+                placeHolder: "Select a lifecycle node to get its state"
+            });
+            
+            if (selected) {
+                const state = await lifecycle.getNodeState(selected);
+                if (state) {
+                    vscode.window.showInformationMessage(`Node ${selected} is in state: ${state.label}`);
+                } else {
+                    vscode.window.showErrorMessage(`Could not get state for node: ${selected}`);
+                }
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.LifecycleSetState, async () => {
+        ensureErrorMessageOnException(async () => {
+            const nodes = await lifecycle.getLifecycleNodes();
+            if (nodes.length === 0) {
+                vscode.window.showInformationMessage("No lifecycle nodes found.");
+                return;
+            }
+            
+            const selectedNode = await vscode.window.showQuickPick(nodes, {
+                placeHolder: "Select a lifecycle node"
+            });
+            
+            if (selectedNode) {
+                const states = Object.values(lifecycle.LIFECYCLE_STATES).map(s => s.label);
+                const selectedState = await vscode.window.showQuickPick(states, {
+                    placeHolder: "Select target state"
+                });
+                
+                if (selectedState) {
+                    const success = await lifecycle.setNodeToState(selectedNode, selectedState);
+                    if (success) {
+                        vscode.window.showInformationMessage(`Successfully set ${selectedNode} to ${selectedState} state`);
+                    }
+                }
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.LifecycleTriggerTransition, async () => {
+        ensureErrorMessageOnException(async () => {
+            const nodes = await lifecycle.getLifecycleNodes();
+            if (nodes.length === 0) {
+                vscode.window.showInformationMessage("No lifecycle nodes found.");
+                return;
+            }
+            
+            const selectedNode = await vscode.window.showQuickPick(nodes, {
+                placeHolder: "Select a lifecycle node"
+            });
+            
+            if (selectedNode) {
+                const availableTransitions = await lifecycle.getAvailableTransitions(selectedNode);
+                if (availableTransitions.length === 0) {
+                    vscode.window.showInformationMessage(`No transitions available for node ${selectedNode}`);
+                    return;
+                }
+                
+                const transitionLabels = availableTransitions.map(t => t.label);
+                const selectedTransition = await vscode.window.showQuickPick(transitionLabels, {
+                    placeHolder: "Select a transition to trigger"
+                });
+                
+                if (selectedTransition) {
+                    const success = await lifecycle.triggerTransitionByLabel(selectedNode, selectedTransition);
+                    if (success) {
+                        vscode.window.showInformationMessage(`Successfully triggered ${selectedTransition} on ${selectedNode}`);
+                    }
+                }
+            }
         });
     });
 

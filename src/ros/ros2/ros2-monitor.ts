@@ -8,6 +8,7 @@ import * as xmlrpc from "xmlrpc";
 import * as extension from "../../extension";
 import * as telemetry from "../../telemetry-helper";
 import * as rosapi from "../ros";
+import * as lifecycle from "./lifecycle";
 // Global variable to track the existing panel
 let existingPanel: vscode.WebviewPanel | undefined;
 let isDaemonRunning: boolean = false;
@@ -113,13 +114,27 @@ export function launchMonitor(context: vscode.ExtensionContext) {
 
     // Handle messages from webview
     panel.webview.onDidReceiveMessage(
-        message => {
+        async message => {
             switch (message.command) {
                 case 'startDaemon':
                     startRos2Daemon(panel);
                     break;
                 case 'stopDaemon':
                     stopRos2Daemon(panel);
+                    break;
+                case 'triggerLifecycleTransition':
+                    try {
+                        const { nodeName, transitionId } = message;
+                        const success = await lifecycle.triggerTransition(nodeName, transitionId);
+                        panel.webview.postMessage({
+                            command: 'transitionResult',
+                            nodeName: nodeName,
+                            success: success
+                        });
+                        // Note: Lifecycle nodes will be refreshed automatically by the polling cycle
+                    } catch (error) {
+                        extension.outputChannel.appendLine(`Error triggering lifecycle transition: ${error.message}`);
+                    }
                     break;
             }
         }
@@ -132,30 +147,72 @@ export function launchMonitor(context: vscode.ExtensionContext) {
                 ros2cliApi.getNodeNamesAndNamespaces(), 
                 ros2cliApi.getTopicNamesAndTypes(), 
                 ros2cliApi.getServiceNamesAndTypes()]);
-            const nodesJSON = JSON.stringify(result[0]);
-            const topicsJSON = JSON.stringify(result[1]);
-            const servicesJSON = JSON.stringify(result[2]);
+            
+            // Filter out ros2cli nodes from the regular nodes list
+            const filteredNodes = result[0].filter((nodeData: any[]) => {
+                const nodeName = nodeData[0]; // Node name is the first element
+                return !nodeName.includes("ros2cli");
+            });
+            
+            // Filter out topics and services associated with ros2cli nodes
+            const filteredTopics = result[1].filter((topicData: any[]) => {
+                const topicName = topicData[0]; // Topic name is the first element
+                return !topicName.includes("ros2cli");
+            });
+            
+            const filteredServices = result[2].filter((serviceData: any[]) => {
+                const serviceName = serviceData[0]; // Service name is the first element
+                return !serviceName.includes("ros2cli");
+            });
+            
+            const nodesJSON = JSON.stringify(filteredNodes);
+            const topicsJSON = JSON.stringify(filteredTopics);
+            const servicesJSON = JSON.stringify(filteredServices);
             
             // Update daemon state based on successful connection
             isDaemonRunning = true;
             
-            panel.webview.postMessage({
-                ready: true,
-                nodes: nodesJSON,
-                topics: topicsJSON,
-                services: servicesJSON,
-                isDaemonRunning: true
-            });
+            // Get lifecycle nodes information
+            try {
+                const lifecycleNodes = await lifecycle.getLifecycleNodes();
+                const nodeInfos = await Promise.all(
+                    lifecycleNodes.map(async (nodeName) => {
+                        const info = await lifecycle.getNodeInfo(nodeName);
+                        return info;
+                    })
+                );
+                
+                panel.webview.postMessage({
+                    ready: true,
+                    nodes: nodesJSON,
+                    topics: topicsJSON,
+                    services: servicesJSON,
+                    isDaemonRunning: true,
+                    lifecycleNodes: nodeInfos.filter(info => info !== null)
+                });
+            } catch (lifecycleError) {
+                // If lifecycle nodes fail to load, still send other data
+                extension.outputChannel.appendLine(`Warning: Could not get lifecycle nodes: ${lifecycleError.message}`);
+                panel.webview.postMessage({
+                    ready: true,
+                    nodes: nodesJSON,
+                    topics: topicsJSON,
+                    services: servicesJSON,
+                    isDaemonRunning: true,
+                    lifecycleNodes: []
+                });
+            }
         } catch (e) {
             // Update daemon state based on failed connection
             isDaemonRunning = false;
             
             panel.webview.postMessage({
                 ready: false,
-                isDaemonRunning: false
+                isDaemonRunning: false,
+                lifecycleNodes: []
             });
         }
-    }, 200);
+    }, 1000);
 
     panel.onDidDispose(() => {
         clearInterval(pollingHandle);
@@ -208,6 +265,58 @@ function getCoreStatusWebviewContent(stylesheet: vscode.Uri, script: vscode.Uri)
             font-style: italic;
             color: #cccccc;
         }
+        .section {
+            margin: 20px 0;
+        }
+        .section h3 {
+            color: #cccccc;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .lifecycle-node {
+            background-color: #2d2d30;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #444;
+        }
+        .lifecycle-node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .node-name {
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .node-state {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .state-unconfigured { background-color: #6c757d; color: white; }
+        .state-inactive { background-color: #ffc107; color: black; }
+        .state-active { background-color: #28a745; color: white; }
+        .state-finalized { background-color: #dc3545; color: white; }
+        .transitions {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .transition-btn {
+            background-color: #0e639c;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .transition-btn:hover {
+            background-color: #1177bb;
+        }
     </style>
 </head>
 
@@ -216,9 +325,20 @@ function getCoreStatusWebviewContent(stylesheet: vscode.Uri, script: vscode.Uri)
         <button id="daemon-toggle-btn" class="menu-button">Start Daemon</button>
         <span id="daemon-status-message" class="status-message"></span>
     </div>
-    <div id="parameters"></div>
-    <div id="topics"></div>
-    <div id="services"></div>
+    
+    <div class="section">
+        <h3>Lifecycle Nodes</h3>
+        <div id="lifecycle-nodes">
+            <p>Loading lifecycle nodes...</p>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>System Information</h3>
+        <div id="parameters"></div>
+        <div id="topics"></div>
+        <div id="services"></div>
+    </div>
 </body>
 
 </html>
