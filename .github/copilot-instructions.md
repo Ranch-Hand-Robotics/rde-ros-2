@@ -9,7 +9,7 @@ This project compiles typescript using `npm run build`
 * This is a Visual Studio Code extension which provides tools to help develop ROS 2 code, which includes rclpy, rclcpp, rclrust and rcldonet.
 * The extension is written in TypeScript and uses the Visual Studio Code API.
 * The extension includes python code which is called from the TypeScript code when directly interfacing with ROS 2.
-* to support modern ubuntu, the extension attempts to manage a virutal environment for python code which lives in the extension directory.
+* to support modern ubuntu, the extension attempts to manage a virtual environment for python code which lives in the extension directory.
 * The extension works with the language debuggers, by attempting to identify the language of the file being debugged and then using the appropriate debugger. Currently this is only implemented for python and C++.
 * This extension used to support ROS 1, so some ROS 1 code may be present in the extension. This code is not used by the extension, and may be removed if encoundered. Do not get confused by this code.
 * The extension is designed to be used with ROS 2, and does not support ROS 1.
