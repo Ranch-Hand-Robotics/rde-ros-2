@@ -88,7 +88,7 @@ export async function getNodeState(nodeName: string): Promise<LifecycleState | n
         // Find the state by label
         for (const state of Object.values(LIFECYCLE_STATES)) {
             // State labels have the form state [index], so just do start with match
-            if (stateLabel.startsWith(state.label.toLocaleLowerCase())) {
+            if (stateLabel.startsWith(state.label.toLowerCase())) {
                 return state;
             }
         }
