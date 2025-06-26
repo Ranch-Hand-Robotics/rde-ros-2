@@ -15,7 +15,7 @@ This project compiles typescript using `npm run build`
 * The extension is designed to be used with ROS 2, and does not support ROS 1.
 * The extension is designed to be used with the latest version of ROS 2, and does not support older versions of ROS 2.
 * The extension is designed to be used with the latest version of Visual Studio Code, and does not support older versions of Visual Studio Code.
-* The extension is designed to be used with the latest version of TypeScript, and does not support older versions of TypeScript.A
+* The extension is designed to be used with the latest version of TypeScript, and does not support older versions of TypeScript.
 * The extension is designed to be used with the latest version of Python, and does not support older versions of Python.
 * The extension is designed to be used with the latest version of C++, and does not support older versions of C++.
 * The extension is designed to be used with the latest version of Rust, and does not support older versions of Rust.
