@@ -12,6 +12,7 @@ import * as ros from "../ros";
 import * as daemon from "./daemon";
 import * as ros2_monitor from "./ros2-monitor";
 import * as ros_utils from "../utils";
+import * as lifecycle from "./lifecycle";
 
 const promisifiedExists = util.promisify(fs.exists);
 const promisifiedExec = util.promisify(child_process.exec);
@@ -199,5 +200,17 @@ export class ROS2 implements ros.ROSApi {
     public activateRostest(launchFilepath: string, argument: string): vscode.Terminal {
         console.error("ROS2 rostest equivalent not implemented yet");
         return;
+    }
+
+    public async getLifecycleNodes(): Promise<string[]> {
+        return lifecycle.getLifecycleNodes();
+    }
+
+    public async getLifecycleNodeState(nodeName: string): Promise<any> {
+        return lifecycle.getNodeState(nodeName);
+    }
+
+    public async triggerLifecycleTransition(nodeName: string, transitionId: number): Promise<boolean> {
+        return lifecycle.triggerTransition(nodeName, transitionId);
     }
 }

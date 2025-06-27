@@ -43,6 +43,77 @@ namespace ros2monitor {
         return t;
     }
 
+    function renderLifecycleNodes(nodes: any[], isDaemonRunning: boolean = true) {
+        const lifecycleContainer = document.getElementById("lifecycle-nodes");
+        const lifecycleSection = lifecycleContainer?.parentElement; // The section div
+        if (!lifecycleContainer || !lifecycleSection) return;
+        
+        removeAllChildElements(lifecycleContainer);
+        
+        // Hide the lifecycle section if daemon is not running or there are no nodes
+        if (!isDaemonRunning || nodes.length === 0) {
+            lifecycleSection.style.display = "none";
+            return;
+        }
+        
+        // Show the lifecycle section when there are nodes and daemon is running
+        lifecycleSection.style.display = "block";
+        
+        nodes.forEach(node => {
+            if (!node) return;
+            
+            const nodeDiv = document.createElement("div");
+            nodeDiv.className = "lifecycle-node";
+            
+            // Node header with name and state
+            const headerDiv = document.createElement("div");
+            headerDiv.className = "lifecycle-node-header";
+            
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "node-name";
+            nameSpan.textContent = node.namespace ? `${node.namespace}/${node.name}` : node.name;
+            
+            const stateSpan = document.createElement("span");
+            stateSpan.className = `node-state state-${node.currentState.label}`;
+            stateSpan.textContent = node.currentState.label;
+            
+            headerDiv.appendChild(nameSpan);
+            headerDiv.appendChild(stateSpan);
+            
+            // Transitions
+            const transitionsDiv = document.createElement("div");
+            transitionsDiv.className = "transitions";
+            
+            if (node.availableTransitions && node.availableTransitions.length > 0) {
+                node.availableTransitions.forEach(transition => {
+                    const transitionBtn = document.createElement("button");
+                    transitionBtn.className = "transition-btn";
+                    transitionBtn.textContent = transition.label;
+                    transitionBtn.onclick = () => triggerTransition(node.namespace ? `${node.namespace}/${node.name}` : node.name, transition.id);
+                    transitionsDiv.appendChild(transitionBtn);
+                });
+            } else {
+                const noTransitionsSpan = document.createElement("span");
+                noTransitionsSpan.textContent = "No transitions available";
+                noTransitionsSpan.style.color = "#888";
+                noTransitionsSpan.style.fontSize = "12px";
+                transitionsDiv.appendChild(noTransitionsSpan);
+            }
+            
+            nodeDiv.appendChild(headerDiv);
+            nodeDiv.appendChild(transitionsDiv);
+            lifecycleContainer.appendChild(nodeDiv);
+        });
+    }
+    
+    function triggerTransition(nodeName: string, transitionId: number) {
+        vscode.postMessage({
+            command: 'triggerLifecycleTransition',
+            nodeName: nodeName,
+            transitionId: transitionId
+        });
+    }
+
     export function initializeRos2Monitor() {
         
         // Initialize menu bar event handlers
@@ -124,6 +195,16 @@ namespace ros2monitor {
                 }
                 return;
             }
+            
+            // Handle lifecycle transition result messages
+            if (message.command === 'transitionResult') {
+                if (message.success) {
+                    console.log(`Transition successful for ${message.nodeName}`);
+                } else {
+                    console.error(`Transition failed for ${message.nodeName}`);
+                }
+                return;
+            }
 
             const topicsElement = document.getElementById("topics");
             const servicesElement = document.getElementById("services");
@@ -138,6 +219,11 @@ namespace ros2monitor {
                     const toggleBtn = document.getElementById("daemon-toggle-btn") as HTMLButtonElement;
                     toggleBtn.textContent = isDaemonRunning ? "Stop Daemon" : "Start Daemon";
                     toggleBtn.className = isDaemonRunning ? "menu-button stop" : "menu-button";
+                }
+
+                // Handle lifecycle nodes from polling data
+                if (message.lifecycleNodes) {
+                    renderLifecycleNodes(message.lifecycleNodes, isDaemonRunning);
                 }
 
                 const nodes = JSON.parse(message.nodes);
@@ -164,15 +250,15 @@ namespace ros2monitor {
                 servicesElement.appendChild(generateColumnTable(services, ["Name", "Type"], (data, i) => {
                     return data[i];
                 }));
-            }
-            else {
-                // Update daemon state based on polling result
-                if (typeof message.isDaemonRunning === 'boolean') {
-                    isDaemonRunning = message.isDaemonRunning;
-                    const toggleBtn = document.getElementById("daemon-toggle-btn") as HTMLButtonElement;
-                    toggleBtn.textContent = isDaemonRunning ? "Stop Daemon" : "Start Daemon";
-                    toggleBtn.className = isDaemonRunning ? "menu-button stop" : "menu-button";
-                }
+            } else {
+                // When daemon is not ready/running
+                isDaemonRunning = false;
+                const toggleBtn = document.getElementById("daemon-toggle-btn") as HTMLButtonElement;
+                toggleBtn.textContent = "Start Daemon";
+                toggleBtn.className = "menu-button";
+                
+                // Hide lifecycle section when daemon is not running
+                renderLifecycleNodes([], false);
             }
         });
     };

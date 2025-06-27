@@ -31,8 +31,8 @@
       "runtimeExecutable": "${execPath}",
       "args": ["--extensionDevelopmentPath=${workspaceRoot}", "--extensionTestsPath=${workspaceRoot}/out/test"],
       "sourceMaps": true,
-      "outFiles": ["${workspaceRoot}/out/test"],
-      "preLaunchTask": "npm: watch"
+      "outFiles": ["${workspaceRoot}/out/**/*.js"],
+      "preLaunchTask": "npm: test-compile"
     }
   ],
   "compounds": [

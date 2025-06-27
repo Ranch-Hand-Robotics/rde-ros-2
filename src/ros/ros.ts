@@ -100,6 +100,21 @@ export interface ROSApi {
      * Activate a terminal for rostest.
      */
     activateRostest: (launchFilepath: string, argument: string) => vscode.Terminal;
+
+    /**
+     * Get all lifecycle nodes in the system.
+     */
+    getLifecycleNodes?: () => Promise<string[]>;
+
+    /**
+     * Get the current state of a lifecycle node.
+     */
+    getLifecycleNodeState?: (nodeName: string) => Promise<any>;
+
+    /**
+     * Trigger a transition on a lifecycle node.
+     */
+    triggerLifecycleTransition?: (nodeName: string, transitionId: number) => Promise<boolean>;
 }
 
 const ros2Api: ROSApi = new ros2.ROS2();

@@ -119,17 +119,37 @@
                 "command": "ROS2.showMcpTerminal",
                 "title": "Show MCP Terminal",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.listNodes",
+                "title": "List Lifecycle Nodes",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.getState",
+                "title": "Get Lifecycle Node State",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.setState",
+                "title": "Set Lifecycle Node State",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.lifecycle.triggerTransition",
+                "title": "Trigger Lifecycle Transition",
+                "category": "ROS2"
             }
         ],
-		"mcpServerDefinitionProviders": [
-			{
-				"id": "ROS 2",
-				"label": "ROS 2"
-			}
-		],
+        "mcpServerDefinitionProviders": [
+            {
+                "id": "ROS 2",
+                "label": "ROS 2"
+            }
+        ],
         "configuration": {
             "type": "object",
-            "title": "ROS2", 
+            "title": "ROS2",
             "properties": {
                 "ROS2.distro": {
                     "type": "string",
@@ -152,7 +172,10 @@
                 "label": "ROS 2",
                 "program": "./out/src/debugger/main.js",
                 "runtime": "node",
-                "languages": ["cpp", "python"],
+                "languages": [
+                    "cpp",
+                    "python"
+                ],
                 "configurationAttributes": {
                     "launch": {
                         "required": [
@@ -395,20 +418,21 @@
         "package:dev": "vsce package -o rde-ros-2-dev.vsix",
         "build": "npm run package",
         "lint": "eslint -p ./",
-        "pretest": "npm run compile",
-        "test": "node ./out/src/test/runTest.js",
+        "pretest": "npm run test-compile",
+        "test": "node ./out/test/runTest.js",
         "vscode:prepublish": "npm run package",
         "webpack": "webpack --mode development",
         "watch": "webpack --mode development --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
-        "test-compile": "npm run webpack",
-		"download-api": "dts dev",
-		"postdownload-api": "dts main",
-		"postinstall": "npm run download-api"        
+        "test-compile": "tsc -p ./",
+        "download-api": "dts dev",
+        "postdownload-api": "dts main",
+        "postinstall": "npm run download-api"
     },
     "dependencies": {
         "@vscode/debugadapter": "^1.68.0",
         "@vscode/extension-telemetry": "^1.0.0",
+        "@vscode/vsce": "^3.5.0",
         "assert": "^2.1.0",
         "buffer": "^6.0.3",
         "console-browserify": "^1.2.0",
@@ -429,7 +453,6 @@
         "timers-browserify": "^2.0.12",
         "tmp": "^0.2.3",
         "tslib": "^2.8.1",
-        "@vscode/vsce": "^3.5.0",
         "xmlrpc": "^1.3.2"
     },
     "devDependencies": {
@@ -439,12 +462,13 @@
         "@types/node": "^24.0.3",
         "@types/shell-quote": "^1.7.5",
         "@types/tmp": "^0.2.6",
+        "@types/vscode": "^1.101.0",
         "@types/vscode-webview": "^1.57.5",
         "@types/xmlrpc": "^1.3.10",
-        "@vscode/test-electron": "^2.5.2",
         "@vscode/dts": "^0.4.1",
+        "@vscode/test-electron": "^2.5.2",
         "glob": "^11.0.3",
-        "mocha": "^11.5.0",
+        "mocha": "^11.7.1",
         "ts-loader": "^9.5.2",
         "typescript": "^5.8.3",
         "webpack": "^5.99.9",
