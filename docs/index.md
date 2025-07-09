@@ -13,6 +13,6 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Syntax highlighting for `.msg`, `.urdf` and other ROS files.
 * Automatically add the ROS C++ include and Python import paths.
 * Format C++ using the ROS `clang-format` style.
-* Debug a single ROS node (C++ or Python) by [attaching to the process][debug_support-attach].
-* Debug ROS nodes (C++ or Python) [launched from a `.launch` file][debug_support-launch].
+* Debug a single ROS node (C++ or Python) by [attaching to the process](debug-support.md#attach).
+* Debug ROS nodes (C++ or Python) [launched from a `.launch` file](debug-support.md#launch).
 * Configure Intellisense
