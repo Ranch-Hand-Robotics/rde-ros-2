@@ -16,6 +16,9 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Debug a single ROS node (C++ or Python) by [attaching to the process][debug_support-attach].
 * Debug ROS nodes (C++ or Python) [launched from a `.launch.py` file][debug_support-launch].
 * Configure Intellisense
+* Support for alternative shells (e.g. `fish`, `zsh`, etc.) for ROS 2.
+* (Preview) [Model Context Protocol (MCP) Server](docs/ModelContextProtocol.md), allowing LLMs to introspect a running ROS 2 system.
+* (Preview) Lifecycle Node Support, allowing you to manage the lifecycle of ROS 2 nodes through the Dashboard.
 
 ## Getting Started
 
