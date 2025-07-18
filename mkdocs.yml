@@ -10,6 +10,7 @@ nav:
   - Debugging:
       - debug-support.md
       - launchdebugging.md
+      - ModelContextProtocol.md
   - Troubleshooting:  troubleshooting.md
 
 theme: 
