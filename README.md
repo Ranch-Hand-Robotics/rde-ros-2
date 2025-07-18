@@ -23,12 +23,23 @@ The VS Code ROS extension will attempt to detect and automatically configure the
 
 The extension will automatically start when you open a `ROS 2` workspace.
 
+## Migrating from ms-iot/vscode-ros
+If you are migrating from the `ms-iot/vscode-ros` extension, consider the following:
+
+* Launch.json - To support splitting the ROS 1 and ROS 2 extensions, the launch task name in launch.json has been changed to `ros2`.
+
+* URDF Editor - The URDF editor has been split into a separate extension. If you were using the URDF editor, you will need to install the [Robot Developer Extension for URDF/Xacro](https://ranchhandrobotics.com/rde-urdf/).
+
+* ROS 1 - If you were using the ROS 1 extension, you will need to install the [Robot Developer Extension for ROS 1](https://ranchhandrobotics.com/rde-ros-1/).
+
+
 ## Documentation, Tutorials, Troubleshooting
 
 Please see the documentation site at [Robotics Developer Extensions for ROS 2 Documentation](https://ranchhandrobotics.github.io/rde-ros-2/)
 
 ## Support
 If you encounter any issues with this extension, the following resources are provided:
+
 ### Github Issues
 Bugs and feature requests are handled through [Github Issues in the Repository](https://github.com/Ranch-Hand-Robotics/rde-ros-2/issues). 
 If you find that you are hitting the same issue as someone else, please give a :+1: or comment on an existing issue.
@@ -37,15 +48,15 @@ Please provide as much details as possible, including an isolated reproduction o
 ### Discussions
 [Github Discussions](https://github.com/orgs/Ranch-Hand-Robotics/discussions) are provided for community driven general guidance, walkthroughs, or support.
 
-### Sponsored Support
- ![Coming Soon](https://img.shields.io/badge/Coming%20Soon-8A2BE2)
- One on one support, mentoring and consulting will be available through Github Sponsors and Patreon. 
+## Sponsor
+If you find this extension useful, please consider [sponsoring Ranch Hand Robotics](https://github.com/sponsors/Ranch-Hand-Robotics) to help support the development of this extension and other open source projects.
 
 ## Contribution
-Contributions are always welcome! Please see our [contributing guide][contributing] for more details!
+Contributions are always welcome! Please see our [contributing guide][CONTRIBUTING.md] for more details!
 
 A big ***Thank you!*** to everyone that have helped make this extension better!
 
 * Andrew Short ([@ajshort](https://github.com/ajshort)), **original author**
 * James Giller ([@JamesGiller](https://github.com/JamesGiller))
 * PickNikRobotics ([@PickNikRobotics](https://github.com/PickNikRobotics)) for code formatting
+* Microsoft ([@ms-iot](https://microsoft.com)) for curating the ms-iot extension
