@@ -1,4 +1,4 @@
-# Model Context Protocol (MCP) Server for ROS 2
+# Model Context Protocol (MCP) Server
 The Model Context Protocol (MCP) Server is a preview feature of the Robot Developer Extension for ROS 2. It allows Large Language Models (LLMs) to introspect a running ROS 2 system, providing a way to query and interact with the ROS 2 environment programmatically.
 
 Model Context Protocol (MCP) is a protocol designed by Anthropic to enable LLMs to understand and interact with complex systems. It provides a structured way for LLMs to query system state, access information about components, and perform actions based on the system's context. 
@@ -13,6 +13,8 @@ Model Context Protocol (MCP) is a protocol designed by Anthropic to enable LLMs 
 
 ## Getting Started
 To use the MCP Server for ROS 2, Start the ROS 2 MCP Server using the command palette (CTRL-SHIFT-P) and selecting `ROS2: Start MCP Server`. 
+
+The first time you run the MCP Server, the extension will create a Python virtual environment. This process may require a super user password to install the required dependencie. Please open the terminal pane and enter your password in the MCP terminal if prompted.
 
 This extension will start the server and make it available for LLMs to connect through a configurable endpoint that defaults to `http://localhost:3002/sse`.
 
@@ -134,4 +136,7 @@ The lc_talker node provides these lifecycle-specific services:
 Topics
 * Publishers: /lifecycle_chatter (std_msgs/String) - publishes messages when active
 * System Topics: /lc_talker/transition_event - publishes state transition events
+
+# Conclusion
+The included model context protocol server offers a powerful way to introspect and interact with ROS 2 systems. It allows you to query the state of nodes, topics, services, and parameters, enabling advanced use cases such as automated debugging, system monitoring, and dynamic configuration of ROS 2 nodes. We'd love to hear your feedback on this feature and any suggestions for improvements.
 
