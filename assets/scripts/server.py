@@ -1016,26 +1016,6 @@ async def set_lifecycle_transition(node_name: str, transition: str) -> Dict[str,
 # --- Utility Tools ---
 
 @mcp.tool()
-async def run_ros_command(command: List[str]) -> str:
-    """
-    Run an arbitrary ROS 2 CLI command
-    
-    Args:
-        command: List of command parts (e.g. ["topic", "list"])
-        
-    Returns:
-        Command output
-    """
-    cmd = ["ros2"] + command
-    
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        raise RuntimeError(f"Command failed: {result.stderr}")
-    
-    return result.stdout.strip()
-
-@mcp.tool()
 async def kill_process(pid: int) -> Dict[str, Any]:
     """
     Kill a ROS process
@@ -1152,61 +1132,46 @@ async def run_doctor(report: bool = False, include_warnings: bool = True) -> Dic
         "raw_output": output
     }
 
-@mcp.tool()
-async def run_doctor_hello() -> str:
-    """
-    Run ROS 2 doctor hello command to check if ROS 2 is installed correctly
-    
-    Returns:
-        Output of the hello command
-    """
-    result = subprocess.run(["ros2", "doctor", "hello"], 
-                           capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        raise RuntimeError(f"ROS 2 doctor hello failed: {result.stderr}")
-    
-    return result.stdout.strip()
+    # @mcp.tool()
+    # async def run_doctor_wtf() -> Dict[str, Any]:
+    #     """
+    #     Run ROS 2 doctor wtf command to get detailed system information
+    #     
+    #     Returns:
+    #         Detailed system information in a structured format
+    #     """
+    #     result = subprocess.run(["ros2", "doctor", "wtf"], 
+    #                            capture_output=True, text=True)
+    #     
+    #     # The wtf command might have a non-zero return code but still output useful information
+    #     output = result.stdout.strip()
+    #     
+    #     # Parse the output into sections
+    #     sections = {}
+    #     current_section = None
+    #     current_content = []
+    #     
+    #     for line in output.split('\n'):
+    #         if line.startswith('===') and line.endswith('==='):
+    #             # This is a section header
+    #             if current_section:
+    #                 sections[current_section] = '\n'.join(current_content)
+    #                 current_content = []
+    #             
+    #             current_section = line.strip('=').strip()
+    #         elif current_section:
+    #             current_content.append(line)
+    #     
+    #     # Don't forget the last section
+    #     if current_section:
+    #         sections[current_section] = '\n'.join(current_content)
+    #     
+    #     return {
+    #         "success": True,
+    #         "sections": sections,
+    #         "raw_output": output
+    #     }
 
-@mcp.tool()
-async def run_doctor_wtf() -> Dict[str, Any]:
-    """
-    Run ROS 2 doctor wtf command to get detailed system information
-    
-    Returns:
-        Detailed system information in a structured format
-    """
-    result = subprocess.run(["ros2", "doctor", "wtf"], 
-                           capture_output=True, text=True)
-    
-    # The wtf command might have a non-zero return code but still output useful information
-    output = result.stdout.strip()
-    
-    # Parse the output into sections
-    sections = {}
-    current_section = None
-    current_content = []
-    
-    for line in output.split('\n'):
-        if line.startswith('===') and line.endswith('==='):
-            # This is a section header
-            if current_section:
-                sections[current_section] = '\n'.join(current_content)
-                current_content = []
-            
-            current_section = line.strip('=').strip()
-        elif current_section:
-            current_content.append(line)
-    
-    # Don't forget the last section
-    if current_section:
-        sections[current_section] = '\n'.join(current_content)
-    
-    return {
-        "success": True,
-        "sections": sections,
-        "raw_output": output
-    }
 
 if __name__ == "__main__":
     # Set up argument parser

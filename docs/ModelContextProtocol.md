@@ -52,11 +52,8 @@ This extension will start the server and make it available for LLMs to connect t
 | `list_lifecycle_nodes` | Lifecycle Management | List nodes with lifecycle support |
 | `get_lifecycle_state` | Lifecycle Management | Get the current lifecycle state of a node |
 | `set_lifecycle_transition` | Lifecycle Management | Trigger a lifecycle state transition for a node |
-| `run_ros_command` | Utility | Run an arbitrary ROS 2 CLI command |
 | `kill_process` | Utility | Kill a ROS process by process ID |
 | `run_doctor` | Diagnostics | Run ROS 2 doctor to check system and ROS 2 setup |
-| `run_doctor_hello` | Diagnostics | Run ROS 2 doctor hello to verify ROS 2 installation |
-| `run_doctor_wtf` | Diagnostics | Run ROS 2 doctor wtf for detailed system information |
 
 ## Example Session (Graphical)
 ![MCP Session Example 1](assets/mcp-session-1.png)
