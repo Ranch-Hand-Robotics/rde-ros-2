@@ -162,7 +162,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         let args = []
         if (config.arguments) {
             for (let arg of config.arguments) {
-                args.push(`"${arg}"`);
+                args.push(`${arg}`);
             }
         }
         let flatten_args = args.join(' ')
