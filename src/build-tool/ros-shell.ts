@@ -40,6 +40,7 @@ export function registerRosShellTaskProvider(): vscode.Disposable[] {
 
 export function resolve(task: vscode.Task): vscode.Task {
     let definition = task.definition as RosTaskDefinition
+    definition.command = definition.command || definition.type;
     const resolvedTask = make(definition.command, definition);
 
     resolvedTask.isBackground = task.isBackground;
