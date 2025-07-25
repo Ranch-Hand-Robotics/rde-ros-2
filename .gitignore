@@ -7,6 +7,7 @@ node_modules
 .vscode-test
 .vscode/c_cpp_properties.json
 .vscode/settings.json
+.vscode/**.db*
 
 vscode.d.ts
 
@@ -15,3 +16,5 @@ vscode-ros-dev.vsix
 **/.venv/**
 
 **/__pycache__
+
+**/log
