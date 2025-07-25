@@ -61,7 +61,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         let args = [config.target]
         if (config.arguments) {
             for (let arg of config.arguments) {
-                args.push(`"${arg}"`);
+                args.push(arg);
             }
         }
 
