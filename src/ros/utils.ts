@@ -179,7 +179,11 @@ export function xacro(filename: string): Promise<any> {
  * Gets the names of installed distros.
  */
 export function getDistros(): Promise<string[]> {
-    return pfs.readdir("/opt/ros");
+    try {
+        return pfs.readdir("/opt/ros");
+    } catch (error) {
+        return Promise.resolve([]);
+    }
 }
 
 /**

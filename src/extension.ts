@@ -525,6 +525,11 @@ async function sourceRosAndWorkspace(): Promise<void> {
     // If the workspace setup script is not set, try to find the ROS setup script in the environment
     let attemptWorkspaceDiscovery = true;
 
+    // On Windows, ROS now uses Pixi to install; with a specific location for the setup script.
+    if (process.platform === "win32" && !rosSetupScript) {
+        rosSetupScript = path.join("C:", "pixi_ws", "ros2-windows", "local_setup.bat");
+    }
+
     if (rosSetupScript) {
         // Regular expression to match '${workspaceFolder}'
         const regex = "\$\{workspaceFolder\}";
@@ -546,7 +551,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
 
                 attemptWorkspaceDiscovery = false;
             } catch (err) {
-                vscode.window.showErrorMessage(`A ROS setup script was provided, but could not source "${rosSetupScript}". Attempting standard discovery.`);
+                await vscode.window.setStatusBarMessage(`A ROS setup script was provided, but could not source "${rosSetupScript}". Attempting standard discovery.`);
             }
         }
     }
@@ -605,7 +610,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
                 outputChannel.appendLine(`Sourcing ROS Distro: ${setupScript}`);
                 newEnv = await ros_utils.sourceSetupFile(setupScript, newEnv);
             } catch (err) {
-                vscode.window.showErrorMessage(`Could not source ROS setup script at "${setupScript}".`);
+                await vscode.window.setStatusBarMessage(`Could not source ROS setup script at "${setupScript}".`);
             }
         } else if (process.env.ROS_DISTRO) {
             newEnv = process.env;
