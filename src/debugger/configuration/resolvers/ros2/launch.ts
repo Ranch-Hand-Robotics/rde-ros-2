@@ -39,6 +39,9 @@ interface IJsonLaunchData {
     version: string;
     processes: IJsonProcess[];
     lifecycle_nodes: IJsonLifecycleNode[];
+    warnings?: string[];
+    errors?: string[];
+    info?: string[];
 }
 
 interface IJsonProcess {
@@ -402,6 +405,29 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
 
     private async processJsonLaunchData(launchData: IJsonLaunchData, config: requests.ILaunchRequest, rosExecOptions: child_process.ExecOptions): Promise<void> {
         const launchPromises: Promise<void>[] = [];
+
+        // Output info messages from the launch dumper
+        if (launchData.info && launchData.info.length > 0) {
+            extension.outputChannel.appendLine("Launch dumper info:");
+            for (const info of launchData.info) {
+                extension.outputChannel.appendLine(`  Info: ${info}`);
+            }
+        }
+
+        // Output warnings and errors from the launch dumper
+        if (launchData.warnings && launchData.warnings.length > 0) {
+            extension.outputChannel.appendLine("Launch dumper warnings:");
+            for (const warning of launchData.warnings) {
+                extension.outputChannel.appendLine(`  Warning: ${warning}`);
+            }
+        }
+
+        if (launchData.errors && launchData.errors.length > 0) {
+            extension.outputChannel.appendLine("Launch dumper errors:");
+            for (const error of launchData.errors) {
+                extension.outputChannel.appendLine(`  Error: ${error}`);
+            }
+        }
 
         // Process regular processes
         for (const process of launchData.processes) {

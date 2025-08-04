@@ -37,6 +37,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.launch_context import LaunchContext
 from launch_ros.actions import PushRosNamespace
 from launch_ros.actions import LifecycleNode
+from launch_ros.actions import Node
 from launch_ros.ros_adapters import get_ros_adapter
 
 
@@ -51,6 +52,9 @@ class LaunchDumperOutput:
         self.use_json = use_json
         self.processes = []
         self.lifecycle_nodes = []
+        self.warnings = []
+        self.errors = []
+        self.info = []
     
     def add_process(self, command, node_name=None, executable=None, arguments=None):
         """Add a process to be launched."""
@@ -80,13 +84,37 @@ class LaunchDumperOutput:
         }
         self.lifecycle_nodes.append(lifecycle_info)
     
+    def add_warning(self, message):
+        """Add a warning message."""
+        if self.use_json:
+            self.warnings.append(message)
+        else:
+            print(f"Warning: {message}", file=sys.stderr)
+    
+    def add_error(self, message):
+        """Add an error message."""
+        if self.use_json:
+            self.errors.append(message)
+        else:
+            print(f"Error: {message}", file=sys.stderr)
+    
+    def add_info(self, message):
+        """Add an info message."""
+        if self.use_json:
+            self.info.append(message)
+        else:
+            print(f"Info: {message}", file=sys.stderr)
+    
     def finalize_output(self):
         """Output the final results."""
         if self.use_json:
             output = {
                 "version": "1.0",
                 "processes": self.processes,
-                "lifecycle_nodes": self.lifecycle_nodes
+                "lifecycle_nodes": self.lifecycle_nodes,
+                "warnings": self.warnings,
+                "errors": self.errors,
+                "info": self.info
             }
             print(json.dumps(output, indent=2))
         # Legacy format outputs as it goes, so no finalization needed
@@ -201,13 +229,23 @@ if __name__ == "__main__":
     # Initialize output handler
     output_handler = LaunchDumperOutput(use_json=(args.output_format == 'json'))
 
+    # Debug: Check package discovery
+    try:
+        from ament_index_python.packages import get_packages_with_prefixes
+        packages = get_packages_with_prefixes()
+        output_handler.add_info(f"Found {len(packages)} packages in AMENT_PREFIX_PATH")
+    except Exception as e:
+        output_handler.add_error(f"Could not perform package discovery: {e}")
+
     path = None
     launch_arguments = []
 
     if os.path.exists(args.launch_full_path):
         path = args.launch_full_path
     else:
-        raise RuntimeError('No launch file supplied')
+        output_handler.add_error('No launch file supplied')
+        output_handler.finalize_output()
+        sys.exit(1)
 
     launch_arguments.extend(args.launch_arguments)
     parsed_launch_arguments = parse_launch_arguments(launch_arguments)
@@ -253,8 +291,49 @@ if __name__ == "__main__":
             except Exception as visit_ex:
                 # Log visit errors but continue processing
                 sys.stdout = sys.__stdout__
-                print(f"Warning: Error visiting entity {type(entity).__name__}: {visit_ex}", file=sys.stderr)
+                output_handler.add_error(f"Could not visit {type(entity).__name__}: {visit_ex}")
                 sys.stdout = mystring
+                
+                # For Node entities that fail to visit due to package not found,
+                # try to extract basic information directly without visiting
+                if hasattr(entity, '__class__') and 'Node' in str(entity.__class__):
+                    try:
+                        # Extract what we can directly from the Node object
+                        node_name = None
+                        namespace = None
+                        package_name = None
+                        executable = None
+                        
+                        if hasattr(entity, 'node_name') and entity.node_name:
+                            node_name = str(entity.node_name)
+                        if hasattr(entity, 'node_namespace') and entity.node_namespace:
+                            namespace = str(entity.node_namespace)
+                        if hasattr(entity, 'node_package') and entity.node_package:
+                            package_name = str(entity.node_package)
+                        if hasattr(entity, 'node_executable') and entity.node_executable:
+                            executable = str(entity.node_executable)
+                        
+                        # Build a basic ros2 run command
+                        if package_name and executable:
+                            command_parts = ["ros2", "run", package_name, executable]
+                            if node_name:
+                                command_parts.extend(["--ros-args", "-r", f"__node:={node_name}"])
+                            if namespace:
+                                command_parts.extend(["-r", f"__ns:={namespace}"])
+                            
+                            command = " ".join(f'"{part}"' for part in command_parts)
+                            
+                            output_handler.add_process(
+                                command=command,
+                                node_name=node_name,
+                                executable=executable,
+                                arguments=command_parts[1:]  # Everything after 'ros2'
+                            )
+                            
+                            output_handler.add_warning(f"Extracted node info despite problem visiting visit: {package_name}::{executable}")
+                    except Exception as extract_ex:
+                        output_handler.add_error(f"Could not extract info from failed node: {extract_ex}")
+                
                 continue
 
             # Process LifecycleNode actions FIRST (before ExecuteProcess since LifecycleNode inherits from it)
@@ -313,7 +392,75 @@ if __name__ == "__main__":
                     )
                     
                 except Exception as e:
-                    print(f"Warning: Error processing LifecycleNode: {e}", file=sys.stderr)
+                    output_handler.add_error(f"Could not process LifecycleNode: {e}")
+                
+                sys.stdout = mystring
+
+            # Process regular Node actions (before ExecuteProcess since Node may create ExecuteProcess)
+            elif is_a(entity, Node):
+                typed_action = cast(Node, entity)
+                sys.stdout = sys.__stdout__
+                
+                try:
+                    # Extract node information
+                    node_name = None
+                    namespace = None
+                    package_name = None
+                    executable = None
+                    command = None
+                    arguments = []
+                    parameters = {}
+                    
+                    # Get node name
+                    if hasattr(typed_action, 'node_name') and typed_action.node_name:
+                        node_name = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_name))
+                    
+                    # Get namespace
+                    if hasattr(typed_action, 'node_namespace') and typed_action.node_namespace:
+                        namespace = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_namespace))
+                    
+                    # Get package name
+                    if hasattr(typed_action, 'node_package') and typed_action.node_package:
+                        package_name = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_package))
+                    
+                    # Get executable
+                    if hasattr(typed_action, 'node_executable') and typed_action.node_executable:
+                        executable = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_executable))
+                    
+                    # Build command line for regular Node
+                    if executable and package_name:
+                        # For regular nodes, build a ros2 run command
+                        command_parts = ["ros2", "run", package_name, executable]
+                        arguments = ["run", package_name, executable]
+                        
+                        # Add node name if specified
+                        if node_name:
+                            command_parts.extend(["--ros-args", "-r", f"__node:={node_name}"])
+                            arguments.extend(["--ros-args", "-r", f"__node:={node_name}"])
+                        
+                        # Add namespace if specified
+                        if namespace:
+                            command_parts.extend(["-r", f"__ns:={namespace}"])
+                            arguments.extend(["-r", f"__ns:={namespace}"])
+                        
+                        command = " ".join(f'"{part}"' for part in command_parts)
+                    
+                    # Get parameters if available
+                    if hasattr(typed_action, '_Node__parameters') and typed_action._Node__parameters:
+                        for param in typed_action._Node__parameters:
+                            if isinstance(param, dict):
+                                parameters.update(param)
+                    
+                    # Add as a regular process (not lifecycle)
+                    output_handler.add_process(
+                        command=command,
+                        node_name=node_name,
+                        executable=executable,
+                        arguments=arguments
+                    )
+                    
+                except Exception as e:
+                    output_handler.add_error(f"Could not process Node: {e}")
                 
                 sys.stdout = mystring
 
@@ -351,7 +498,7 @@ if __name__ == "__main__":
         
     except Exception as ex:
         sys.stdout = sys.__stdout__
-        print(f"Error processing launch file: {ex}", file=sys.stderr)
+        output_handler.add_error(f"Could not process launch file: {ex}")
     finally:
         # Ensure stdout is restored
         sys.stdout = sys.__stdout__
