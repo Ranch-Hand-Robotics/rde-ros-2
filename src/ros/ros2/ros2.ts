@@ -65,8 +65,9 @@ export class ROS2 implements ros.ROSApi {
 
     public async getIncludeDirs(): Promise<string[]> {
         const prefixPaths: string[] = [];
-        if (this.env.AMENT_PREFIX_PATH) {
-            prefixPaths.push(...this.env.AMENT_PREFIX_PATH.split(path.delimiter));
+        const envPrefixPath = this.env.CMAKE_PREFIX_PATH;
+        if (envPrefixPath) {
+            prefixPaths.push(...envPrefixPath.split(path.delimiter));
         }
 
         const includeDirs: string[] = [];
