@@ -26,6 +26,22 @@ The VS Code ROS extension will attempt to detect and automatically configure the
 
 The extension will automatically start when you open a `ROS 2` workspace.
 
+## Building for Different Editors
+
+### Building for Visual Studio Code
+To build the extension for Visual Studio Code (default):
+```bash
+npm run build
+```
+
+### Building for Cursor
+To build the extension for Cursor (Anysphere's editor), which uses different extension dependencies:
+```bash
+npm run build:cursor
+```
+
+This will automatically modify the `extensionDependencies` in `package.json` to use `anysphere.cpptools` instead of `ms-vscode.cpptools`, build the extension, and then restore the original dependencies.
+
 ## Migrating from ms-iot/vscode-ros
 If you are migrating from the `ms-iot/vscode-ros` extension, consider the following:
 
