@@ -74,6 +74,7 @@ export enum Commands {
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
     LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    CheckCursorEnvironment = "ROS2.checkCursorEnvironment",
 }
 
 /**
@@ -147,24 +148,37 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
     }
     
-    context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider('ROS 2', {
-        provideMcpServerDefinitions: async () => {
-            let output: vscode.McpHttpServerDefinition[] = [];
+    // Check if the MCP API is available
+    if ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm) {
+        try {
+            // Use type assertion to handle the API that might not be available in all environments
+            const lm = vscode.lm as any;
+            context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
+                provideMcpServerDefinitions: async () => {
+                    let output: any[] = [];
 
-            // Get the port from configuration or use default
-            const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+                    // Get the port from configuration or use default
+                    const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
 
-            // Use the configured port for the MCP server
-            output.push( 
-                new vscode.McpHttpServerDefinition(
-                    "ROS 2",
-                    vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                )
-            )
+                    // Use the configured port for the MCP server
+                    // Note: McpHttpServerDefinition might not be available in all environments
+                    if ('McpHttpServerDefinition' in vscode) {
+                        const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
+                        output.push( 
+                            new McpHttpServerDefinition(
+                                "ROS 2",
+                                vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
+                            )
+                        );
+                    }
 
-            return output;
+                    return output;
+                }
+            }));
+        } catch (error) {
+            outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
         }
-    }));    
+    }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -173,6 +187,14 @@ export async function activate(context: vscode.ExtensionContext) {
     outputChannel = vscode_utils.createOutputChannel();
     extensionContext = context; // Store the context for later use
     context.subscriptions.push(outputChannel);
+
+    // Detect if running in Cursor
+    const isCursor = vscode_utils.isRunningInCursor();
+    if (isCursor) {
+        outputChannel.appendLine("Running in Cursor (Anysphere's editor)");
+    } else {
+        outputChannel.appendLine("Running in VS Code");
+    }
 
     // Activate components when the ROS env is changed.
     context.subscriptions.push(onDidChangeEnv(activateEnvironment.bind(null, context)));
