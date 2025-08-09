@@ -75,6 +75,7 @@ export enum Commands {
     LifecycleSetState = "ROS2.lifecycle.setState",
     LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
     CheckCursorEnvironment = "ROS2.checkCursorEnvironment",
+    ShowCursorMcpInfo = "ROS2.showCursorMcpInfo",
 }
 
 /**
@@ -116,6 +117,49 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
         const serverPath = path.join(extPath, "assets", "scripts", "server.py");
         
+        // Show MCP server information for Cursor users
+        const isCursor = vscode_utils.isRunningInCursor();
+        if (isCursor) {
+            const infoMessage = `ROS 2 MCP Server starting on port ${mcpServerPort}.\n\nTo use MCP features in Cursor, add this server to your .cursor/mcp.json:\n\nServer URL: http://localhost:${mcpServerPort}/sse`;
+            
+            vscode.window.showInformationMessage(infoMessage, "Copy URL", "Open MCP Config", "Dismiss").then(selection => {
+                if (selection === "Copy URL") {
+                    vscode.env.clipboard.writeText(`http://localhost:${mcpServerPort}/sse`);
+                    vscode.window.showInformationMessage("MCP Server URL copied to clipboard!");
+                } else if (selection === "Open MCP Config") {
+                    // Open the .cursor/mcp.json file if it exists, otherwise create it
+                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                    if (workspaceRoot) {
+                        const mcpConfigPath = path.join(workspaceRoot, '.cursor', 'mcp.json');
+                        vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
+                            vscode.window.showTextDocument(doc);
+                        }, () => {
+                            // File doesn't exist, create it with basic structure
+                            const basicConfig = {
+                                "mcpServers": {
+                                    "ros2": {
+                                        "command": "npx",
+                                        "args": ["-y", "@modelcontextprotocol/server-ros2", "stdio"],
+                                        "env": {}
+                                    }
+                                }
+                            };
+                            vscode.workspace.fs.writeFile(
+                                vscode.Uri.file(mcpConfigPath),
+                                Buffer.from(JSON.stringify(basicConfig, null, 2))
+                            ).then(() => {
+                                vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
+                                    vscode.window.showTextDocument(doc);
+                                }, () => {
+                                    // Handle any errors silently
+                                });
+                            });
+                        });
+                    }
+                }
+            });
+        }
+        
         if (await pfs.exists(serverPath)) {
             outputChannel.appendLine(`Starting MCP server from ${serverPath} on port ${mcpServerPort}`);
 
@@ -146,7 +190,11 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
     } catch (err) {
         outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
         vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
+
+        return;
     }
+
+    
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -440,6 +488,72 @@ export async function activate(context: vscode.ExtensionContext) {
             const editorName = isCursor ? "Cursor (Anysphere's editor)" : "Visual Studio Code";
             vscode.window.showInformationMessage(`Current editor: ${editorName}`);
             outputChannel.appendLine(`Environment detection: Running in ${editorName}`);
+            
+            // If running in Cursor, show MCP server information
+            if (isCursor) {
+                const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+                const mcpInfo = `MCP Server URL: http://localhost:${mcpServerPort}/sse\n\nTo add this server to Cursor's MCP handler:\n1. Create or edit .cursor/mcp.json in your workspace\n2. Add the server URL to your MCP configuration`;
+                
+                vscode.window.showInformationMessage(mcpInfo, "Copy URL", "Start MCP Server", "Dismiss").then(selection => {
+                    if (selection === "Copy URL") {
+                        vscode.env.clipboard.writeText(`http://localhost:${mcpServerPort}/sse`);
+                        vscode.window.showInformationMessage("MCP Server URL copied to clipboard!");
+                    } else if (selection === "Start MCP Server") {
+                        vscode.commands.executeCommand(Commands.StartMcpServer);
+                    }
+                });
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.ShowCursorMcpInfo, () => {
+        ensureErrorMessageOnException(() => {
+            const isCursor = vscode_utils.isRunningInCursor();
+            if (isCursor) {
+                const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+                const mcpInfo = `ROS 2 MCP Server Configuration for Cursor:\n\nServer URL: http://localhost:${mcpServerPort}/sse\n\nTo configure in Cursor:\n1. Create or edit .cursor/mcp.json in your workspace\n2. Add the server URL to your MCP configuration\n3. Start the MCP server using: ROS2: Start MCP Server`;
+                
+                vscode.window.showInformationMessage(mcpInfo, "Copy URL", "Start MCP Server", "Open Settings").then(selection => {
+                    if (selection === "Copy URL") {
+                        vscode.env.clipboard.writeText(`http://localhost:${mcpServerPort}/sse`);
+                        vscode.window.showInformationMessage("MCP Server URL copied to clipboard!");
+                    } else if (selection === "Start MCP Server") {
+                        vscode.commands.executeCommand(Commands.StartMcpServer);
+                    } else if (selection === "Open Settings") {
+                        // Open the .cursor/mcp.json file if it exists, otherwise create it
+                        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                        if (workspaceRoot) {
+                            const mcpConfigPath = path.join(workspaceRoot, '.cursor', 'mcp.json');
+                            vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
+                                vscode.window.showTextDocument(doc);
+                            }, () => {
+                                // File doesn't exist, create it with basic structure
+                                const basicConfig = {
+                                    "mcpServers": {
+                                        "ros2": {
+                                            "command": "npx",
+                                            "args": ["-y", "@modelcontextprotocol/server-ros2", "stdio"],
+                                            "env": {}
+                                        }
+                                    }
+                                };
+                                vscode.workspace.fs.writeFile(
+                                    vscode.Uri.file(mcpConfigPath),
+                                    Buffer.from(JSON.stringify(basicConfig, null, 2))
+                                ).then(() => {
+                                                                    vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
+                                    vscode.window.showTextDocument(doc);
+                                }, () => {
+                                    // Handle any errors silently
+                                });
+                                });
+                            });
+                        }
+                    }
+                });
+            } else {
+                vscode.window.showInformationMessage("This command is only available in Cursor (Anysphere's editor)");
+            }
         });
     });
 
