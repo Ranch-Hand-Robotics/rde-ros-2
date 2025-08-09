@@ -147,46 +147,22 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
         vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
     }
-    
-    // Check if the MCP API is available
-    if ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm) {
-        try {
-            // Use type assertion to handle the API that might not be available in all environments
-            const lm = vscode.lm as any;
-            context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
-                provideMcpServerDefinitions: async () => {
-                    let output: any[] = [];
-
-                    // Get the port from configuration or use default
-                    const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
-
-                    // Use the configured port for the MCP server
-                    // Note: McpHttpServerDefinition might not be available in all environments
-                    if ('McpHttpServerDefinition' in vscode) {
-                        const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
-                        output.push( 
-                            new McpHttpServerDefinition(
-                                "ROS 2",
-                                vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                            )
-                        );
-                    }
-
-                    return output;
-                }
-            }));
-        } catch (error) {
-            outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
-        }
-    }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-    const reporter = telemetry.getReporter();
-    extPath = context.extensionPath;
-    outputChannel = vscode_utils.createOutputChannel();
-    extensionContext = context; // Store the context for later use
-    context.subscriptions.push(outputChannel);
+    try {
+        const reporter = telemetry.getReporter();
+        extPath = context.extensionPath;
+        outputChannel = vscode_utils.createOutputChannel();
+        extensionContext = context; // Store the context for later use
+        context.subscriptions.push(outputChannel);
+
+        // Log extension activation
+        outputChannel.appendLine("ROS 2 Extension activating...");
+    } catch (error) {
+        console.error("Error during extension activation:", error);
+        throw error;
+    }
 
     // Detect if running in Cursor
     const isCursor = vscode_utils.isRunningInCursor();
@@ -194,6 +170,41 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine("Running in Cursor (Anysphere's editor)");
     } else {
         outputChannel.appendLine("Running in VS Code");
+    }
+
+    // Register MCP server definition provider (only in VS Code, not Cursor)
+    if (!isCursor) {
+        // Check if the MCP API is available (only in VS Code, not Cursor)
+        if ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm) {
+            try {
+                // Use type assertion to handle the API that might not be available in all environments
+                const lm = vscode.lm as any;
+                context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
+                    provideMcpServerDefinitions: async () => {
+                        let output: any[] = [];
+
+                        // Get the port from configuration or use default
+                        const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+
+                        // Use the configured port for the MCP server
+                        // Note: McpHttpServerDefinition might not be available in all environments
+                        if ('McpHttpServerDefinition' in vscode) {
+                            const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
+                            output.push( 
+                                new McpHttpServerDefinition(
+                                    "ROS 2",
+                                    vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
+                                )
+                            );
+                        }
+
+                        return output;
+                    }
+                }));
+            } catch (error) {
+                outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
+            }
+        }
     }
 
     // Activate components when the ROS env is changed.
@@ -423,8 +434,17 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
-    reporter.sendTelemetryActivate();
+    vscode.commands.registerCommand(Commands.CheckCursorEnvironment, () => {
+        ensureErrorMessageOnException(() => {
+            const isCursor = vscode_utils.isRunningInCursor();
+            const editorName = isCursor ? "Cursor (Anysphere's editor)" : "Visual Studio Code";
+            vscode.window.showInformationMessage(`Current editor: ${editorName}`);
+            outputChannel.appendLine(`Environment detection: Running in ${editorName}`);
+        });
+    });
 
+    const reporter = telemetry.getReporter();
+    reporter.sendTelemetryActivate();
 
     // Activate the workspace environment if possible.
     await activateEnvironment(context);
