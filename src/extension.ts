@@ -187,6 +187,43 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         } else {
             throw new Error(`MCP server script not found at ${serverPath}`);
         }
+
+
+        // Register MCP server definition provider (only in VS Code, not Cursor until sync'd to 1.101)
+        if (!isCursor) {
+            // Check if the MCP API is available (only in VS Code, not Cursor)
+            if ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm) {
+                try {
+                    // Use type assertion to handle the API that might not be available in all environments
+                    const lm = vscode.lm as any;
+                    context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
+                        provideMcpServerDefinitions: async () => {
+                            let output: any[] = [];
+
+                            // Get the port from configuration or use default
+                            const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+
+                            // Use the configured port for the MCP server
+                            // Note: McpHttpServerDefinition might not be available in all environments
+                            if ('McpHttpServerDefinition' in vscode) {
+                                const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
+                                output.push( 
+                                    new McpHttpServerDefinition(
+                                        "ROS 2",
+                                        vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
+                                    )
+                                );
+                            }
+
+                            return output;
+                        }
+                    }));
+                } catch (error) {
+                    outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
+                }
+            }
+        }
+
     } catch (err) {
         outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
         vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
@@ -219,41 +256,6 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine("Running in Cursor (Anysphere's editor)");
     } else {
         outputChannel.appendLine("Running in VS Code");
-    }
-
-    // Register MCP server definition provider (only in VS Code, not Cursor)
-    if (!isCursor) {
-        // Check if the MCP API is available (only in VS Code, not Cursor)
-        if ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm) {
-            try {
-                // Use type assertion to handle the API that might not be available in all environments
-                const lm = vscode.lm as any;
-                context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
-                    provideMcpServerDefinitions: async () => {
-                        let output: any[] = [];
-
-                        // Get the port from configuration or use default
-                        const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
-
-                        // Use the configured port for the MCP server
-                        // Note: McpHttpServerDefinition might not be available in all environments
-                        if ('McpHttpServerDefinition' in vscode) {
-                            const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
-                            output.push( 
-                                new McpHttpServerDefinition(
-                                    "ROS 2",
-                                    vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                                )
-                            );
-                        }
-
-                        return output;
-                    }
-                }));
-            } catch (error) {
-                outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
-            }
-        }
     }
 
     // Activate components when the ROS env is changed.

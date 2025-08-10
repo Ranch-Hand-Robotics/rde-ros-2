@@ -62,7 +62,6 @@
         "ROS_PACKAGE_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install:/opt/ros/kilted/share"
       }
     },
-    ,
     {
       "name": "Debug Launch Dumper (cpp)",
       "type": "debugpy",
@@ -87,7 +86,20 @@
         "ROS_VERSION": "2",
         "COLCON_PREFIX_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/cpp/install"
       }
-    }    
+    },
+    {
+      "name": "Debug MCP Server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceRoot}/assets/scripts/server.py",
+      "python": "${workspaceRoot}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceRoot}",
+      "env": {
+        "VIRTUAL_ENV": "${workspaceRoot}/.venv",
+        "PATH": "${workspaceRoot}/.venv/bin:${env:PATH}"
+      }
+    }
   ],
   "compounds": [
     {

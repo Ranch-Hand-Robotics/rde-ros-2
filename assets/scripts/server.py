@@ -17,9 +17,6 @@ logger = logging.getLogger(__name__)
 
 # Create an MCP server
 mcp = FastMCP(name = "ros2_mcp", 
-              version = "0.0.0", 
-              description = "ROS2 MCP Server", 
-              port=3002, 
               debug=True)
 
 rclpy.init(args=None)
