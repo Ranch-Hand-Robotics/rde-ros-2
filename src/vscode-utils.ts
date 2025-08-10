@@ -194,7 +194,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
  */
 export function isRunningInCursor(): boolean {
     // Method 1: Check for Cursor-specific environment variables
-    if (process.env.CURSOR_EXTENSION_HOST || process.env.ANYSHPERE_EXTENSION_HOST) {
+    if (process.env.CURSOR_EXTENSION_HOST || process.env.ANYSPHERE_EXTENSION_HOST) {
         return true;
     }
 
