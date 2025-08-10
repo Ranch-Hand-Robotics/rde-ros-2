@@ -36,6 +36,32 @@
             "script": "test-compile",
             "group": "build",
             "problemMatcher": "$tsc"
+        },
+        {
+            "label": "Source ROS 2 Environment",
+            "type": "shell",
+            "command": "source /opt/ros/kilted/setup.bash && echo 'ROS 2 environment sourced'",
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Turtle Square Package",
+            "type": "shell",
+            "command": "cd /home/rhr/ws/vibe && source /opt/ros/kilted/setup.bash && source install/setup.bash && echo 'Workspace sourced'",
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
         }            
 
     ]

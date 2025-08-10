@@ -33,6 +33,35 @@
       "sourceMaps": true,
       "outFiles": ["${workspaceRoot}/out/**/*.js"],
       "preLaunchTask": "npm: test-compile"
+    },
+    {
+      "name": "Debug Launch Dumper",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceRoot}/assets/scripts/ros2_launch_dumper.py",
+      "python": "/usr/bin/python3",
+      "args": [
+        "/home/rhr/ws/vibe/src/turtle_square/launch/turtle_square_demo.launch.py",
+        "cs_type:=cs625",
+        "robot_name:=debug_robot"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "/home/rhr/ws/vibe",
+      "env": {
+        "ROS_DISTRO": "kilted",
+        "AMENT_PREFIX_PATH": "/home/rhr/ws/vibe/install:/home/rhr/ws/vibe/src:/opt/ros/kilted",
+        "CMAKE_PREFIX_PATH": "/home/rhr/ws/vibe/install:/opt/ros/kilted",
+        "LD_LIBRARY_PATH": "/home/rhr/ws/vibe/install/lib:/opt/ros/kilted/lib",
+        "PATH": "/home/rhr/ws/vibe/install/bin:/opt/ros/kilted/bin:${env:PATH}",
+        "PKG_CONFIG_PATH": "/home/rhr/ws/vibe/install/lib/pkgconfig:/opt/ros/kilted/lib/pkgconfig",
+        "PYTHONPATH": "/home/rhr/ws/vibe/install/lib/python3.12/site-packages:/home/rhr/ws/vibe/src:/opt/ros/kilted/lib/python3.12/site-packages:/usr/lib/python3/dist-packages:${env:PYTHONPATH}",
+        "ROS_PYTHON_VERSION": "3",
+        "ROS_VERSION": "2",
+        "COLCON_PREFIX_PATH": "/home/rhr/ws/vibe/install",
+        "ROS_PACKAGE_PATH": "/home/rhr/ws/vibe/src:/opt/ros/kilted/share"
+      },
+      "preLaunchTask": "Build Turtle Square Package"
     }
   ],
   "compounds": [
