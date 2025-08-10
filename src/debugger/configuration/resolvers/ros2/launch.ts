@@ -22,6 +22,8 @@ import * as lifecycle from "../../../../ros/ros2/lifecycle";
 
 const promisifiedExec = util.promisify(child_process.exec);
 
+
+
 interface ILaunchRequest {
     nodeName: string;
     executable: string;
@@ -204,6 +206,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         if (result.stderr) {
             // Having stderr output is not nessesarily a problem, but it is useful for debugging
             extension.outputChannel.appendLine(`ROS2 launch processor produced stderr output:\r\n ${result.stderr}`);
+            // Show output channel when there's stderr output
+            vscode_utils.showOutputPanel(extension.outputChannel);
         }        
 
         if (result.stdout.length == 0) {
@@ -215,8 +219,10 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             const launchData = JSON.parse(result.stdout);
             await this.processJsonLaunchData(launchData, config, rosExecOptions);
         } catch (jsonError) {
-            extension.outputChannel.appendLine(`JSON parsing failed, falling back to legacy format: ${jsonError.message}`);
-            await this.processLegacyLaunchData(result.stdout, config, rosExecOptions);
+            extension.outputChannel.appendLine(`JSON parsing failed: ${jsonError.message}`);
+            extension.outputChannel.appendLine(result.stdout);
+            // Show output channel when JSON parsing fails
+            vscode_utils.showOutputPanel(extension.outputChannel);
         }
 
         // @todo: error handling for Promise.all
@@ -467,6 +473,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             for (const error of launchData.errors) {
                 extension.outputChannel.appendLine(`  Error: ${error}`);
             }
+            // Show output channel when there are errors
+            vscode_utils.showOutputPanel(extension.outputChannel);
         }
 
         // Process regular processes
@@ -552,6 +560,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             }
             
             extension.outputChannel.appendLine("Warning: Could not detect ROS setup on Windows, assuming environment is already configured");
+            // Show output channel when there's a ROS setup warning
+            vscode_utils.showOutputPanel(extension.outputChannel);
             return '';
         } else {
             // Linux/Unix: Use bash setup scripts

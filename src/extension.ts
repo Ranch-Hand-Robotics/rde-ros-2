@@ -75,7 +75,7 @@ export enum Commands {
     LifecycleSetState = "ROS2.lifecycle.setState",
     LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
     CheckCursorEnvironment = "ROS2.checkCursorEnvironment",
-    ShowCursorMcpInfo = "ROS2.showCursorMcpInfo",
+    ShowCursorMcpInfo = "ROS2.showCursorMcpInfo"
 }
 
 /**
@@ -117,11 +117,11 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
         const serverPath = path.join(extPath, "assets", "scripts", "server.py");
         
-        // Show MCP server information for Cursor users
+                // Show MCP server information for Cursor users
         const isCursor = vscode_utils.isRunningInCursor();
         if (isCursor) {
             const infoMessage = `ROS 2 MCP Server starting on port ${mcpServerPort}.\n\nTo use MCP features in Cursor, add this server to your .cursor/mcp.json:\n\nServer URL: http://localhost:${mcpServerPort}/sse`;
-            
+
             vscode.window.showInformationMessage(infoMessage, "Copy URL", "Open MCP Config", "Dismiss").then(selection => {
                 if (selection === "Copy URL") {
                     vscode.env.clipboard.writeText(`http://localhost:${mcpServerPort}/sse`);
@@ -207,6 +207,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // Log extension activation
         outputChannel.appendLine("ROS 2 Extension activating...");
+        
     } catch (error) {
         console.error("Error during extension activation:", error);
         throw error;

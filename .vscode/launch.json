@@ -35,34 +35,59 @@
       "preLaunchTask": "npm: test-compile"
     },
     {
-      "name": "Debug Launch Dumper",
+      "name": "Debug Launch Dumper (python)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceRoot}/assets/scripts/ros2_launch_dumper.py",
       "python": "/usr/bin/python3",
       "args": [
-        "/home/rhr/ws/vibe/src/turtle_square/launch/turtle_square_demo.launch.py",
+        "/home/polyhobbyist/ws/rde-ros-2/samples/py/install/rde_py/share/rde_py/launch/rde_publisher.launch.py",
         "cs_type:=cs625",
         "robot_name:=debug_robot"
       ],
       "console": "integratedTerminal",
       "justMyCode": false,
-      "cwd": "/home/rhr/ws/vibe",
+      "cwd": "/home/polyhobbyist/ws/rde-ros-2/samples/py",
       "env": {
         "ROS_DISTRO": "kilted",
-        "AMENT_PREFIX_PATH": "/home/rhr/ws/vibe/install:/home/rhr/ws/vibe/src:/opt/ros/kilted",
-        "CMAKE_PREFIX_PATH": "/home/rhr/ws/vibe/install:/opt/ros/kilted",
-        "LD_LIBRARY_PATH": "/home/rhr/ws/vibe/install/lib:/opt/ros/kilted/lib",
-        "PATH": "/home/rhr/ws/vibe/install/bin:/opt/ros/kilted/bin:${env:PATH}",
-        "PKG_CONFIG_PATH": "/home/rhr/ws/vibe/install/lib/pkgconfig:/opt/ros/kilted/lib/pkgconfig",
-        "PYTHONPATH": "/home/rhr/ws/vibe/install/lib/python3.12/site-packages:/home/rhr/ws/vibe/src:/opt/ros/kilted/lib/python3.12/site-packages:/usr/lib/python3/dist-packages:${env:PYTHONPATH}",
+        "AMENT_PREFIX_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install/rde_py:/home/polyhobbyist/ws/rde-ros-2/samples/py/src:/opt/ros/kilted",
+        "CMAKE_PREFIX_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install:/opt/ros/kilted",
+        "LD_LIBRARY_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install/lib:/opt/ros/kilted/lib",
+        "PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install/rde_py/install/rde_py/bin:/opt/ros/kilted/bin:${env:PATH}",
+        "PKG_CONFIG_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install/lib/pkgconfig:/opt/ros/kilted/lib/pkgconfig",
+        "PYTHONPATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install/lib/python3.12/site-packages:/home/polyhobbyist/ws/rde-ros-2/samples/py/build/rde_py:/opt/ros/kilted/lib/python3.12/site-packages:/usr/lib/python3/dist-packages:${env:PYTHONPATH}",
         "ROS_PYTHON_VERSION": "3",
         "ROS_VERSION": "2",
-        "COLCON_PREFIX_PATH": "/home/rhr/ws/vibe/install",
-        "ROS_PACKAGE_PATH": "/home/rhr/ws/vibe/src:/opt/ros/kilted/share"
-      },
-      "preLaunchTask": "Build Turtle Square Package"
-    }
+        "COLCON_PREFIX_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install",
+        "ROS_PACKAGE_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/py/install:/opt/ros/kilted/share"
+      }
+    },
+    ,
+    {
+      "name": "Debug Launch Dumper (cpp)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceRoot}/assets/scripts/ros2_launch_dumper.py",
+      "python": "/usr/bin/python3",
+      "args": [
+        "/home/polyhobbyist/ws/rde-ros-2/samples/cpp/install/rde_cpp/share/rde_cpp/launch/rde_publisher.launch.py",
+        "cs_type:=cs625",
+        "robot_name:=debug_robot"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "/home/polyhobbyist/ws/rde-ros-2/samples/cpp",
+      "env": {
+        "ROS_DISTRO": "kilted",
+        "AMENT_PREFIX_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/cpp/install/rde_cpp:/opt/ros/kilted",
+        "CMAKE_PREFIX_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/cpp/install/rde_cpp:/opt/ros/kilted",
+        "LD_LIBRARY_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/cpp/install/lib:/opt/ros/kilted/lib",
+        "PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/cpp/install:/opt/ros/kilted/bin:${env:PATH}",
+        "ROS_PYTHON_VERSION": "3",
+        "ROS_VERSION": "2",
+        "COLCON_PREFIX_PATH": "/home/polyhobbyist/ws/rde-ros-2/samples/cpp/install"
+      }
+    }    
   ],
   "compounds": [
     {

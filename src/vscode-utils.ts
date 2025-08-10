@@ -39,6 +39,16 @@ export function createOutputChannel(): vscode.OutputChannel {
 }
 
 /**
+ * Shows the output panel if autoShowOutputChannel is enabled (default: true).
+ * @param outputChannel The output channel to show
+ */
+export function showOutputPanel(outputChannel: vscode.OutputChannel): void {
+    if (getExtensionConfiguration().get<boolean>("autoShowOutputChannel", true)) {
+        outputChannel.show();
+    }
+}
+
+/**
  * Checks if the Python environment is externally managed (PEP 668).
  * This is common in Ubuntu 24.04+ and other modern Linux distributions.
  */
@@ -208,20 +218,8 @@ export function isRunningInCursor(): boolean {
     }
 
     // Method 3: Check for Cursor-specific extension dependencies
-    // This is a heuristic based on the build process we saw in the codebase
-    try {
-        const packageJson = require('../../package.json');
-        if (packageJson.extensionDependencies) {
-            const hasAnysphereDeps = packageJson.extensionDependencies.some((dep: string) => 
-                dep.startsWith('anysphere.')
-            );
-            if (hasAnysphereDeps) {
-                return true;
-            }
-        }
-    } catch (error) {
-        // Ignore errors in package.json reading
-    }
+    // This method was removed due to webpack bundling issues with require('../../package.json')
+    // The other detection methods should be sufficient for most cases
 
     // Method 4: Check for Cursor-specific workspace settings or configurations
     const workspaceConfig = vscode.workspace.getConfiguration();

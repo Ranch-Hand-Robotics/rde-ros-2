@@ -26,6 +26,15 @@ The VS Code ROS extension will attempt to detect and automatically configure the
 
 The extension will automatically start when you open a `ROS 2` workspace.
 
+## Configuration
+
+The extension provides several configuration options that can be set in VS Code settings:
+
+### `ROS2.mcpServerPort`
+- **Type**: `integer`
+- **Default**: `3002`
+- **Description**: (Preview) The port to use for the MCP Server.
+
 ## Building for Different Editors
 
 ### Building for Visual Studio Code
