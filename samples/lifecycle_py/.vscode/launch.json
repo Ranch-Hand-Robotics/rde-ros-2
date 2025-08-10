@@ -1,0 +1,19 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "ROS2: ROS 2 Launch",
+            "request": "launch",
+            "target": "/home/polyhobbyist/ws/rde-ros-2/samples/lifecycle_py/install/rde_lifecycle_py/share/rde_lifecycle_py/launch/rde_lifecycle_py.launch.py",
+            "launch": [
+                "rviz",
+                "gz"
+            ],
+            "type": "ros2"
+        }
+    ]
+}

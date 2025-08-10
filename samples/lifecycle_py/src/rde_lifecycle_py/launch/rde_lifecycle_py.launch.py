@@ -9,14 +9,14 @@ def generate_launch_description():
     # Declare launch arguments
     node_name_arg = DeclareLaunchArgument(
         'node_name',
-        default_value='rde_lifecycle_cpp',
+        default_value='rde_lifecycle_py',
         description='Name of the lifecycle node'
     )
 
     # Create the lifecycle node
     lifecycle_node = LifecycleNode(
-        package='rde_lifecycle_cpp',
-        executable='rde_lifecycle_cpp',
+        package='rde_lifecycle_py',
+        executable='rde_lifecycle_py',
         name=LaunchConfiguration('node_name'),
         namespace='',
         output='screen',
