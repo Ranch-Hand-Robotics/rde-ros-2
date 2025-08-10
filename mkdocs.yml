@@ -7,6 +7,7 @@ nav:
       - usage.md
       - tutorials.md
       - configuration.md
+      - openvsx.md
   - Debugging:
       - debug-support.md
       - launchdebugging.md

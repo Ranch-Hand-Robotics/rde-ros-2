@@ -139,16 +139,6 @@
                 "command": "ROS2.lifecycle.triggerTransition",
                 "title": "Trigger Lifecycle Transition",
                 "category": "ROS2"
-            },
-            {
-                "command": "ROS2.checkCursorEnvironment",
-                "title": "Check Cursor Environment",
-                "category": "ROS2"
-            },
-            {
-                "command": "ROS2.showCursorMcpInfo",
-                "title": "Show Cursor MCP Info",
-                "category": "ROS2"
             }
         ],
         "mcpServerDefinitionProviders": [
@@ -177,7 +167,7 @@
                 "ROS2.autoShowOutputChannel": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Automatically show the ROS 2 output channel when there are warnings, errors, or important messages."
+                    "description": "Automatically show the ROS 2 output channel when there are warnings or errors."
                 }
             }
         },

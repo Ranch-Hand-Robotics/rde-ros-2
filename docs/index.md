@@ -1,7 +1,7 @@
 # Robotics Development Extensions for ROS 2
 This is a Visual Studio Code Extension that  provides debugging support for [Robot Operating System 2 (ROS 2)](http://ros.org) development ROS 2 on Windows, Linux and MacOS. The Robot Operating System is a trademark of Open Robotics.
 
-> NOTE: This extension is rebranded and re-released by Ranch Hand Robotics, owned by the maintainer of the [ms-iot VSCode ROS Extension](https://github.com/ms-iot/vscode-ros) with permission from Microsoft. The source extension was split into 3 parts - [ROS 1](https://ranchhandrobotics.com/rde-ros-1/), [ROS 2](https://ranchhandrobotics.com/rde-ros-2/) and a [URDF editor](https://ranchhandrobotics.com/rde-urdf/).
+![Robotics Development Extensions Hero](./assets/hero.png)
 
 ## Features
 
@@ -16,3 +16,29 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Debug a single ROS node (C++ or Python) by [attaching to the process](debug-support.md#attach).
 * Debug ROS nodes (C++ or Python) [launched from a `.launch` file](debug-support.md#launch).
 * Configure Intellisense
+* Available for Microsoft Visual Studio Code and Anysphere's Cursor.
+
+## Other Offerings
+
+### URDF / Xacro Editing
+
+Ranch Hand Robotics offers a [URDF and Xacro editor](https://ranchhandrobotics.com/rde-urdf/), which pairs well with this extension
+
+### Robot Developer Extensions for ROS 1
+For those working with ROS 1, the [Robot Developer Extensions for ROS 1](https://ranchhandrobotics.com/rde-ros-1/) are available to support you
+
+### Discussions
+[Github Discussions](https://github.com/orgs/Ranch-Hand-Robotics/discussions) are provided for community driven general guidance, walkthroughs, or support.
+
+## Sponsor
+If you find this extension useful, please consider [sponsoring Ranch Hand Robotics](https://github.com/sponsors/Ranch-Hand-Robotics) to help support the development of this extension and other open source projects.
+
+
+## Acknowledgements
+This extension is rebranded and re-released by Ranch Hand Robotics, founded by the maintainer of the [ms-iot VSCode ROS Extension](https://github.com/ms-iot/vscode-ros) with permission from Microsoft. 
+
+* Andrew Short ([@ajshort](https://github.com/ajshort)), **original author**
+* James Giller ([@JamesGiller](https://github.com/JamesGiller))
+* PickNikRobotics ([@PickNikRobotics](https://github.com/PickNikRobotics)) for code formatting
+* Microsoft ([@ms-iot](https://microsoft.com)) for curating the ms-iot extension
+* and the many contributors and users over the years. 
