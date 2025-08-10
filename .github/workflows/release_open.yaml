@@ -26,6 +26,9 @@ jobs:
       - name: Install OpenVSX
         run: npm install ovsx -g
         
+      - name: Build Prepare the extension for Cursor
+        run: npm run build:cursor
+
       - name: Build Extension
         run: npm run build
       
