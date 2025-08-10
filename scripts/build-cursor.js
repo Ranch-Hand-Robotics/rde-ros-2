@@ -38,6 +38,19 @@ function modifyForCursor(packageJson) {
             return dep;
         });
     }
+    
+    // Update VS Code engine version from ^1.101.0 to ^1.99.0
+    if (packageJson.engines && packageJson.engines.vscode) {
+        packageJson.engines.vscode = packageJson.engines.vscode.replace('^1.101.0', '^1.99.0');
+        console.log('Updated VS Code engine version to ^1.99.0');
+    }
+    
+    // Update @types/vscode version from ^1.101.0 to ^1.99.0
+    if (packageJson.devDependencies && packageJson.devDependencies['@types/vscode']) {
+        packageJson.devDependencies['@types/vscode'] = packageJson.devDependencies['@types/vscode'].replace('^1.101.0', '^1.99.0');
+        console.log('Updated @types/vscode version to ^1.99.0');
+    }
+    
     return packageJson;
 }
 
