@@ -1,12 +1,12 @@
 # Debug ROS Nodes
 
-One of the key goals of `vscode-ros` is to provide a streamlined debugging experience for ROS nodes.
+One of the key goals of this extension is to provide a streamlined debugging experience for ROS nodes.
 To achieve this, this extension aims to help developers utilize the debugging capabilities provided by Visual Studio Code.
 This document covers instructions of how to use such functionalities.
 
 ## Attach
 
-`vscode-ros` enables a bootstrapped debugging experience for debugging a ROS (Python or C++) node by attaching to the process.
+This extension enables a bootstrapped debugging experience for debugging a ROS (Python or C++) node by attaching to the process.
 
 To get started, create a `ros`-type debug configuration with an `attach` request: (use <kbd>Ctrl</kbd>-<kbd>Space</kbd> to bring up the autocomplete dropdown)
 
@@ -22,7 +22,7 @@ To get started, create a `ros`-type debug configuration with an `attach` request
 
 ## Launch
 
-`vscode-ros` enables a streamlined debugging experience for debugging a ROS (Python or C++) node in a ROS launch file similar to a native debug flow.
+This extension enables a streamlined debugging experience for debugging a ROS (Python or C++) node in a ROS launch file similar to a native debug flow.
 
 To get started, create a `ros`-type debug configuration with a `launch` request:
 
@@ -35,7 +35,7 @@ To get started, create a `ros`-type debug configuration with a `launch` request:
 
 ## Note
 
-1. Debugging functionality provided by `vscode-ros` has dependencies on VS Code’s [C++][ms-vscode.cpptools] and [Python][ms-python.python] extensions, and those have dependencies on the version of VS Code. To ensure everything works as expected, please make sure to have everything up-to-date.
+1. Debugging functionality provided by this extension has dependencies on VS Code’s [C++][ms-vscode.cpptools] and [Python][ms-python.python] extensions, and those have dependencies on the version of VS Code. To ensure everything works as expected, please make sure to have everything up-to-date.
 2. To debug a C++ executable, please make sure the binary is [built with debug symbols][ros_answers_debug_symbol] (e.g. `-DCMAKE_BUILD_TYPE=RelWithDebInfo`, read more about [CMAKE_BUILD_TYPE here][stackoverflow-cmake_build_type]).
 3. To use VS Code's C++ extension with MSVC on Windows, please make sure the VS Code instance is launched from a Visual Studio command prompt.
 

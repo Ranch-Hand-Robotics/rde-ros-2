@@ -1,4 +1,4 @@
-# Robotics Development Extensions for ROS 2 within Visual Studio Code
+# Robotics Development Extensions for ROS 2
 This is a Visual Studio Code Extension that  provides debugging support for [Robot Operating System 2 (ROS 2)](http://ros.org) development ROS 2 on Windows, Linux and MacOS. The Robot Operating System is a trademark of Open Robotics.
 
 > NOTE: This extension is rebranded and re-released by Ranch Hand Robotics, a company owned by the maintainer of the [ms-iot VSCode ROS Extension](https://github.com/ms-iot/vscode-ros) with permission from Microsoft. The source extension was split into 3 parts - [ROS 1](https://ranchhandrobotics.github.io/rde-ros-1/), [ROS 2](https://ranchhandrobotics.github.io/rde-ros-2/) and a [URDF editor](https://ranchhandrobotics.github.io/rde-urdf/).
@@ -13,12 +13,13 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Syntax highlighting for `.msg`, `.urdf` and other ROS files.
 * Automatically add the ROS C++ include and Python import paths.
 * Format C++ using the ROS `clang-format` style.
-* Debug a single ROS node (C++ or Python) by [attaching to the process][debug_support-attach].
-* Debug ROS nodes (C++ or Python) [launched from a `.launch.py` file][debug_support-launch].
+* Debug a single ROS node (C++ or Python) by [attaching to the process](https://ranchhandrobotics.com/rde-ros-2/debug-support.html#attach).
+* Debug ROS nodes (C++ or Python) [launched from a `.launch.py` file](https://ranchhandrobotics.com/rde-ros-2/debug-support.html#launch).
 * Configure Intellisense
 * Support for alternative shells (e.g. `fish`, `zsh`, etc.) for ROS 2.
-* (Preview) [Model Context Protocol (MCP) Server](docs/ModelContextProtocol.md), allowing LLMs to introspect a running ROS 2 system.
+* (Preview) [Model Context Protocol (MCP) Server](https://ranchhandrobotics.com/rde-ros-2/ModelContextProtocol.html), allowing LLMs to introspect a running ROS 2 system.
 * (Preview) Lifecycle Node Support, allowing you to manage the lifecycle of ROS 2 nodes through the Dashboard.
+* Support for Visual Studio Code and Cursor
 
 ## Getting Started
 
