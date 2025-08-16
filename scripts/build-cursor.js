@@ -79,7 +79,7 @@ function main() {
         buildExtension();
         
         // Restore original package.json
-        restorePackageJson();
+        //restorePackageJson();
         
         console.log('Cursor build process completed successfully!');
         
