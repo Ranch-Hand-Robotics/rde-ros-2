@@ -39,7 +39,7 @@ If you are migrating from the `ms-iot/vscode-ros` extension, consider the follow
 
 ## Documentation, Tutorials, Troubleshooting
 
-Please see the documentation site at [Robotics Developer Extensions for ROS 2 Documentation](https://ranchhandrobotics.github.io/rde-ros-2/)
+Please see the documentation site at [Robotics Developer Extensions for ROS 2 Documentation](https://ranchhandrobotics.com/rde-ros-2/)
 
 ## Support
 If you encounter any issues with this extension, the following resources are provided:
