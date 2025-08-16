@@ -15,6 +15,8 @@ import * as picker_items_provider_factory from "../../process-picker/process-ite
 import * as requests from "../../requests";
 import * as utils from "../../utils";
 
+import * as vscode_utils from "../../../vscode-utils";
+
 const promisifiedExec = util.promisify(child_process.exec);
 const promisifiedSudoExec = util.promisify(
     (command: any, options: any, cb: any) =>
@@ -53,9 +55,18 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
             return;
         }
 
-        let debugConfig: ICppvsdbgAttachConfiguration | ICppdbgAttachConfiguration | IPythonAttachConfiguration;
+        let debugConfig: ICppvsdbgAttachConfiguration | ICppdbgAttachConfiguration | IPythonAttachConfiguration | any;
         if (config.runtime === "C++") {
-            if (os.platform() === "win32") {
+            const isCursor = vscode_utils.isRunningInCursor();
+            if (isCursor) {
+                const lldbAttachConfig: any = {
+                    name: `C++: ${config.processId}`,
+                    type: "lldb",
+                    request: "attach",
+                    processId: config.processId,
+                };
+                debugConfig = lldbAttachConfig;
+            } else if (os.platform() === "win32") {
                 const cppvsdbgAttachConfig: ICppvsdbgAttachConfiguration = {
                     name: `C++: ${config.processId}`,
                     type: "cppvsdbg",

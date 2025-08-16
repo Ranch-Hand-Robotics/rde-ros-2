@@ -233,7 +233,6 @@ if __name__ == "__main__":
     try:
         from ament_index_python.packages import get_packages_with_prefixes
         packages = get_packages_with_prefixes()
-        output_handler.add_info(f"Found {len(packages)} packages in AMENT_PREFIX_PATH")
     except Exception as e:
         output_handler.add_error(f"Could not perform package discovery: {e}")
 
@@ -279,8 +278,8 @@ if __name__ == "__main__":
         #   but without actually kicking off the processes.
         # * Traverse the sub entities by DFS.
         # * Shadow the stdout to avoid random print outputs.
-        mystring = StringIO()
-        sys.stdout = mystring
+        my_stdout = StringIO()
+        sys.stdout = my_stdout
         while walker:
             entity = walker.pop()
             try:
@@ -289,10 +288,9 @@ if __name__ == "__main__":
                     visit_future.reverse()
                     walker.extend(visit_future)
             except Exception as visit_ex:
-                # Log visit errors but continue processing
                 sys.stdout = sys.__stdout__
                 output_handler.add_error(f"Could not visit {type(entity).__name__}: {visit_ex}")
-                sys.stdout = mystring
+                sys.stdout = my_stdout
                 
                 # For Node entities that fail to visit due to package not found,
                 # try to extract basic information directly without visiting
@@ -313,26 +311,9 @@ if __name__ == "__main__":
                         if hasattr(entity, 'node_executable') and entity.node_executable:
                             executable = str(entity.node_executable)
                         
-                        # Build a basic ros2 run command
-                        if package_name and executable:
-                            command_parts = ["ros2", "run", package_name, executable]
-                            if node_name:
-                                command_parts.extend(["--ros-args", "-r", f"__node:={node_name}"])
-                            if namespace:
-                                command_parts.extend(["-r", f"__ns:={namespace}"])
-                            
-                            command = " ".join(f'"{part}"' for part in command_parts)
-                            
-                            output_handler.add_process(
-                                command=command,
-                                node_name=node_name,
-                                executable=executable,
-                                arguments=command_parts[1:]  # Everything after 'ros2'
-                            )
-                            
-                            output_handler.add_warning(f"Extracted node info despite problem visiting visit: {package_name}::{executable}")
+                        output_handler.add_error(f"Could not locate: {package_name}::{executable}")
                     except Exception as extract_ex:
-                        output_handler.add_error(f"Could not extract info from failed node: {extract_ex}")
+                        output_handler.add_error(f"giving up on {type(entity).__name__}: {visit_ex}")
                 
                 continue
 
@@ -374,6 +355,8 @@ if __name__ == "__main__":
                         if executable and node_name:
                             command = f"{executable} --ros-args -r __node:={node_name}"
                             arguments = ["--ros-args", "-r", f"__node:={node_name}"]
+                    if namespace:
+                        arguments.extend(["-r", f"__ns:={namespace}"])
                     
                     # Get parameters if available
                     if hasattr(typed_action, '_Node__parameters') and typed_action._Node__parameters:
@@ -394,75 +377,30 @@ if __name__ == "__main__":
                 except Exception as e:
                     output_handler.add_error(f"Could not process LifecycleNode: {e}")
                 
-                sys.stdout = mystring
+                sys.stdout = my_stdout
 
             # Process regular Node actions (before ExecuteProcess since Node may create ExecuteProcess)
             elif is_a(entity, Node):
                 typed_action = cast(Node, entity)
                 sys.stdout = sys.__stdout__
+                if typed_action.process_details is not None:
+                    sys.stdout = sys.__stdout__
+                    
+                    # Process the command using the extracted function
+                    cmd_list = typed_action.process_details['cmd']
+                    command, executable, arguments = process_execute_process_commands(cmd_list, context)
+                    
+                    if command:
+                        # Add to output handler
+                        output_handler.add_process(
+                            command=command,
+                            executable=executable,
+                            arguments=arguments
+                        )
+                    else:
+                        output_handler.add_error(f"Could not process Node: {type(entity).__name__}")
                 
-                try:
-                    # Extract node information
-                    node_name = None
-                    namespace = None
-                    package_name = None
-                    executable = None
-                    command = None
-                    arguments = []
-                    parameters = {}
-                    
-                    # Get node name
-                    if hasattr(typed_action, 'node_name') and typed_action.node_name:
-                        node_name = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_name))
-                    
-                    # Get namespace
-                    if hasattr(typed_action, 'node_namespace') and typed_action.node_namespace:
-                        namespace = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_namespace))
-                    
-                    # Get package name
-                    if hasattr(typed_action, 'node_package') and typed_action.node_package:
-                        package_name = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_package))
-                    
-                    # Get executable
-                    if hasattr(typed_action, 'node_executable') and typed_action.node_executable:
-                        executable = perform_substitutions(context, normalize_to_list_of_substitutions(typed_action.node_executable))
-                    
-                    # Build command line for regular Node
-                    if executable and package_name:
-                        # For regular nodes, build a ros2 run command
-                        command_parts = ["ros2", "run", package_name, executable]
-                        arguments = ["run", package_name, executable]
-                        
-                        # Add node name if specified
-                        if node_name:
-                            command_parts.extend(["--ros-args", "-r", f"__node:={node_name}"])
-                            arguments.extend(["--ros-args", "-r", f"__node:={node_name}"])
-                        
-                        # Add namespace if specified
-                        if namespace:
-                            command_parts.extend(["-r", f"__ns:={namespace}"])
-                            arguments.extend(["-r", f"__ns:={namespace}"])
-                        
-                        command = " ".join(f'"{part}"' for part in command_parts)
-                    
-                    # Get parameters if available
-                    if hasattr(typed_action, '_Node__parameters') and typed_action._Node__parameters:
-                        for param in typed_action._Node__parameters:
-                            if isinstance(param, dict):
-                                parameters.update(param)
-                    
-                    # Add as a regular process (not lifecycle)
-                    output_handler.add_process(
-                        command=command,
-                        node_name=node_name,
-                        executable=executable,
-                        arguments=arguments
-                    )
-                    
-                except Exception as e:
-                    output_handler.add_error(f"Could not process Node: {e}")
-                
-                sys.stdout = mystring
+                sys.stdout = my_stdout
 
             # Process ExecuteProcess actions (regular ROS nodes)               
             elif is_a(entity, ExecuteProcess):
@@ -482,7 +420,7 @@ if __name__ == "__main__":
                             arguments=arguments
                         )
                     
-                    sys.stdout = mystring
+                    sys.stdout = my_stdout
 
             # Lifecycle node support
             # https://github.com/ranchhandrobotics/rde-ros-2/issues/632

@@ -73,7 +73,7 @@ export enum Commands {
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
-    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition"
 }
 
 /**
@@ -115,6 +115,49 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
         const serverPath = path.join(extPath, "assets", "scripts", "server.py");
         
+                // Show MCP server information for Cursor users
+        const isCursor = vscode_utils.isRunningInCursor();
+        if (isCursor) {
+            const infoMessage = `ROS 2 MCP Server starting on port ${mcpServerPort}.\n\nTo use MCP features in Cursor, add this server to your .cursor/mcp.json:\n\nServer URL: http://localhost:${mcpServerPort}/sse`;
+
+            vscode.window.showInformationMessage(infoMessage, "Copy URL", "Open MCP Config", "Dismiss").then(selection => {
+                if (selection === "Copy URL") {
+                    vscode.env.clipboard.writeText(`http://localhost:${mcpServerPort}/sse`);
+                    vscode.window.showInformationMessage("MCP Server URL copied to clipboard!");
+                } else if (selection === "Open MCP Config") {
+                    // Open the .cursor/mcp.json file if it exists, otherwise create it
+                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                    if (workspaceRoot) {
+                        const mcpConfigPath = path.join(workspaceRoot, '.cursor', 'mcp.json');
+                        vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
+                            vscode.window.showTextDocument(doc);
+                        }, () => {
+                            // File doesn't exist, create it with basic structure
+                            const basicConfig = {
+                                "mcpServers": {
+                                    "ros2": {
+                                        "command": "npx",
+                                        "args": ["-y", "@modelcontextprotocol/server-ros2", "stdio"],
+                                        "env": {}
+                                    }
+                                }
+                            };
+                            vscode.workspace.fs.writeFile(
+                                vscode.Uri.file(mcpConfigPath),
+                                Buffer.from(JSON.stringify(basicConfig, null, 2))
+                            ).then(() => {
+                                vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
+                                    vscode.window.showTextDocument(doc);
+                                }, () => {
+                                    // Handle any errors silently
+                                });
+                            });
+                        });
+                    }
+                }
+            });
+        }
+        
         if (await pfs.exists(serverPath)) {
             outputChannel.appendLine(`Starting MCP server from ${serverPath} on port ${mcpServerPort}`);
 
@@ -142,37 +185,76 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         } else {
             throw new Error(`MCP server script not found at ${serverPath}`);
         }
+
+
+        // Register MCP server definition provider (only in VS Code, not Cursor until sync'd to 1.101)
+        if (!isCursor) {
+            // Check if the MCP API is available (only in VS Code, not Cursor)
+            if ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm) {
+                try {
+                    // Use type assertion to handle the API that might not be available in all environments
+                    const lm = vscode.lm as any;
+                    context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
+                        provideMcpServerDefinitions: async () => {
+                            let output: any[] = [];
+
+                            // Get the port from configuration or use default
+                            const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+
+                            // Use the configured port for the MCP server
+                            // Note: McpHttpServerDefinition might not be available in all environments
+                            if ('McpHttpServerDefinition' in vscode) {
+                                const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
+                                output.push( 
+                                    new McpHttpServerDefinition(
+                                        "ROS 2",
+                                        vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
+                                    )
+                                );
+                            }
+
+                            return output;
+                        }
+                    }));
+                } catch (error) {
+                    outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
+                }
+            }
+        }
+
     } catch (err) {
         outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
         vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
+
+        return;
     }
+
     
-    context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider('ROS 2', {
-        provideMcpServerDefinitions: async () => {
-            let output: vscode.McpHttpServerDefinition[] = [];
-
-            // Get the port from configuration or use default
-            const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
-
-            // Use the configured port for the MCP server
-            output.push( 
-                new vscode.McpHttpServerDefinition(
-                    "ROS 2",
-                    vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                )
-            )
-
-            return output;
-        }
-    }));    
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-    const reporter = telemetry.getReporter();
-    extPath = context.extensionPath;
-    outputChannel = vscode_utils.createOutputChannel();
-    extensionContext = context; // Store the context for later use
-    context.subscriptions.push(outputChannel);
+    try {
+        const reporter = telemetry.getReporter();
+        extPath = context.extensionPath;
+        outputChannel = vscode_utils.createOutputChannel();
+        extensionContext = context; // Store the context for later use
+        context.subscriptions.push(outputChannel);
+
+        // Log extension activation
+        outputChannel.appendLine("ROS 2 Extension activating...");
+        
+    } catch (error) {
+        console.error("Error during extension activation:", error);
+        throw error;
+    }
+
+    // Detect if running in Cursor
+    const isCursor = vscode_utils.isRunningInCursor();
+    if (isCursor) {
+        outputChannel.appendLine("Running in Cursor (Anysphere's editor)");
+    } else {
+        outputChannel.appendLine("Running in VS Code");
+    }
 
     // Activate components when the ROS env is changed.
     context.subscriptions.push(onDidChangeEnv(activateEnvironment.bind(null, context)));
@@ -401,8 +483,9 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
-    reporter.sendTelemetryActivate();
 
+    const reporter = telemetry.getReporter();
+    reporter.sendTelemetryActivate();
 
     // Activate the workspace environment if possible.
     await activateEnvironment(context);

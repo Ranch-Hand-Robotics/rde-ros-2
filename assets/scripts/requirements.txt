@@ -1,4 +1,4 @@
-mcp[cli]
+mcp[cli]==1.12.3
 rclpy
 pyyaml
 pydantic

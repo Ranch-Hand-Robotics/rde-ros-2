@@ -22,6 +22,8 @@ import * as lifecycle from "../../../../ros/ros2/lifecycle";
 
 const promisifiedExec = util.promisify(child_process.exec);
 
+
+
 interface ILaunchRequest {
     nodeName: string;
     executable: string;
@@ -110,6 +112,32 @@ interface ICppdbgLaunchConfiguration {
     }>;
 }
 
+export interface ILldbLaunchConfiguration {
+    type: "lldb";
+    request: "launch" | "attach";
+    name: string;
+    cwd?: string;
+    program?: string;
+    args?: string[];
+    env?:  { [key: string]: string };
+    initCommands?: string[];
+    targetCreateCommands?: string[];
+    preRunCommands?: string[];
+    processCreateCommands?: string[];
+    postRunCommands?: string[];
+    preTerminateCommands?: string[];
+    exitCommands?: string[];
+    expressions?: "simple" | "python" | "native";
+    sourceMap?: { [key: string]: string; };
+    relativePathBase?: string;
+    breakpointMode?: "path" | "file";
+    sourceLanguages?: string[]; 
+    reverseDebugging?: boolean;
+    stopAtEntry?: boolean;
+    pid?: number;
+}
+
+
 function getExtensionFilePath(extensionFile: string): string {
     return path.resolve(extension.extPath, extensionFile);
 }
@@ -178,6 +206,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         if (result.stderr) {
             // Having stderr output is not nessesarily a problem, but it is useful for debugging
             extension.outputChannel.appendLine(`ROS2 launch processor produced stderr output:\r\n ${result.stderr}`);
+            // Show output channel when there's stderr output
+            vscode_utils.showOutputPanel(extension.outputChannel);
         }        
 
         if (result.stdout.length == 0) {
@@ -189,8 +219,10 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             const launchData = JSON.parse(result.stdout);
             await this.processJsonLaunchData(launchData, config, rosExecOptions);
         } catch (jsonError) {
-            extension.outputChannel.appendLine(`JSON parsing failed, falling back to legacy format: ${jsonError.message}`);
-            await this.processLegacyLaunchData(result.stdout, config, rosExecOptions);
+            extension.outputChannel.appendLine(`JSON parsing failed: ${jsonError.message}`);
+            extension.outputChannel.appendLine(result.stdout);
+            // Show output channel when JSON parsing fails
+            vscode_utils.showOutputPanel(extension.outputChannel);
         }
 
         // @todo: error handling for Promise.all
@@ -268,7 +300,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         return pythonLaunchConfig;
     }
 
-    private createCppLaunchConfig(request: ILaunchRequest, stopOnEntry: boolean): ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration {
+    private createCppLaunchConfig(request: ILaunchRequest, stopOnEntry: boolean): ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration | ILldbLaunchConfiguration {
         const envConfigs: ICppEnvConfig[] = [];
         for (const key in request.env) {
             if (request.env.hasOwnProperty(key)) {
@@ -279,7 +311,21 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             }
         }
 
-        if (os.platform() === "win32") {
+        const isCursor = vscode_utils.isRunningInCursor();
+        if (isCursor) {
+            const lldbLaunchConfig: ILldbLaunchConfiguration = {
+                name: request.nodeName,
+                type: "lldb",
+                request: "launch",
+                program: request.executable,
+                args: request.arguments,
+                cwd: ".",
+                env: request.env,
+                stopAtEntry: stopOnEntry
+            };
+
+            return lldbLaunchConfig;
+        } else if (os.platform() === "win32") {
                 const cppvsdbgLaunchConfig: ICppvsdbgLaunchConfiguration = {
                 name: request.nodeName,
                 type: "cppvsdbg",
@@ -321,7 +367,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
     }
 
     private async executeLaunchRequest(request: ILaunchRequest, stopOnEntry: boolean) {
-        let debugConfig: ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration | IPythonLaunchConfiguration;
+        let debugConfig: ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration | IPythonLaunchConfiguration | ILldbLaunchConfiguration;
 
         if (os.platform() === "win32") {
             let nodePath = path.parse(request.executable);
@@ -427,6 +473,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             for (const error of launchData.errors) {
                 extension.outputChannel.appendLine(`  Error: ${error}`);
             }
+            // Show output channel when there are errors
+            vscode_utils.showOutputPanel(extension.outputChannel);
         }
 
         // Process regular processes
@@ -512,6 +560,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             }
             
             extension.outputChannel.appendLine("Warning: Could not detect ROS setup on Windows, assuming environment is already configured");
+            // Show output channel when there's a ROS setup warning
+            vscode_utils.showOutputPanel(extension.outputChannel);
             return '';
         } else {
             // Linux/Unix: Use bash setup scripts

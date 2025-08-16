@@ -163,6 +163,11 @@
                     "type": "integer",
                     "default": 3002,
                     "description": "(Preview) The port to use for the MCP Server."
+                },
+                "ROS2.autoShowOutputChannel": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically show the ROS 2 output channel when there are warnings or errors."
                 }
             }
         },
@@ -417,6 +422,7 @@
     "scripts": {
         "package:dev": "vsce package -o rde-ros-2-dev.vsix",
         "build": "npm run package",
+        "build:cursor": "node scripts/build-cursor.js",
         "lint": "eslint -p ./",
         "pretest": "npm run test-compile",
         "test": "node ./out/test/runTest.js",

@@ -18,3 +18,8 @@ vscode-ros-dev.vsix
 **/__pycache__
 
 **/log
+
+samples/**/build
+samples/**/install
+samples/**/log
+samples/**/.vscode
