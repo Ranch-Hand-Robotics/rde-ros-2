@@ -29,11 +29,11 @@ function restorePackageJson() {
 }
 
 function modifyForCursor(packageJson) {
-    // Change ms-vscode.cpptools to anysphere.cpptools
+    // Change ms-vscode.cpptools to vadimcn.vscode-lldb (which is the debugger from anysphere.cpptools)
     if (packageJson.extensionDependencies) {
         packageJson.extensionDependencies = packageJson.extensionDependencies.map(dep => {
             if (dep === 'ms-vscode.cpptools') {
-                return 'anysphere.cpptools';
+                return 'vadimcn.vscode-lldb';
             }
             return dep;
         });
