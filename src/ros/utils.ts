@@ -3,11 +3,15 @@
 
 import * as child_process from "child_process";
 import * as os from "os";
+import * as path from "path";
 import * as vscode from "vscode";
+import * as fs from "fs";
 
 import * as extension from "../extension";
 import * as pfs from "../promise-fs";
 import * as telemetry from "../telemetry-helper";
+import * as ros_utils from "./utils";
+import * as vscode_utils from "../vscode-utils";
 
 /**
  * Detected shell information
@@ -135,10 +139,6 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
         if (process.platform === "win32") {
             // On Windows, create a composite environment by sourcing multiple setup scripts
             // Use a temporary batch file to avoid command line length limitations
-            const path = require("path");
-            const fs = require("fs");
-            const os = require("os");
-            
             const tempDir = os.tmpdir();
             const tempBatchFile = path.join(tempDir, `ros_env_setup_${Date.now()}.bat`);
             
@@ -160,19 +160,15 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
             }
             setupCommands.push(":vs_done");
             
-            // 2. Pixi shell from c:\pixi_ws
+            // 2. Pixi shell hook (if available)
             setupCommands.push("REM Setup Pixi environment");
-            setupCommands.push(`pixi shell-hook`);
+            setupCommands.push("where pixi >nul 2>nul && pixi shell-hook");
             
-            // 3. Local setup from c:\pixi_ws\ros2-windows
-            setupCommands.push("REM Setup ROS2 Windows environment");
-            setupCommands.push(`if exist "c:\\pixi_ws\\ros2-windows\\local_setup.bat" call "c:\\pixi_ws\\ros2-windows\\local_setup.bat"`);
-            
-            // 4. Finally, source the requested setup file
+            // 3. Source the requested setup file
             setupCommands.push("REM Setup target file");
             setupCommands.push(`call "${filename}"`);
             
-            // 5. Output environment variables
+            // 4. Output environment variables
             setupCommands.push("REM Output environment");
             setupCommands.push("set");
             

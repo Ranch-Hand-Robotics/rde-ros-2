@@ -18,6 +18,7 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Configure Intellisense
 * Support for alternative shells (e.g. `fish`, `zsh`, etc.) for ROS 2.
 * (Preview) [Model Context Protocol (MCP) Server](https://ranchhandrobotics.com/rde-ros-2/ModelContextProtocol.html), allowing LLMs to introspect a running ROS 2 system.
+* Support for [Pixi Package Manager for ROS 2](https://ranchhandrobotics.com/rde-ros-2/pixi.html), a cross-platform ROS 2 development environment.
 * (Preview) Lifecycle Node Support, allowing you to manage the lifecycle of ROS 2 nodes through the Dashboard.
 * Support for Visual Studio Code and Cursor
 

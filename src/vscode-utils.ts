@@ -34,6 +34,48 @@ export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
     return vscode.workspace.getConfiguration(rosConfigurationName);
 }
 
+/**
+ * Gets the ROS setup script path from user settings with Windows default for Pixi.
+ * Returns the full path to the setup script that should be sourced.
+ */
+export function getRosSetupScript(): string {
+    const config = getExtensionConfiguration();
+    let rosSetupScript = config.get("rosSetupScript", "");
+    
+    if (!rosSetupScript) {
+        // Read the flag that allows Pixi usage on non-Windows platforms (defaults to false)
+        const usePixiOnAllPlatforms = config.get("usePixiOnAllPlatforms", false);
+
+        if (process.platform === "win32") {
+            // Default to Pixi installation on Windows
+            const shellInfo = ros_utils.detectUserShell();
+            const setupFileName = `local_setup${shellInfo.scriptExtension}`;
+            rosSetupScript = path.join("c:", "pixi_ws", `ros2-windows`, setupFileName);
+        } else {
+            // On Unix-like systems we currently require the user to specify the setup script path.
+            // The `usePixiOnAllPlatforms` flag is reserved for future behavior changes; for now
+            // return an empty string to indicate no default was found.
+            if (!usePixiOnAllPlatforms) {
+                return "";
+            }
+
+            // If Pixi-on-all-platforms is enabled, we still don't auto-guess a Unix path at this time.
+            return "";
+        }
+    }
+    
+    // Handle workspace folder variable substitution
+    const regex = /\$\{workspaceFolder\}/g;
+    if (rosSetupScript.includes("${workspaceFolder}")) {
+        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length === 1) {
+            rosSetupScript = rosSetupScript.replace(regex, vscode.workspace.workspaceFolders[0].uri.fsPath);
+        }
+    }
+    
+    // Normalize path separators for current platform
+    return path.normalize(rosSetupScript);
+}
+
 export function createOutputChannel(): vscode.OutputChannel {
     return vscode.window.createOutputChannel("ROS 2");
 }

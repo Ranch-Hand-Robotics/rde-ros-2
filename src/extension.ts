@@ -605,13 +605,14 @@ async function sourceRosAndWorkspace(): Promise<void> {
 
     let rosSetupScript = config.get("rosSetupScript", "");
 
+    // If no setup script is configured, use platform defaults
+    const usePixiOnAllPlatforms = config.get("usePixiOnAllPlatforms", false);
+    if (!rosSetupScript && (process.platform === "win32" || usePixiOnAllPlatforms)) {
+        rosSetupScript = vscode_utils.getRosSetupScript();
+    }
+
     // If the workspace setup script is not set, try to find the ROS setup script in the environment
     let attemptWorkspaceDiscovery = true;
-
-    // On Windows, ROS now uses Pixi to install; with a specific location for the setup script.
-    if (process.platform === "win32" && !rosSetupScript) {
-        rosSetupScript = path.join("C:", "pixi_ws", "ros2-windows", "local_setup.bat");
-    }
 
     if (rosSetupScript) {
         // Regular expression to match '${workspaceFolder}'
