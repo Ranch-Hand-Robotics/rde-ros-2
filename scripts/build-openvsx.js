@@ -43,6 +43,14 @@ function modifyForOpenVSX(packageJson) {
         packageJson.devDependencies['@types/vscode'] = packageJson.devDependencies['@types/vscode'].replace('^1.101.0', '^1.99.0');
         console.log('Updated @types/vscode version to ^1.99.0');
     }
+    if (packageJson.extensionDependencies) {
+        packageJson.extensionDependencies = packageJson.extensionDependencies.map(dep => {
+            if (dep === 'ms-vscode.cpptools') {
+                return 'vadimcn.vscode-lldb';
+            }
+            return dep;
+        });
+    }  
     
     return packageJson;
 }
