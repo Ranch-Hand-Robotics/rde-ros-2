@@ -157,7 +157,7 @@
                 },
                 "ROS2.rosSetupScript": {
                     "type": "string",
-                    "description": "ROS workspace setup script. Overrides ros.distro."
+                    "description": "ROS workspace setup script path. If empty, defaults to 'c:\\pixi_ws\\ros2-windows\\local_setup.bat' on Windows. On other platforms, you must specify the full path unless 'usePixiOnAllPlatforms' is enabled. Supports '${workspaceFolder}' variable substitution."
                 },
                 "ROS2.mcpServerPort": {
                     "type": "integer",
@@ -168,6 +168,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Automatically show the ROS 2 output channel when there are warnings or errors."
+                },
+                "ROS2.usePixiOnAllPlatforms": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Pixi environment setup on all platforms (Linux, macOS, Windows). When disabled, Pixi is only used by default on Windows. When enabled, the extension will attempt to use the configured ROS setup script on all platforms."
                 }
             }
         },
