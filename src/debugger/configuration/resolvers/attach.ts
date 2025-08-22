@@ -57,8 +57,8 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
 
         let debugConfig: ICppvsdbgAttachConfiguration | ICppdbgAttachConfiguration | IPythonAttachConfiguration | any;
         if (config.runtime === "C++") {
-            const isCursor = vscode_utils.isRunningInCursor();
-            if (isCursor) {
+            const isLldbInstalled = vscode_utils.isLldbExtensionInstalled();
+            if (isLldbInstalled) {
                 const lldbAttachConfig: any = {
                     name: `C++: ${config.processId}`,
                     type: "lldb",

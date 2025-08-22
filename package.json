@@ -9,7 +9,7 @@
         "name": "Ranchhand Robotics"
     },
     "displayName": "Robot Developer Extensions for ROS 2",
-    "description": "Robot Developer Extensions for developing Robot Operating System (ROS) 2 with Visual Studio Code.",
+    "description": "Robot Developer Extensions for developing Robot Operating System (ROS) 2.",
     "icon": "media/icon.png",
     "aiKey": "",
     "categories": [
@@ -422,7 +422,7 @@
     "scripts": {
         "package:dev": "vsce package -o rde-ros-2-dev.vsix",
         "build": "npm run package",
-        "build:cursor": "node scripts/build-cursor.js",
+        "build:openvsx": "node scripts/build-openvsx.js",
         "lint": "eslint -p ./",
         "pretest": "npm run test-compile",
         "test": "node ./out/test/runTest.js",

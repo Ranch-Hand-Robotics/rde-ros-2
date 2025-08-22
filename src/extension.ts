@@ -115,9 +115,10 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
         const serverPath = path.join(extPath, "assets", "scripts", "server.py");
         
-                // Show MCP server information for Cursor users
-        const isCursor = vscode_utils.isRunningInCursor();
-        if (isCursor) {
+        // Show MCP server information for users without MCP support
+        let supportsMcpRegistration = ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm);
+
+        if (!supportsMcpRegistration) {
             const infoMessage = `ROS 2 MCP Server starting on port ${mcpServerPort}.\n\nTo use MCP features in Cursor, add this server to your .cursor/mcp.json:\n\nServer URL: http://localhost:${mcpServerPort}/sse`;
 
             vscode.window.showInformationMessage(infoMessage, "Copy URL", "Open MCP Config", "Dismiss").then(selection => {
@@ -187,38 +188,35 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
         }
 
 
-        // Register MCP server definition provider (only in VS Code, not Cursor until sync'd to 1.101)
-        if (!isCursor) {
-            // Check if the MCP API is available (only in VS Code, not Cursor)
-            if ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm) {
-                try {
-                    // Use type assertion to handle the API that might not be available in all environments
-                    const lm = vscode.lm as any;
-                    context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
-                        provideMcpServerDefinitions: async () => {
-                            let output: any[] = [];
+        // Register MCP server definition provider (only when LLDB extension is not available)
+        if (supportsMcpRegistration) {
+            try {
+                // Use type assertion to handle the API that might not be available in all environments
+                const lm = vscode.lm as any;
+                context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
+                    provideMcpServerDefinitions: async () => {
+                        let output: any[] = [];
 
-                            // Get the port from configuration or use default
-                            const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+                        // Get the port from configuration or use default
+                        const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
 
-                            // Use the configured port for the MCP server
-                            // Note: McpHttpServerDefinition might not be available in all environments
-                            if ('McpHttpServerDefinition' in vscode) {
-                                const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
-                                output.push( 
-                                    new McpHttpServerDefinition(
-                                        "ROS 2",
-                                        vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                                    )
-                                );
-                            }
-
-                            return output;
+                        // Use the configured port for the MCP server
+                        // Note: McpHttpServerDefinition might not be available in all environments
+                        if ('McpHttpServerDefinition' in vscode) {
+                            const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
+                            output.push( 
+                                new McpHttpServerDefinition(
+                                    "ROS 2",
+                                    vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
+                                )
+                            );
                         }
-                    }));
-                } catch (error) {
-                    outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
-                }
+
+                        return output;
+                    }
+                }));
+            } catch (error) {
+                outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
             }
         }
 
@@ -248,12 +246,12 @@ export async function activate(context: vscode.ExtensionContext) {
         throw error;
     }
 
-    // Detect if running in Cursor
-    const isCursor = vscode_utils.isRunningInCursor();
-    if (isCursor) {
-        outputChannel.appendLine("Running in Cursor (Anysphere's editor)");
+    // Detect if LLDB extension is installed
+    const isLldbInstalled = vscode_utils.isLldbExtensionInstalled();
+    if (isLldbInstalled) {
+        outputChannel.appendLine("LLDB extension is installed - C++ debugging with LLDB available");
     } else {
-        outputChannel.appendLine("Running in VS Code");
+        outputChannel.appendLine("LLDB extension not installed - C++ debugging with LLDB not available");
     }
 
     // Activate components when the ROS env is changed.

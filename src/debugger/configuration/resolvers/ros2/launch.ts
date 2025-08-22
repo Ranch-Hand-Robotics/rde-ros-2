@@ -311,8 +311,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             }
         }
 
-        const isCursor = vscode_utils.isRunningInCursor();
-        if (isCursor) {
+        const isLldbInstalled = vscode_utils.isLldbExtensionInstalled();
+        if (isLldbInstalled) {
             const lldbLaunchConfig: ILldbLaunchConfiguration = {
                 name: request.nodeName,
                 type: "lldb",
