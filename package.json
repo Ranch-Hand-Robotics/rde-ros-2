@@ -328,23 +328,23 @@
                 ]
             },
             {
-                "id": "RDE.msg",
+                "id": "rosmsg",
                 "aliases": [
-                    "ROS Message"
+                    "ROS Interface"
                 ],
                 "extensions": [
                     ".action",
                     ".msg",
                     ".srv"
                 ],
-                "configuration": "./languages/ros.msg.configuration.json"
+                "configuration": "./languages/ROS Interface.configuration.json"
             }
         ],
         "grammars": [
             {
-                "language": "RDE.msg",
-                "scopeName": "source.rde.msg",
-                "path": "./languages/syntaxes/ros.msg.tmLanguage.json"
+                "language": "rosmsg",
+                "scopeName": "source.rosmsg",
+                "path": "./languages/syntaxes/ROS Interface.tmLanguage.json"
             }
         ],
         "problemMatchers": [
