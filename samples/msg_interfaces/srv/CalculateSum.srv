@@ -1,0 +1,16 @@
+# CalculateSum.srv - Testing basic service syntax highlighting
+# Simple service with request and response
+
+# Request - Input parameters
+float64[] numbers                     # Array of numbers to sum
+bool include_negative true           # Whether to include negative numbers
+string operation_id ""               # Optional operation identifier
+
+---
+
+# Response - Output parameters  
+float64 result                       # Sum of the numbers
+uint32 count                         # Number of values processed
+bool success true                    # Operation success status
+string message "Calculation completed successfully"
+builtin_interfaces/Duration processing_time

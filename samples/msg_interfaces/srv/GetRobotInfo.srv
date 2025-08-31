@@ -1,0 +1,62 @@
+# GetRobotInfo.srv - Testing complex service with nested messages
+# Service for retrieving comprehensive robot information
+
+# Request
+string robot_id ""                   # Empty string means current robot
+bool include_sensor_data true        # Include current sensor readings
+bool include_diagnostics false       # Include diagnostic information
+string[] requested_topics            # Specific topics to include
+uint8 detail_level 1                 # 0=basic, 1=standard, 2=detailed
+
+# Constants for detail levels
+uint8 DETAIL_BASIC=0
+uint8 DETAIL_STANDARD=1
+uint8 DETAIL_DETAILED=2
+
+---
+
+# Response
+bool success false
+string message ""
+builtin_interfaces/Time timestamp
+
+# Basic robot information
+string robot_id "robot_001"
+string robot_name "TestBot"
+string robot_type "mobile_manipulator"
+string firmware_version "v2.1.3"
+string software_version "ROS2-Humble"
+
+# Current status
+RobotStatus current_status           # Using our custom message type
+geometry_msgs/PoseStamped current_pose
+geometry_msgs/Twist current_velocity
+
+# Hardware information
+string[] available_sensors
+string[] active_controllers
+uint32 total_joints 7
+string[] joint_names
+float64[] joint_limits_lower
+float64[] joint_limits_upper
+
+# Network information
+string ip_address "192.168.1.100"
+uint16 ros_port 11311
+string[] published_topics
+string[] subscribed_topics
+string[] available_services
+
+# Sensor data (conditional)
+SensorData[] sensor_readings         # Only if include_sensor_data=true
+
+# Diagnostics (conditional)
+string[] diagnostic_messages         # Only if include_diagnostics=true
+uint8[] diagnostic_levels           # 0=OK, 1=WARN, 2=ERROR
+builtin_interfaces/Time[] diagnostic_timestamps
+
+# Performance metrics
+float64 cpu_usage_percent 0.0
+float64 memory_usage_mb 0.0
+float64 network_bandwidth_mbps 0.0
+builtin_interfaces/Duration uptime
