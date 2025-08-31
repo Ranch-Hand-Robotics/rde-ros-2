@@ -1,9 +1,9 @@
 # General
 Create test cases in the test directory for all new features and bug fixes.
 Do not create summary documents.
-If you need to execute ROS commands, source the ROS 2 setup script in the terminal before running the command. We're testing on Kilted, so use /opt/ros/kilted/setup.bash.
+If you need to execute ROS commands, source the ROS 2 setup script in the terminal before running the command. We're testing on Kilted, so use /opt/ros/kilted/setup.bash when running on a Linux system or c:\pixi_ws\ros2-windows\local_setup.bat on Windows.
 This project compiles typescript using `npm run build`
-
+Require statements should always be at the top of a file, never in the middle.
 
 # Library specifications
 * This is a Visual Studio Code extension which provides tools to help develop ROS 2 code, which includes rclpy, rclcpp, rclrust and rcldonet.
@@ -12,15 +12,8 @@ This project compiles typescript using `npm run build`
 * to support modern ubuntu, the extension attempts to manage a virtual environment for python code which lives in the extension directory.
 * The extension works with the language debuggers, by attempting to identify the language of the file being debugged and then using the appropriate debugger. Currently this is only implemented for python and C++.
 * This extension used to support ROS 1, so some ROS 1 code may be present in the extension. This code is not used by the extension, and may be removed if encoundered. Do not get confused by this code.
-* The extension is designed to be used with ROS 2, and does not support ROS 1.
-* The extension is designed to be used with the latest version of ROS 2, and does not support older versions of ROS 2.
-* The extension is designed to be used with the latest version of Visual Studio Code, and does not support older versions of Visual Studio Code.
-* The extension is designed to be used with the latest version of TypeScript, and does not support older versions of TypeScript.
-* The extension is designed to be used with the latest version of Python, and does not support older versions of Python.
-* The extension is designed to be used with the latest version of C++, and does not support older versions of C++.
-* The extension is designed to be used with the latest version of Rust, and does not support older versions of Rust.
-* The extension is designed to be used with the latest version of .NET, and does not support older versions of .NET.
-* The extension is designed to be used with the latest version of Node.js, and does not support older versions of Node.js.
+* This extension is used with ROS 2 Humble or Greater, and does not support ROS 1.
+* The extension works with latest versions Visual Studio Code and Cursor.
 
 # ROS 2 Launch File Dumper
 This extension provides a tool to dump the contents of a ROS 2 python based launch file to enable the extension to launch each ROS node under
