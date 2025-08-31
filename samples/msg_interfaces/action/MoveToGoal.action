@@ -1,0 +1,101 @@
+# MoveToGoal.action - Testing action syntax highlighting with goal, result, and feedback
+# Action for robot navigation with comprehensive feedback
+
+# Goal - What we want to achieve
+geometry_msgs/PoseStamped target_pose
+float64 position_tolerance 0.1       # Meters
+float64 orientation_tolerance 0.087  # Radians (~5 degrees)
+float64 max_velocity 1.0             # m/s
+bool use_obstacle_avoidance true
+string planner_type "global"
+builtin_interfaces/Duration timeout
+uint8 priority 1                     # 1=high, 5=low
+
+# Behavior options
+uint8 behavior_mode
+uint8 BEHAVIOR_FASTEST=0
+uint8 BEHAVIOR_SAFEST=1
+uint8 BEHAVIOR_ENERGY_EFFICIENT=2
+
+# Recovery options
+bool enable_recovery true
+float64 recovery_timeout 30.0        # Seconds
+string[] recovery_behaviors
+
+---
+
+# Result - Final outcome when action completes
+bool success false
+string result_message ""
+builtin_interfaces/Duration total_time
+float64 distance_traveled 0.0        # Meters
+float64 average_speed 0.0             # m/s
+uint32 replanning_count 0             # Number of times path was replanned
+
+# Final pose achieved
+geometry_msgs/PoseStamped final_pose
+float64 position_error 0.0            # Distance from target
+float64 orientation_error 0.0         # Angular difference from target
+
+# Path information
+geometry_msgs/PoseStamped[] executed_path
+float64 path_length 0.0               # Total path length in meters
+uint32 waypoints_visited 0
+
+# Performance metrics
+float64 max_speed_achieved 0.0        # m/s
+float64 min_clearance 0.0             # Closest obstacle distance
+uint32 obstacle_encounters 0          # Number of dynamic obstacles
+bool recovery_used false
+string[] warnings                     # Non-critical issues encountered
+
+# Result codes
+uint8 result_code
+uint8 SUCCESS=0
+uint8 TIMEOUT=1
+uint8 OBSTACLE_BLOCKED=2
+uint8 GOAL_UNREACHABLE=3
+uint8 PREEMPTED=4
+uint8 HARDWARE_ERROR=5
+
+---
+
+# Feedback - Periodic updates during execution
+builtin_interfaces/Time timestamp
+geometry_msgs/PoseStamped current_pose
+float64 distance_remaining 0.0        # Meters to goal
+float64 estimated_time_remaining 0.0  # Seconds
+float64 current_speed 0.0             # m/s
+float64 completion_percentage 0.0     # 0.0 to 100.0
+
+# Current path information
+geometry_msgs/PoseStamped[] current_path
+uint32 current_waypoint_index 0
+float64 path_deviation 0.0            # Distance from planned path
+
+# Obstacle information
+bool obstacles_detected false
+uint32 obstacle_count 0
+float64 closest_obstacle_distance 0.0 # Meters
+geometry_msgs/Point[] obstacle_positions
+
+# Navigation state
+uint8 navigation_state
+uint8 STATE_PLANNING=0
+uint8 STATE_MOVING=1
+uint8 STATE_REPLANNING=2
+uint8 STATE_RECOVERY=3
+uint8 STATE_WAITING=4
+
+# Performance data
+float64 cpu_usage 0.0                 # Percentage
+float64 memory_usage 0.0              # MB
+string current_planner ""
+uint32 planning_cycles 0
+float64 average_planning_time 0.0     # Seconds
+
+# Error and warning tracking
+string[] active_warnings
+uint8 warning_level 0                 # 0=none, 1=minor, 2=major
+bool safety_stop_active false
+string status_message "Navigating to goal"
