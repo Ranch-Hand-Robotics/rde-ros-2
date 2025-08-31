@@ -1,0 +1,358 @@
+{
+    "information_for_contributors": [
+        "This file has been imported from https://github.com/jtbandes/ros-tmlanguage/blob/main/ROS%20Interface.tmLanguage.json",
+        "If you want to provide a fix or improvement, please create a pull request against the original repository."
+    ],
+    "name": "ROS Interface",
+    "uuid": "313710D0-E611-401D-90B2-21A40D1834C6",
+    "scopeName": "source.rosmsg",
+    "keyEquivalent": "^~R",
+    "fileTypes": [
+        "msg",
+        "srv",
+        "action"
+    ],
+    "patterns": [
+        {
+            "include": "#separators"
+        },
+        {
+            "include": "#lines"
+        },
+        {
+            "include": "#comments"
+        }
+    ],
+    "repository": {
+        "attributes": {
+            "name": "storage.modifier.attribute.rosmsg",
+            "match": "@optional\\b"
+        },
+        "builtin-types": {
+            "name": "storage.type.rosmsg",
+            "match": "\\b(?:bool|byte|char|u?int(?:8|16|32|64)|float(?:32|64)|w?string|time|duration)\\b"
+        },
+        "comments": {
+            "name": "comment.line.number-sign.rosmsg",
+            "match": "#.*"
+        },
+        "field-other": {
+            "begin": "(?=\\b[a-zA-Z_])",
+            "end": "$|(?=#)",
+            "patterns": [
+                {
+                    "name": "support.type.rosmsg",
+                    "match": "\\G[a-zA-Z0-9_/]+",
+                    "captures": {
+                        "0": {
+                            "patterns": [
+                                {
+                                    "include": "#builtin-types"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "constant.numeric.integer.rosmsg",
+                    "match": "\\d+"
+                },
+                {
+                    "comment": "Extra indirection to allow the entity.name.type rule to begin with \\G",
+                    "begin": "(?=[a-zA-Z_])",
+                    "end": "$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#field-other-after-type"
+                        }
+                    ]
+                }
+            ]
+        },
+        "field-other-after-type": {
+            "patterns": [
+                {
+                    "name": "variable.other.field.rosmsg",
+                    "match": "\\G[a-zA-Z0-9_]+"
+                },
+                {
+                    "comment": "Constant or default value",
+                    "begin": "",
+                    "end": "$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#literal-other"
+                        },
+                        {
+                            "include": "#literal-other-array"
+                        }
+                    ]
+                }
+            ]
+        },
+        "field-string": {
+            "begin": "(?=\\bw?string\\b)",
+            "end": "$|(?=#)",
+            "patterns": [
+                {
+                    "match": "\\Gw?string\\b",
+                    "captures": {
+                        "0": {
+                            "name": "storage.type.rosmsg"
+                        }
+                    }
+                },
+                {
+                    "name": "constant.numeric.integer.rosmsg",
+                    "match": "\\d+"
+                },
+                {
+                    "comment": "Extra indirection to allow the entity.name.type rule to begin with \\G",
+                    "begin": "(?=[a-zA-Z_])",
+                    "end": "$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#field-string-after-type"
+                        }
+                    ]
+                }
+            ]
+        },
+        "field-string-after-type": {
+            "patterns": [
+                {
+                    "name": "variable.other.field.rosmsg",
+                    "match": "\\G[a-zA-Z0-9_]+"
+                },
+                {
+                    "comment": "Constant or default value",
+                    "begin": "=|(?<=\\s)",
+                    "end": "$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#literal-string"
+                        }
+                    ]
+                }
+            ]
+        },
+        "field-string-array": {
+            "begin": "(?=\\bw?string[<=\\d]*\\[)",
+            "end": "$|(?=#)",
+            "patterns": [
+                {
+                    "name": "support.type.rosmsg",
+                    "match": "\\Gw?string\\b",
+                    "captures": {
+                        "0": {
+                            "name": "storage.type.rosmsg"
+                        }
+                    }
+                },
+                {
+                    "name": "constant.numeric.integer.rosmsg",
+                    "match": "\\d+"
+                },
+                {
+                    "comment": "Extra indirection to allow the entity.name.type rule to begin with \\G",
+                    "begin": "(?=[a-zA-Z_])",
+                    "end": "$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#field-string-array-after-type"
+                        }
+                    ]
+                }
+            ]
+        },
+        "field-string-array-after-type": {
+            "patterns": [
+                {
+                    "name": "variable.other.field.rosmsg",
+                    "match": "\\G[a-zA-Z0-9_]+"
+                },
+                {
+                    "name": "meta.default-value.rosmsg",
+                    "begin": "(?<=\\s)",
+                    "end": "$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#literal-string-array"
+                        }
+                    ]
+                }
+            ]
+        },
+        "lines": {
+            "patterns": [
+                {
+                    "include": "#attributes"
+                },
+                {
+                    "include": "#field-string-array"
+                },
+                {
+                    "include": "#field-string"
+                },
+                {
+                    "include": "#field-other"
+                }
+            ]
+        },
+        "literal-other": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.float.rosmsg",
+                    "match": "[-+]?(?:(?:\\d+(?:_\\d+)*)?\\.\\d+(?:_\\d+)*|\\d+(?:_\\d+)*\\.)(?:[eE][-+]?\\d+(?:_\\d+)*)?"
+                },
+                {
+                    "name": "constant.numeric.integer.rosmsg",
+                    "match": "[-+]?\\d+(?:_\\d+)*"
+                },
+                {
+                    "name": "constant.language.boolean.rosmsg",
+                    "match": "(?i)\\b(?:true|false)\\b"
+                }
+            ]
+        },
+        "literal-other-array": {
+            "patterns": [
+                {
+                    "name": "meta.array.rosmsg",
+                    "begin": "\\[",
+                    "end": "\\]|$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#literal-other"
+                        }
+                    ]
+                }
+            ]
+        },
+        "literal-string": {
+            "patterns": [
+                {
+                    "include": "#literal-string-quoted"
+                },
+                {
+                    "include": "#literal-string-unquoted"
+                }
+            ]
+        },
+        "literal-string-array": {
+            "patterns": [
+                {
+                    "name": "meta.array.rosmsg",
+                    "begin": "\\[",
+                    "end": "\\]|$|(?=#)",
+                    "patterns": [
+                        {
+                            "include": "#literal-string-quoted"
+                        },
+                        {
+                            "include": "#literal-string-unquoted-in-array"
+                        }
+                    ]
+                }
+            ]
+        },
+        "literal-string-escape": {
+            "patterns": [
+                {
+                    "name": "constant.character.escape.rosmsg",
+                    "match": "\\\\[0-7]{3}|\\\\x[0-9a-fA-F]{2}|\\\\u[0-9a-fA-F]{4}|\\\\U[0-9a-fA-F]{8}|\\\\."
+                }
+            ]
+        },
+        "literal-string-quoted": {
+            "comment": "Note: this is inaccurate; the real implementation only parses as a quoted string if the appropriate end quote is present. We don't capture newlines as illegal because they may be legal in ROS 1.",
+            "patterns": [
+                {
+                    "name": "string.quoted.double.rosmsg",
+                    "begin": "\"",
+                    "end": "\"|$",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.begin.rosmsg"
+                        }
+                    },
+                    "endCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.end.rosmsg"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "include": "#literal-string-escape"
+                        }
+                    ]
+                },
+                {
+                    "name": "string.quoted.single.rosmsg",
+                    "begin": "'",
+                    "end": "'|$",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.begin.rosmsg"
+                        }
+                    },
+                    "endCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.end.rosmsg"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "include": "#literal-string-escape"
+                        }
+                    ]
+                }
+            ]
+        },
+        "literal-string-unquoted": {
+            "comment": "ROS 2 allows comments after the string, while ROS 1 includes them in the string. We just assume the ROS 2 behavior here.",
+            "name": "string.unquoted.rosmsg",
+            "begin": "(?=[^\\s\"'])",
+            "end": "(?=\\s*(?:#|$))",
+            "patterns": [
+                {
+                    "include": "#literal-string-escape"
+                }
+            ]
+        },
+        "literal-string-unquoted-in-array": {
+            "comment": "like literal-string-unquoted, but terminated by , and ]",
+            "name": "string.unquoted.rosmsg",
+            "begin": "(?=[^\\s\"',\\]])",
+            "end": "(?=\\s*(?:$|[,\\]]))",
+            "patterns": [
+                {
+                    "include": "#literal-string-escape"
+                }
+            ]
+        },
+        "separators": {
+            "patterns": [
+                {
+                    "name": "meta.separator.rosmsg",
+                    "match": "^---\\s*$\\n?"
+                },
+                {
+                    "comment": "separator between msg definitions in gendeps format",
+                    "name": "meta.separator.rosmsg",
+                    "match": "^={3,}\\s*$\\n?"
+                },
+                {
+                    "comment": "separator between msg definitions in gendeps format",
+                    "name": "meta.separator.rosmsg",
+                    "match": "^MSG:\\s+([a-zA-Z0-9_/]+)\\s*$\\n?",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.class.rosmsg"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
