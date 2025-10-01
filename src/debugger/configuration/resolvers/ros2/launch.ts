@@ -201,7 +201,23 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         // Use the detected Python command for better virtual environment support
         let ros2_launch_dumper_cmdLine = `python3 ${ros2_launch_dumper} "${config.target}" ${flatten_args}`;
 
-        let result = await promisifiedExec(ros2_launch_dumper_cmdLine, rosExecOptions);
+        // Remove LD_DEBUG environment variable for the launch dumper to prevent conflicts
+        // but preserve them in the original environment for the actual processes
+        const cleanedEnv = { ...rosExecOptions.env };
+        if (cleanedEnv.LD_DEBUG) {
+            delete cleanedEnv.LD_DEBUG;
+        }
+        if (cleanedEnv.LD_DEBUG_OUTPUT) {
+            delete cleanedEnv.LD_DEBUG_OUTPUT;
+        }
+
+        // Use cleaned environment for the dumper
+        const dumperExecOptions: child_process.ExecOptions = {
+            ...rosExecOptions,
+            env: cleanedEnv
+        };
+
+        let result = await promisifiedExec(ros2_launch_dumper_cmdLine, dumperExecOptions);
 
         if (result.stderr) {
             // Having stderr output is not nessesarily a problem, but it is useful for debugging
