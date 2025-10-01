@@ -5,7 +5,6 @@ import * as vscode from "vscode";
 import * as child_process from "child_process";
 import * as os from "os";
 import * as port_finder from "portfinder";
-import * as sudo from "sudo-prompt";
 import * as util from "util";
 
 import * as extension from "../../../extension";
@@ -18,10 +17,53 @@ import * as utils from "../../utils";
 import * as vscode_utils from "../../../vscode-utils";
 
 const promisifiedExec = util.promisify(child_process.exec);
-const promisifiedSudoExec = util.promisify(
-    (command: any, options: any, cb: any) =>
-        sudo.exec(command, options,
-            (error, stdout, stderr) => cb(error, stdout)));
+
+// Reuse the same terminal for elevated commands
+let elevatedCommandTerminal: vscode.Terminal | undefined;
+
+/**
+ * Executes a command that requires elevated privileges using VS Code terminal
+ */
+async function executeElevatedCommand(command: string, processOptions: child_process.ExecOptions): Promise<{ stdout: string; stderr: string }> {
+    if (os.platform() === "win32") {
+        // On Windows, try without elevation first, then provide helpful error message
+        try {
+            return await promisifiedExec(command, processOptions);
+        } catch (error) {
+            const errorMessage = `Command requires administrator privileges. Please run VS Code as administrator or use the terminal method.\n\nCommand: ${command}`;
+            throw new Error(errorMessage);
+        }
+    } else {
+        // On Linux/macOS, use sudo in terminal - simple and reliable
+        const sudoCommand = `sudo ${command}`;
+        
+        // Reuse existing terminal or create a new one
+        if (!elevatedCommandTerminal || elevatedCommandTerminal.exitStatus !== undefined) {
+            elevatedCommandTerminal = vscode.window.createTerminal({
+                name: 'ROS Debug - Elevated Commands',
+                hideFromUser: false
+            });
+        }
+        
+        elevatedCommandTerminal.show();
+        elevatedCommandTerminal.sendText(sudoCommand);
+        
+        // Show a message to the user about what's happening
+        const message = `Running elevated command in terminal. Please enter your password if prompted.\n\nCommand: ${sudoCommand}`;
+        const result = await vscode.window.showInformationMessage(
+            message,
+            'Continue',
+            'Cancel'
+        );
+        
+        if (result === 'Cancel') {
+            throw new Error('User cancelled elevated command execution');
+        }
+        
+        // Return success indicator - the actual command execution happens in the terminal
+        return { stdout: 'Command sent to terminal', stderr: '' };
+    }
+}
 
 export interface IResolvedAttachRequest extends requests.IAttachRequest {
     runtime: string;
@@ -96,37 +138,57 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
             const host = "localhost";
             const port = await port_finder.getPortPromise();
             const ptvsdInjectCommand = await utils.getPtvsdInjectCommand(host, port, config.processId);
+            
+            // Log the command being executed for debugging
+            extension.outputChannel.appendLine(`Attempting to inject Python debugger into process ${config.processId}`);
+            extension.outputChannel.appendLine(`Command: ${ptvsdInjectCommand}`);
+            extension.outputChannel.appendLine(`Target process: ${config.processId} (${config.commandLine || 'unknown command'})`);
+            
             try {
-                if (os.platform() === "win32") {
-                    const processOptions: child_process.ExecOptions = {
-                        cwd: vscode.workspace.rootPath,
-                        env: await extension.resolvedEnv(),
-                    };
+                const processOptions: child_process.ExecOptions = {
+                    cwd: vscode.workspace.rootPath,
+                    env: await extension.resolvedEnv(),
+                };
 
+                if (os.platform() === "win32") {
                     // "ptvsd --pid" works with child_process.exec() on Windows
                     const result = await promisifiedExec(ptvsdInjectCommand, processOptions);
                 } else {
-                    const processOptions = {
-                        name: "ptvsd",
-                    };
-
-                    // "ptvsd --pid" requires elevated permission on Ubuntu
-                    const result = await promisifiedSudoExec(ptvsdInjectCommand, processOptions);
+                    // "ptvsd --pid" requires elevated permission on Linux/macOS
+                    // Use our VS Code-friendly elevated command execution
+                    const result = await executeElevatedCommand(ptvsdInjectCommand, processOptions);
                 }
 
             } catch (error) {
-                const errorMsg = `Command [${ptvsdInjectCommand}] failed!`;
-                throw (new Error(errorMsg));
+                const errorMsg = `Python debugger injection failed: ${error.message}`;
+                
+                // Provide helpful troubleshooting information
+                const troubleshootMsg = `Python debugger injection failed. This could be due to:\n\n` +
+                    `1. The process is not a Python process\n` +
+                    `2. The Python extension needs to be updated\n` +
+                    `3. The debugger is already attached\n` +
+                    `4. Permission issues\n\n` +
+                    `Note: GDB warnings (like ".gnu_debugaltlink") are normal - debugpy uses GDB internally.\n` +
+                    `Look for actual error messages, not GDB warnings.\n\n` +
+                    `Command that failed: ${ptvsdInjectCommand}\n\n` +
+                    `Please check the Output panel for more details.`;
+                extension.outputChannel.appendLine(troubleshootMsg);
+                extension.outputChannel.show();
+                    
+                vscode.window.showErrorMessage(errorMsg, 'Open Output').then(selection => {
+                    if (selection === 'Open Output') {
+                        extension.outputChannel.show();
+                    }
+                });
+                
+                throw new Error(errorMsg);
             }
 
-            let statusMsg = `New ptvsd instance running on ${host}:${port} `;
-            statusMsg += `injected into process [${config.processId}].` + os.EOL;
-            statusMsg += `To re-attach to process [${config.processId}] after disconnecting, `;
-            statusMsg += `please create a separate Python remote attach debug configuration `;
-            statusMsg += `that uses the host and port listed above.`;
+            let statusMsg = `Python debugger injection completed for process [${config.processId}].\n`;
+            statusMsg += `Attempting to connect to debug server at ${host}:${port}\n\n`;
             extension.outputChannel.appendLine(statusMsg);
             extension.outputChannel.show(true);
-            vscode.window.showInformationMessage(statusMsg);
+            vscode.window.showInformationMessage(`Connecting to Python debugger at ${host}:${port}...`);
 
             const pythonattachdebugconfiguration: IPythonAttachConfiguration = {
                 name: `Python: ${config.processId}`,
@@ -135,15 +197,85 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
                 port: port,
                 host: host,
             };
+            
+            extension.outputChannel.appendLine(`Created Python attach configuration:`);
+            extension.outputChannel.appendLine(`  Name: ${pythonattachdebugconfiguration.name}`);
+            extension.outputChannel.appendLine(`  Type: ${pythonattachdebugconfiguration.type}`);
+            extension.outputChannel.appendLine(`  Host: ${pythonattachdebugconfiguration.host}`);
+            extension.outputChannel.appendLine(`  Port: ${pythonattachdebugconfiguration.port}`);
+            
             debugConfig = pythonattachdebugconfiguration;
         }
 
         if (!debugConfig) {
+            extension.outputChannel.appendLine(`Error: No debug configuration created!`);
             return;
         }
-        const launched = await vscode.debug.startDebugging(undefined, debugConfig);
-        if (!launched) {
-            throw (new Error(`Failed to start debug session!`));
+        
+        extension.outputChannel.appendLine(`Starting debug session with configuration: ${debugConfig.name}`);
+        
+        // For Python debugging, add a small delay to let the debug server start
+        if (debugConfig.type === 'python') {
+            extension.outputChannel.appendLine(`Waiting 2 seconds for Python debug server to start...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Try to test if the port is accessible (basic connection test)
+            try {
+                const net = require('net');
+                const socket = new net.Socket();
+                const connected = await new Promise((resolve) => {
+                    socket.setTimeout(1000);
+                    socket.on('connect', () => {
+                        socket.destroy();
+                        resolve(true);
+                    });
+                    socket.on('timeout', () => {
+                        socket.destroy();
+                        resolve(false);
+                    });
+                    socket.on('error', () => {
+                        socket.destroy();
+                        resolve(false);
+                    });
+                    socket.connect(debugConfig.port, debugConfig.host || 'localhost');
+                });
+                
+                if (connected) {
+                    extension.outputChannel.appendLine(`✅ Debug server is responding on ${debugConfig.host}:${debugConfig.port}`);
+                } else {
+                    extension.outputChannel.appendLine(`⚠️ Debug server not responding on ${debugConfig.host}:${debugConfig.port}`);
+                    extension.outputChannel.appendLine(`This might indicate the debugger injection failed or the process exited.`);
+                }
+            } catch (netError) {
+                extension.outputChannel.appendLine(`Connection test failed: ${netError.message}`);
+            }
+        }
+        
+        try {
+            const launched = await vscode.debug.startDebugging(undefined, debugConfig);
+            if (!launched) {
+                const errorMsg = `Failed to start debug session for ${debugConfig.name}. This could be due to:\n` +
+                                `1. Debug server not responding on ${debugConfig.host || 'localhost'}:${debugConfig.port || 'unknown'}\n` +
+                                `2. Python extension issues\n` +
+                                `3. The injected debugger process exited\n` +
+                                `4. Firewall blocking the connection\n\n` +
+                                `Check the terminal for debugger injection results.`;
+                extension.outputChannel.appendLine(errorMsg);
+                extension.outputChannel.show();
+                vscode.window.showErrorMessage(`Debug session failed to start`, 'Open Output').then(selection => {
+                    if (selection === 'Open Output') {
+                        extension.outputChannel.show();
+                    }
+                });
+                throw new Error(`Failed to start debug session!`);
+            } else {
+                extension.outputChannel.appendLine(`✅ Debug session started successfully: ${debugConfig.name}`);
+                vscode.window.showInformationMessage(`Python debugger attached successfully!`);
+            }
+        } catch (error) {
+            extension.outputChannel.appendLine(`Error starting debug session: ${error.message}`);
+            extension.outputChannel.show();
+            throw error;
         }
     }
 

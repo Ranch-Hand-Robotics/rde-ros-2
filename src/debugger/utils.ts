@@ -51,7 +51,7 @@ export async function getPtvsdInjectCommand(host: string, port: number, pid: num
             const ptvsdCommand = await pyExtension.exports.debug.getRemoteLauncherCommand(host, port, waitForDebugger);
 
             // prepend python interpreter
-            ptvsdCommand.unshift("python");
+            ptvsdCommand.unshift("python3");
             // append the --pid flag
             ptvsdCommand.push("--pid", pid.toString());
             return ptvsdCommand.join(" ");
