@@ -220,7 +220,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         let result = await promisifiedExec(ros2_launch_dumper_cmdLine, dumperExecOptions);
 
         if (result.stderr) {
-            // Having stderr output is not nessesarily a problem, but it is useful for debugging
+            // Having stderr output is not necessarily a problem, but it is useful for debugging
             extension.outputChannel.appendLine(`ROS2 launch processor produced stderr output:\r\n ${result.stderr}`);
             // Show output channel when there's stderr output
             vscode_utils.showOutputPanel(extension.outputChannel);
