@@ -24,8 +24,9 @@ suite("ROS Setup Script Configuration Tests", () => {
             
             if (process.platform === "win32") {
                 // Should default to Pixi path on Windows
-                assert.ok(setupScriptPath.includes("c:\\pixi_ws"), "Should use Windows Pixi default path");
-                assert.ok(setupScriptPath.includes("ros2-win32"), "Should include platform in path");
+                const defaultPixiRoot = config.get("pixiRoot", "c:\\pixi_ws");
+                assert.ok(setupScriptPath.includes(defaultPixiRoot), "Should use Windows Pixi default path");
+                assert.ok(setupScriptPath.includes("ros2-windows"), "Should include platform in path");
                 assert.ok(setupScriptPath.endsWith(".bat"), "Should end with .bat on Windows");
                 assert.ok(setupScriptPath.includes("local_setup"), "Should include setup script name");
             } else {
@@ -101,63 +102,83 @@ suite("ROS Setup Script Configuration Tests", () => {
         }
     });
     
-    test("usePixiOnAllPlatforms configuration exists and defaults to false", () => {
+    test("pixiRoot configuration exists and defaults to c:\\pixi_ws", () => {
         const config = vscode_utils.getExtensionConfiguration();
         
-        // Should be able to get the configuration value (default false)
-        const usePixiOnAllPlatforms = config.get("usePixiOnAllPlatforms", undefined);
-        assert.notStrictEqual(usePixiOnAllPlatforms, undefined, "usePixiOnAllPlatforms setting should exist");
-        assert.strictEqual(config.get("usePixiOnAllPlatforms"), false, "usePixiOnAllPlatforms should default to false");
+        // Should be able to get the configuration value (default c:\pixi_ws)
+        const pixiRoot = config.get("pixiRoot", undefined);
+        assert.notStrictEqual(pixiRoot, undefined, "pixiRoot setting should exist");
+        assert.strictEqual(config.get("pixiRoot"), "c:\\pixi_ws", "pixiRoot should default to c:\\pixi_ws");
         
-        // Test setting it to true
-        const originalValue = config.get("usePixiOnAllPlatforms");
+        // Test setting it to a custom path
+        const originalValue = config.get("pixiRoot");
         try {
-            config.update("usePixiOnAllPlatforms", true, vscode.ConfigurationTarget.Global);
-            const newValue = config.get("usePixiOnAllPlatforms");
-            assert.strictEqual(newValue, true, "Should be able to set usePixiOnAllPlatforms to true");
+            config.update("pixiRoot", "D:\\custom\\pixi", vscode.ConfigurationTarget.Global);
+            assert.strictEqual(config.get("pixiRoot"), "D:\\custom\\pixi", "Should be able to set custom pixiRoot");
+            
+            // Test that getRosSetupScript uses the custom path on Windows
+            if (process.platform === "win32") {
+                config.update("rosSetupScript", "", vscode.ConfigurationTarget.Global);
+                const setupScript = vscode_utils.getRosSetupScript();
+                assert.ok(setupScript.includes("D:\\custom\\pixi"), "Should use custom pixiRoot in setup script path");
+            }
         } finally {
             // Restore original value
-            config.update("usePixiOnAllPlatforms", originalValue, vscode.ConfigurationTarget.Global);
+            config.update("pixiRoot", originalValue, vscode.ConfigurationTarget.Global);
+            config.update("rosSetupScript", "", vscode.ConfigurationTarget.Global);
+        }
+    });
+
+    test("pixiRoot configuration exists and has correct default", () => {
+        const config = vscode_utils.getExtensionConfiguration();
+        
+        // Should be able to get the configuration value
+        const pixiRoot = config.get("pixiRoot", undefined);
+        assert.notStrictEqual(pixiRoot, undefined, "pixiRoot setting should exist");
+        assert.strictEqual(config.get("pixiRoot"), "c:\\pixi_ws", "pixiRoot should default to c:\\pixi_ws");
+        
+        // Test setting it to a custom value
+        const originalValue = config.get("pixiRoot");
+        try {
+            config.update("pixiRoot", "/custom/pixi/path", vscode.ConfigurationTarget.Global);
+            const newValue = config.get("pixiRoot");
+            assert.strictEqual(newValue, "/custom/pixi/path", "Should be able to set pixiRoot to custom path");
+        } finally {
+            // Restore original value
+            config.update("pixiRoot", originalValue, vscode.ConfigurationTarget.Global);
         }
     });
     
-    test("getRosSetupScript respects usePixiOnAllPlatforms setting", () => {
+    test("getRosSetupScript respects pixiRoot setting across all platforms", () => {
         const config = vscode_utils.getExtensionConfiguration();
         const originalRosSetupScript = config.get("rosSetupScript");
-        const originalUsePixiOnAllPlatforms = config.get("usePixiOnAllPlatforms");
+        const originalPixiRoot = config.get("pixiRoot");
         
         try {
             // Clear setup script to test defaults
             config.update("rosSetupScript", "", vscode.ConfigurationTarget.Global);
             
-            // Test with usePixiOnAllPlatforms disabled (default)
-            config.update("usePixiOnAllPlatforms", false, vscode.ConfigurationTarget.Global);
+            // Test with pixiRoot set to custom value
+            const customPixiRoot = "/custom/pixi/workspace";
+            config.update("pixiRoot", customPixiRoot, vscode.ConfigurationTarget.Global);
+            
             let setupScriptPath = vscode_utils.getRosSetupScript();
             
-            if (process.platform === "win32") {
-                // Should still get default on Windows even when usePixiOnAllPlatforms is false
-                assert.ok(setupScriptPath.includes("c:\\pixi_ws"), "Should use Windows default when usePixiOnAllPlatforms is false");
-            } else {
-                // Should return empty on Unix when usePixiOnAllPlatforms is false
-                assert.strictEqual(setupScriptPath, "", "Should return empty on Unix when usePixiOnAllPlatforms is false");
-            }
+            // Should use pixiRoot on all platforms when set
+            assert.ok(setupScriptPath.includes(customPixiRoot), "Should use custom pixiRoot on any platform");
+            assert.ok(setupScriptPath.includes("ros2-windows"), "Should include ros2-windows subdirectory");
             
-            // Test with usePixiOnAllPlatforms enabled
-            config.update("usePixiOnAllPlatforms", true, vscode.ConfigurationTarget.Global);
+            // Test with pixiRoot cleared
+            config.update("pixiRoot", "", vscode.ConfigurationTarget.Global);
             setupScriptPath = vscode_utils.getRosSetupScript();
             
-            if (process.platform === "win32") {
-                // Should still get default on Windows
-                assert.ok(setupScriptPath.includes("c:\\pixi_ws"), "Should still use Windows default when usePixiOnAllPlatforms is true");
-            } else {
-                // Should still return empty on Unix (user must configure)
-                assert.strictEqual(setupScriptPath, "", "Should still require user configuration on Unix even when usePixiOnAllPlatforms is true");
-            }
+            // Should return empty when pixiRoot is not set
+            assert.strictEqual(setupScriptPath, "", "Should return empty when pixiRoot is not configured");
             
         } finally {
             // Restore original configuration
             config.update("rosSetupScript", originalRosSetupScript, vscode.ConfigurationTarget.Global);
-            config.update("usePixiOnAllPlatforms", originalUsePixiOnAllPlatforms, vscode.ConfigurationTarget.Global);
+            config.update("pixiRoot", originalPixiRoot, vscode.ConfigurationTarget.Global);
         }
     });
 });

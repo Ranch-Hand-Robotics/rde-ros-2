@@ -43,23 +43,15 @@ export function getRosSetupScript(): string {
     let rosSetupScript = config.get("rosSetupScript", "");
     
     if (!rosSetupScript) {
-        // Read the flag that allows Pixi usage on non-Windows platforms (defaults to false)
-        const usePixiOnAllPlatforms = config.get("usePixiOnAllPlatforms", false);
-
-        if (process.platform === "win32") {
-            // Default to Pixi installation on Windows
+        // If pixiRoot is configured, use it on any platform
+        const pixiRoot = config.get("pixiRoot", "");
+        
+        if (pixiRoot) {
             const shellInfo = ros_utils.detectUserShell();
             const setupFileName = `local_setup${shellInfo.scriptExtension}`;
-            rosSetupScript = path.join("c:", "pixi_ws", `ros2-windows`, setupFileName);
+            rosSetupScript = path.join(pixiRoot, `ros2-windows`, setupFileName);
         } else {
-            // On Unix-like systems we currently require the user to specify the setup script path.
-            // The `usePixiOnAllPlatforms` flag is reserved for future behavior changes; for now
-            // return an empty string to indicate no default was found.
-            if (!usePixiOnAllPlatforms) {
-                return "";
-            }
-
-            // If Pixi-on-all-platforms is enabled, we still don't auto-guess a Unix path at this time.
+            // No pixiRoot configured - return empty string to indicate no default
             return "";
         }
     }
