@@ -198,7 +198,7 @@ function parsePackageXml(packageXmlPath: string): { name: string; packageRoot: s
             };
         }
     } catch (error) {
-        extension.outputChannel.appendLine(`Error parsing package.xml at ${packageXmlPath}: ${error.message}`);
+        extension.outputChannel.appendLine(`Error parsing package.xml at ${packageXmlPath}: ${String(error)}`);
     }
     
     return null;
