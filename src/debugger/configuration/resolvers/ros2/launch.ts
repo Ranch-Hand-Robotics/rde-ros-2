@@ -348,7 +348,7 @@ function findSourcePythonFile(executablePath: string): { sourcePath: string; pat
         };
         
     } catch (error) {
-        extension.outputChannel.appendLine(`Error finding source file for ${executablePath}: ${error.message}`);
+        extension.outputChannel.appendLine(`Error finding source file for ${executablePath}: ${String(error)}`);
     }
     
     return null;
