@@ -79,6 +79,7 @@ interface IPythonLaunchConfiguration {
     env: { [key: string]: string };
     stopOnEntry: boolean;
     justMyCode: boolean;
+    pathMappings?: Array<{ localRoot: string; remoteRoot: string; }>;
 }
 
 interface ICppvsdbgLaunchConfiguration {
@@ -140,6 +141,217 @@ export interface ILldbLaunchConfiguration {
 
 function getExtensionFilePath(extensionFile: string): string {
     return path.resolve(extension.extPath, extensionFile);
+}
+
+/**
+ * Finds all package.xml files in a workspace recursively.
+ * 
+ * @param workspaceRoot Root directory of the workspace
+ * @returns Array of package.xml file paths
+ */
+function findPackageXmlFiles(workspaceRoot: string): string[] {
+    const packageXmlFiles: string[] = [];
+    
+    function searchDirectory(dirPath: string) {
+        try {
+            const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+            
+            for (const entry of entries) {
+                const fullPath = path.join(dirPath, entry.name);
+                
+                if (entry.isDirectory()) {
+                    // Skip common directories that won't contain packages
+                    if (['build', 'install', 'log', '.git', 'node_modules', '__pycache__'].includes(entry.name)) {
+                        continue;
+                    }
+                    searchDirectory(fullPath);
+                } else if (entry.isFile() && entry.name === 'package.xml') {
+                    packageXmlFiles.push(fullPath);
+                }
+            }
+        } catch (error) {
+            // Ignore directories we can't read
+        }
+    }
+    
+    searchDirectory(workspaceRoot);
+    return packageXmlFiles;
+}
+
+/**
+ * Parses a package.xml file to extract package information.
+ * 
+ * @param packageXmlPath Path to the package.xml file
+ * @returns Package information or null if parsing fails
+ */
+function parsePackageXml(packageXmlPath: string): { name: string; packageRoot: string } | null {
+    try {
+        const xmlContent = fs.readFileSync(packageXmlPath, 'utf8');
+        const packageRoot = path.dirname(packageXmlPath);
+        
+        // Simple XML parsing to extract package name
+        const nameMatch = xmlContent.match(/<name>\s*([^<]+)\s*<\/name>/);
+        if (nameMatch && nameMatch[1]) {
+            return {
+                name: nameMatch[1].trim(),
+                packageRoot: packageRoot
+            };
+        }
+    } catch (error) {
+        extension.outputChannel.appendLine(`Error parsing package.xml at ${packageXmlPath}: ${String(error)}`);
+    }
+    
+    return null;
+}
+
+/**
+ * Recursively searches for Python files in a directory.
+ * 
+ * @param dirPath Directory to search
+ * @param fileName Name of the Python file to find (without .py extension)
+ * @returns Array of matching file paths
+ */
+function findPythonFiles(dirPath: string, fileName: string): string[] {
+    const pythonFiles: string[] = [];
+    
+    function searchDirectory(currentPath: string) {
+        try {
+            const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+            
+            for (const entry of entries) {
+                const fullPath = path.join(currentPath, entry.name);
+                
+                if (entry.isDirectory()) {
+                    // Skip common build/cache directories
+                    if (['__pycache__', '.git', 'build', 'install', 'log'].includes(entry.name)) {
+                        continue;
+                    }
+                    searchDirectory(fullPath);
+                } else if (entry.isFile() && entry.name === `${fileName}.py`) {
+                    pythonFiles.push(fullPath);
+                }
+            }
+        } catch (error) {
+            // Ignore directories we can't read
+        }
+    }
+    
+    searchDirectory(dirPath);
+    return pythonFiles;
+}
+
+/**
+ * Attempts to find the source Python file corresponding to an installed executable.
+ * Returns the source file path and path mappings for debugging.
+ * 
+ * @param executablePath Path to the installed executable
+ * @returns Object containing source file path and path mappings, or null if not found
+ */
+function findSourcePythonFile(executablePath: string): { sourcePath: string; pathMappings: Array<{ localRoot: string; remoteRoot: string; }>; } | null {
+    try {
+        // Parse the executable path to understand the structure
+        // Example executable: /path/to/workspace/install/package_name/lib/package_name/node_name
+        const parsedPath = path.parse(executablePath);
+        const pathParts = parsedPath.dir.split(path.sep);
+        
+        // Find the 'install' directory in the path
+        const installIndex = pathParts.lastIndexOf('install');
+        if (installIndex === -1) {
+            extension.outputChannel.appendLine(`No 'install' directory found in path: ${executablePath}`);
+            return null;
+        }
+        
+        // Find the package name (should be the directory after 'install')
+        if (installIndex + 1 >= pathParts.length) {
+            extension.outputChannel.appendLine(`Cannot determine package name from path: ${executablePath}`);
+            return null;
+        }
+        
+        const packageName = pathParts[installIndex + 1];
+        const workspaceRoot = pathParts.slice(0, installIndex).join(path.sep);
+        const nodeName = parsedPath.name;
+        
+        extension.outputChannel.appendLine(`Searching for source file: package=${packageName}, node=${nodeName}, workspace=${workspaceRoot}`);
+        
+        // Find all package.xml files in the workspace
+        const packageXmlFiles = findPackageXmlFiles(workspaceRoot);
+        extension.outputChannel.appendLine(`Found ${packageXmlFiles.length} package.xml files in workspace`);
+        
+        // Find the package.xml that matches our package name
+        let targetPackageRoot: string | null = null;
+        for (const packageXmlPath of packageXmlFiles) {
+            const packageInfo = parsePackageXml(packageXmlPath);
+            if (packageInfo && packageInfo.name === packageName) {
+                targetPackageRoot = packageInfo.packageRoot;
+                extension.outputChannel.appendLine(`Found matching package.xml: ${packageXmlPath}`);
+                break;
+            }
+        }
+        
+        if (!targetPackageRoot) {
+            extension.outputChannel.appendLine(`Could not find package.xml for package: ${packageName}`);
+            return null;
+        }
+        
+        // Search for Python files with the node name within the package directory
+        const pythonFiles = findPythonFiles(targetPackageRoot, nodeName);
+        extension.outputChannel.appendLine(`Found ${pythonFiles.length} potential Python files: ${pythonFiles.join(', ')}`);
+        
+        if (pythonFiles.length === 0) {
+            extension.outputChannel.appendLine(`No Python file found for node: ${nodeName} in package: ${packageName}`);
+            return null;
+        }
+        
+        // Use the first matching Python file (could be enhanced with better selection logic)
+        const sourcePath = pythonFiles[0];
+        if (pythonFiles.length > 1) {
+            extension.outputChannel.appendLine(`Multiple Python files found, using: ${sourcePath}`);
+        }
+        
+        // Create path mappings to redirect from install to source
+        const installPackageRoot = path.join(workspaceRoot, 'install', packageName);
+        const sourcePackageDir = path.dirname(sourcePath);
+        
+        const pathMappings = [
+            {
+                localRoot: path.resolve(targetPackageRoot),
+                remoteRoot: path.resolve(installPackageRoot)
+            }
+        ];
+        
+        // Add specific mapping for the Python module directory if different from package root
+        if (sourcePackageDir !== targetPackageRoot) {
+            const installLibDir = path.join(installPackageRoot, 'lib', packageName);
+            pathMappings.push({
+                localRoot: path.resolve(sourcePackageDir),
+                remoteRoot: path.resolve(installLibDir)
+            });
+        }
+        
+        // Add additional mappings for site-packages (Windows case)
+        if (executablePath.includes('site-packages')) {
+            const sitePackagesRoot = path.dirname(executablePath);
+            pathMappings.push({
+                localRoot: path.resolve(sourcePackageDir),
+                remoteRoot: path.resolve(sitePackagesRoot)
+            });
+        }
+        
+        extension.outputChannel.appendLine(`Found source file for debugging: ${sourcePath}`);
+        extension.outputChannel.appendLine(`Package root: ${targetPackageRoot}`);
+        extension.outputChannel.appendLine(`Install package root: ${installPackageRoot}`);
+        extension.outputChannel.appendLine(`Path mappings: ${JSON.stringify(pathMappings, null, 2)}`);
+        
+        return {
+            sourcePath: sourcePath,
+            pathMappings: pathMappings
+        };
+        
+    } catch (error) {
+        extension.outputChannel.appendLine(`Error finding source file for ${executablePath}: ${String(error)}`);
+    }
+    
+    return null;
 }
 
 /**
@@ -302,17 +514,42 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
     }
 
     private createPythonLaunchConfig(request: ILaunchRequest, stopOnEntry: boolean): IPythonLaunchConfiguration {
+        let programPath = request.executable;
+        let pathMappings: Array<{ localRoot: string; remoteRoot: string; }> | undefined;
+        
+        // Check if Python source file debugging is enabled
+        const useSourceFiles = vscode.workspace.getConfiguration('ROS2').get<boolean>('debugPythonUsingSourceFiles', false);
+        
+        if (useSourceFiles) {
+            // Try to find the source Python file for better debugging experience
+            const sourceInfo = findSourcePythonFile(request.executable);
+            if (sourceInfo) {
+                // Use the source file as the program to launch
+                programPath = sourceInfo.sourcePath;
+                
+                extension.outputChannel.appendLine(`Python source file debugging enabled - found source file:`);
+                extension.outputChannel.appendLine(`  Original executable: ${request.executable}`);
+                extension.outputChannel.appendLine(`  Using source file: ${sourceInfo.sourcePath}`);
+                
+                // Only add path mappings if we think they're needed for complex scenarios
+                // For now, let's try without them since we're launching the source directly
+            } else {
+                extension.outputChannel.appendLine(`Python source file debugging enabled, but no source file found for: ${request.executable}`);
+                extension.outputChannel.appendLine(`Using installed executable for debugging.`);
+            }
+        }
+        
         const pythonLaunchConfig: IPythonLaunchConfiguration = {
             name: request.nodeName,
             type: "python",
             request: "launch",
-            program: request.executable,
+            program: programPath,
             args: request.arguments,
             env: request.env,
             stopOnEntry: stopOnEntry,
             justMyCode: false,
         };
-
+        
         return pythonLaunchConfig;
     }
 

@@ -173,6 +173,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Enable Pixi environment setup on all platforms (Linux, macOS, Windows). When disabled, Pixi is only used by default on Windows. When enabled, the extension will attempt to use the configured ROS setup script on all platforms."
+                },
+                "ROS2.debugPythonUsingSourceFiles": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "(experimental) Automatically find and use source files instead of installed executables. This allows setting breakpoints in your source code rather than the copied files in the install directory."
                 }
             }
         },
