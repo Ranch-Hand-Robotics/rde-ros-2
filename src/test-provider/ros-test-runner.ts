@@ -74,6 +74,7 @@ export class RosTestRunner {
                 vscode.workspace.workspaceFolders?.[0],
                 debugConfig
             );
+            return Promise.resolve(); // Debug sessions don't have completion callbacks
         } else {
             // Use rostest command through rosApi for non-debug execution
             const terminal = rosApi.activateRostest(testData.launchFile, "");
@@ -82,8 +83,12 @@ export class RosTestRunner {
                 
                 // Monitor terminal output if we have a test run
                 if (run && testItem) {
-                    this.monitorTerminalOutput(terminal, run, testItem);
+                    return this.monitorTerminalOutput(terminal, run, testItem);
+                } else {
+                    return Promise.resolve();
                 }
+            } else {
+                return Promise.resolve();
             }
         }
     }
@@ -121,12 +126,13 @@ export class RosTestRunner {
                 vscode.workspace.workspaceFolders?.[0],
                 debugConfig
             );
+            return Promise.resolve(); // Debug sessions don't have completion callbacks
         } else {
             // Use ROS task execution for better integration with VS Code task system
             const taskDefinition = {
                 type: 'ROS2',
-                command: 'python',
-                args: testCommand.slice(1) // Remove 'python' from testCommand as it's the command
+                command: 'python3',
+                args: testCommand.slice(1) // Remove 'python3' from testCommand as it's the command
             };
             
             const task = new vscode.Task(
@@ -136,7 +142,7 @@ export class RosTestRunner {
                 'ROS2'
             );
             
-            task.execution = new vscode.ShellExecution('python', taskDefinition.args, {
+            task.execution = new vscode.ShellExecution('python3', taskDefinition.args, {
                 env: env, // ROS environment
                 cwd: vscode.workspace.workspaceFolders?.[0].uri.fsPath
             });
@@ -146,7 +152,9 @@ export class RosTestRunner {
             
             // Monitor task completion if we have a test run
             if (run && testItem) {
-                this.monitorTaskExecution(task, run, testItem);
+                return this.monitorTaskExecution(task, run, testItem);
+            } else {
+                return Promise.resolve();
             }
         }
     }
@@ -208,23 +216,25 @@ export class RosTestRunner {
                 debugConfig
             );
         } else {
-            // Use colcon test for running tests (proper ROS 2 workflow)
-            const testFilter = `${testData.testClass}.${testData.testMethod}`;
-            const colconArgs = [
-                'test',
-                '--packages-select', testData.packageName,
-                '--event-handlers', 'console_direct+',
-                '--test-result-base', path.join(workspaceRoot, 'test_results'),
-                '--'  // Pass remaining args to the test executable
-            ];
+            // For C++ tests, run the executable directly since colcon test doesn't support
+            // passing gtest filters through the -- separator
+            const executableName = TestDiscoveryUtils.getCppTestExecutable(testData.filePath, testData.packageName);
+            if (!executableName) {
+                throw new Error("Could not determine test executable name");
+            }
             
-            // Add gtest filter for specific test
-            colconArgs.push(`--gtest_filter=${testFilter}`);
+            const executablePath = this.findTestExecutable(workspaceRoot, testData.packageName, executableName);
+            if (!executablePath) {
+                throw new Error(`Test executable '${executableName}' not found in build directory for package '${testData.packageName}'. Build may have failed or executable name is incorrect.`);
+            }
+            
+            // Build command line arguments for the test executable
+            const testArgs = this.buildGTestArgs(testData);
             
             const taskDefinition = {
                 type: 'ROS2',
-                command: 'colcon',
-                args: colconArgs
+                command: executablePath,
+                args: testArgs
             };
             
             const task = new vscode.Task(
@@ -234,8 +244,8 @@ export class RosTestRunner {
                 'ROS2'
             );
             
-            task.execution = new vscode.ShellExecution('colcon', colconArgs, {
-                env: env, // ROS environment with all necessary variables
+            task.execution = new vscode.ShellExecution(executablePath, testArgs, {
+                env: env, // ROS environment
                 cwd: workspaceRoot
             });
             
@@ -243,7 +253,9 @@ export class RosTestRunner {
             vscode.tasks.executeTask(task);
             
             if (run && testItem) {
-                this.monitorTaskExecution(task, run, testItem);
+                return this.monitorTaskExecution(task, run, testItem);
+            } else {
+                return Promise.resolve();
             }
         }
     }
@@ -399,34 +411,55 @@ export class RosTestRunner {
         task: vscode.Task,
         run: vscode.TestRun,
         testItem: vscode.TestItem
-    ): void {
-        const taskDisposable = vscode.tasks.onDidEndTask((e) => {
-            if (e.execution.task === task) {
-                // Task completed successfully (reached end without error)
-                run.passed(testItem);
-                taskDisposable.dispose();
-            }
-        });
-        
-        const processDisposable = vscode.tasks.onDidEndTaskProcess((e) => {
-            if (e.execution.task === task) {
-                if (e.exitCode === 0) {
-                    // Success case handled by onDidEndTask
+    ): Promise<void> {
+        return new Promise<void>((resolve) => {
+            let taskEnded = false;
+            let processEnded = false;
+            let exitCode: number | undefined;
+
+            const taskDisposable = vscode.tasks.onDidEndTask((e) => {
+                if (e.execution.task === task) {
+                    taskEnded = true;
+                    // Don't mark as passed here - wait for process exit code
+                    if (processEnded) {
+                        // Process already ended, check final result
+                        finalizeTestResult();
+                    }
+                    taskDisposable.dispose();
+                }
+            });
+            
+            const processDisposable = vscode.tasks.onDidEndTaskProcess((e) => {
+                if (e.execution.task === task) {
+                    processEnded = true;
+                    exitCode = e.exitCode;
+                    if (taskEnded) {
+                        // Task already ended, check final result
+                        finalizeTestResult();
+                    }
+                    processDisposable.dispose();
+                }
+            });
+
+            const finalizeTestResult = () => {
+                if (exitCode === 0) {
+                    run.passed(testItem);
                 } else {
-                    const message = new vscode.TestMessage(`Test failed with exit code ${e.exitCode}`);
+                    const message = new vscode.TestMessage(`Test failed with exit code ${exitCode}`);
                     run.failed(testItem, message);
                 }
-                processDisposable.dispose();
-            }
+                resolve(); // Resolve the promise when test is complete
+            };
+            
+            // Set up timeout
+            setTimeout(() => {
+                if (!processEnded) {
+                    const message = new vscode.TestMessage('Test timed out after 5 minutes');
+                    run.failed(testItem, message);
+                    resolve(); // Resolve even on timeout
+                }
+            }, 300000); // 5 minute timeout
         });
-        
-        // Set up timeout
-        setTimeout(() => {
-            const message = new vscode.TestMessage('Test timed out after 5 minutes');
-            run.failed(testItem, message);
-            taskDisposable.dispose();
-            processDisposable.dispose();
-        }, 300000); // 5 minute timeout
     }
 
     /**
@@ -436,42 +469,45 @@ export class RosTestRunner {
         terminal: vscode.Terminal,
         run: vscode.TestRun,
         testItem: vscode.TestItem
-    ): void {
-        const disposable = vscode.window.onDidCloseTerminal((closedTerminal) => {
-            if (closedTerminal === terminal) {
-                // Check the exit status to determine success/failure
-                if (closedTerminal.exitStatus) {
-                    const exitCode = closedTerminal.exitStatus.code;
-                    if (exitCode === 0) {
-                        run.passed(testItem);
+    ): Promise<void> {
+        return new Promise<void>((resolve) => {
+            const disposable = vscode.window.onDidCloseTerminal((closedTerminal) => {
+                if (closedTerminal === terminal) {
+                    // Check the exit status to determine success/failure
+                    if (closedTerminal.exitStatus) {
+                        const exitCode = closedTerminal.exitStatus.code;
+                        if (exitCode === 0) {
+                            run.passed(testItem);
+                        } else {
+                            const message = new vscode.TestMessage(`Test failed with exit code ${exitCode}`);
+                            run.failed(testItem, message);
+                        }
                     } else {
-                        const message = new vscode.TestMessage(`Test failed with exit code ${exitCode}`);
+                        // No exit status available, check if process was killed
+                        const message = new vscode.TestMessage('Test was terminated or interrupted');
                         run.failed(testItem, message);
                     }
-                } else {
-                    // No exit status available, check if process was killed
-                    const message = new vscode.TestMessage('Test was terminated or interrupted');
-                    run.failed(testItem, message);
+                    disposable.dispose();
+                    resolve();
                 }
-                disposable.dispose();
-            }
+            });
+            
+            // Set up a timeout to handle hung processes
+            const timeout = setTimeout(() => {
+                if (!terminal.exitStatus) {
+                    const message = new vscode.TestMessage('Test timed out after 5 minutes');
+                    run.failed(testItem, message);
+                    resolve();
+                }
+            }, 300000); // 5 minute timeout
+            
+            // Clean up timeout when terminal closes
+            const originalDispose = disposable.dispose;
+            disposable.dispose = () => {
+                clearTimeout(timeout);
+                originalDispose.call(disposable);
+            };
         });
-        
-        // Set up a timeout to handle hung processes
-        const timeout = setTimeout(() => {
-            if (!terminal.exitStatus) {
-                const message = new vscode.TestMessage('Test timed out after 5 minutes');
-                run.failed(testItem, message);
-                // Don't dispose the terminal yet, let user manually kill it if needed
-            }
-        }, 300000); // 5 minute timeout
-        
-        // Clean up timeout when terminal closes
-        const originalDispose = disposable.dispose;
-        disposable.dispose = () => {
-            clearTimeout(timeout);
-            originalDispose.call(disposable);
-        };
     }
     
     /**

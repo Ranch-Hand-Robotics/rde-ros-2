@@ -449,6 +449,12 @@
                     }
                 }
             }
+        ],
+        "testExplorer": [
+            {
+                "id": "ros2-test-provider",
+                "label": "ROS 2 Tests"
+            }
         ]
     },
     "scripts": {

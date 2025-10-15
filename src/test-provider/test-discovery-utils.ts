@@ -363,7 +363,7 @@ export class TestDiscoveryUtils {
      * Extract test command from Python test file
      */
     static getPythonTestCommand(testData: RosTestData): string[] {
-        const args = ['python', '-m', 'pytest', '-v'];
+        const args = ['python3', '-m', 'pytest', '-v'];
         
         if (testData.testClass && testData.testMethod) {
             args.push(`${testData.filePath}::${testData.testClass}::${testData.testMethod}`);
@@ -394,7 +394,7 @@ export class TestDiscoveryUtils {
         try {
             const util = require('util');
             const exec = util.promisify(require('child_process').exec);
-            await exec('python -c "import pytest"');
+            await exec('python3 -c "import pytest"');
             result.pytest = true;
         } catch (error) {
             console.log('pytest not available:', error.message);
@@ -431,7 +431,7 @@ export class TestDiscoveryUtils {
         try {
             const util = require('util');
             const exec = util.promisify(require('child_process').exec);
-            await exec('python -c "import launch_testing"');
+            await exec('python3 -c "import launch_testing"');
             result.launchTesting = true;
         } catch (error) {
             console.log('launch_testing not available:', error.message);

@@ -372,8 +372,10 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(Commands.TestsRefresh, () => {
         ensureErrorMessageOnException(() => {
             if (rosTestProvider) {
-                // Test discovery will be refreshed automatically via file watcher
+                rosTestProvider.refresh();
                 vscode.window.showInformationMessage("ROS 2 test discovery refreshed");
+            } else {
+                vscode.window.showWarningMessage("ROS 2 test provider not initialized");
             }
         });
     });

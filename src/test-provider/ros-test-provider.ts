@@ -299,6 +299,7 @@ export class RosTestProvider {
         cancellation: vscode.CancellationToken
     ): Promise<void> {
         const run = this.testController.createTestRun(request);
+        const completionPromises: Promise<void>[] = [];
         
         try {
             const testItems = request.include || [];
@@ -308,8 +309,12 @@ export class RosTestProvider {
                     break;
                 }
                 
-                await this.runSingleTest(testItem, run, false);
+                const completionPromise = this.runSingleTest(testItem, run, false);
+                completionPromises.push(completionPromise);
             }
+            
+            // Wait for all tests to complete before ending the run
+            await Promise.all(completionPromises);
         } finally {
             run.end();
         }
@@ -323,6 +328,7 @@ export class RosTestProvider {
         cancellation: vscode.CancellationToken
     ): Promise<void> {
         const run = this.testController.createTestRun(request);
+        const completionPromises: Promise<void>[] = [];
         
         try {
             const testItems = request.include || [];
@@ -332,8 +338,12 @@ export class RosTestProvider {
                     break;
                 }
                 
-                await this.runSingleTest(testItem, run, true);
+                const completionPromise = this.runSingleTest(testItem, run, true);
+                completionPromises.push(completionPromise);
             }
+            
+            // Wait for all tests to complete before ending the run
+            await Promise.all(completionPromises);
         } finally {
             run.end();
         }
@@ -357,7 +367,7 @@ export class RosTestProvider {
 
         try {
             await this.testRunner.runTest(testData, debug, run, testItem);
-            run.passed(testItem);
+            // Test result is handled by the monitoring in runTest
         } catch (error) {
             const message = new vscode.TestMessage(error.message);
             run.failed(testItem, message);
@@ -371,5 +381,12 @@ export class RosTestProvider {
      */
     public dispose(): void {
         this.disposables.forEach(d => d.dispose());
+    }
+
+    /**
+     * Manually refresh test discovery
+     */
+    public refresh(): void {
+        this.discoverTests();
     }
 }
