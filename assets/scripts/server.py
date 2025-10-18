@@ -9,6 +9,7 @@ import logging
 import time
 import os
 import argparse
+from datetime import datetime
 
 import rclpy.node
 
@@ -24,17 +25,31 @@ rclpy.init(args=None)
 # Create a node
 rclpy_node = rclpy.create_node("ros2_mcp")
 
+# Global state for topic monitoring
+active_monitors = {}  # topic_name -> {"task": asyncio.Task, "subscription": subscription, "start_time": float, "last_message": dict, "topic_type": str}
+
 
 
 # Returns a list of running ROS nodes
 @mcp.tool()
-async def get_nodes() -> list:
+async def get_nodes() -> Dict[str, List[str]]:
     """Returns a list of running ROS nodes"""
     # Get the list of node names
-    node_names = rclpy_node.get_node_names()
-
-    # Return the list of nodes
-    return node_names
+    all_node_names = rclpy_node.get_node_names()
+    
+    # Filter out meta nodes (nodes starting with underscore or system nodes)
+    filtered_nodes = []
+    for node_name in all_node_names:
+        # Skip nodes that start with underscore (meta nodes)
+        if node_name.startswith('_'):
+            continue
+        # Skip common system/meta nodes
+        if node_name in ['parameter_events', 'ros2cli']:
+            continue
+        filtered_nodes.append(node_name)
+    
+    # Return the filtered list of nodes
+    return {"nodes": filtered_nodes}
 
 # Returns information about a given ROS node by name
 @mcp.tool()
@@ -74,24 +89,14 @@ async def list_topics(show_types: bool = False) -> List[Dict[str, str]]:
     Returns:
         List of topics with optional type information
     """
-    result = subprocess.run(["ros2", "topic", "list", "-t" if show_types else ""], 
-                           capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to list topics: {result.stderr}")
+    topic_names_and_types = rclpy_node.get_topic_names_and_types()
     
     topics = []
-    lines = result.stdout.strip().split('\n')
-    
-    for line in lines:
-        if not line:  # Skip empty lines
-            continue
-            
-        if show_types and ' ' in line:
-            topic, topic_type = line.split(' ', 1)
-            topics.append({"name": topic, "type": topic_type})
+    for topic_name, topic_types in topic_names_and_types:
+        if show_types and topic_types:
+            topics.append({"name": topic_name, "type": topic_types[0]})
         else:
-            topics.append({"name": line})
+            topics.append({"name": topic_name})
     
     return topics
 
@@ -106,79 +111,25 @@ async def get_topic_info(topic_name: str) -> Dict[str, Any]:
     Returns:
         Dictionary with topic information
     """
-    result = subprocess.run(["ros2", "topic", "info", topic_name], 
-                           capture_output=True, text=True)
+    # Get topic type using rclpy
+    topic_names_and_types = rclpy_node.get_topic_names_and_types()
+    topic_type_map = {name: types[0] if types else None for name, types in topic_names_and_types}
     
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to get topic info: {result.stderr}")
+    topic_type = topic_type_map.get(topic_name)
     
-    # Get the topic type
-    type_result = subprocess.run(["ros2", "topic", "type", topic_name], 
-                               capture_output=True, text=True)
+    if topic_type is None:
+        raise RuntimeError(f"Topic '{topic_name}' not found")
     
-    if type_result.returncode != 0:
-        raise RuntimeError(f"Failed to get topic type: {type_result.stderr}")
+    # Get publisher and subscriber counts using rclpy
+    publishers_info = rclpy_node.get_publishers_info_by_topic(topic_name)
+    subscriptions_info = rclpy_node.get_subscriptions_info_by_topic(topic_name)
     
-    topic_type = type_result.stdout.strip()
-    
-    # Extract publisher and subscriber counts
-    info = {}
-    info["name"] = topic_name
-    info["type"] = topic_type
-    
-    for line in result.stdout.strip().split('\n'):
-        if 'Publisher count:' in line:
-            info["publisher_count"] = int(line.split(':')[1].strip())
-        elif 'Subscription count:' in line:
-            info["subscription_count"] = int(line.split(':')[1].strip())
-    
-    return info
-
-@mcp.tool()
-async def echo_topic(topic_name: str, message_count: int = 1) -> List[Dict[str, Any]]:
-    """
-    Echo messages from a topic
-    
-    Args:
-        topic_name: Name of the topic to echo
-        message_count: Number of messages to echo (default: 1)
-        
-    Returns:
-        List of received messages
-    """
-    # Get the topic type first
-    type_result = subprocess.run(["ros2", "topic", "type", topic_name], 
-                               capture_output=True, text=True)
-    
-    if type_result.returncode != 0:
-        raise RuntimeError(f"Failed to get topic type: {type_result.stderr}")
-    
-    # We'll use a timeout to avoid hanging indefinitely
-    timeout_seconds = 10
-    
-    cmd = ["ros2", "topic", "echo", "--no-daemon", "--once" if message_count == 1 else "", topic_name]
-    # Filter out empty arguments
-    cmd = [arg for arg in cmd if arg]
-    
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
-        
-        if result.returncode != 0:
-            raise RuntimeError(f"Failed to echo topic: {result.stderr}")
-        
-        try:
-            # Try to parse as JSON
-            messages = result.stdout.strip()
-            if messages:
-                return [json.loads(messages)]
-            else:
-                return []
-        except json.JSONDecodeError:
-            # If not valid JSON, return as text
-            return [{"data": result.stdout.strip()}]
-            
-    except subprocess.TimeoutExpired:
-        raise TimeoutError(f"Timed out waiting for message on topic {topic_name}")
+    return {
+        "name": topic_name,
+        "type": topic_type,
+        "publisher_count": len(publishers_info),
+        "subscription_count": len(subscriptions_info)
+    }
 
 @mcp.tool()
 async def publish_to_topic(topic_name: str, topic_type: str, message: str) -> Dict[str, Any]:
@@ -207,6 +158,230 @@ async def publish_to_topic(topic_name: str, topic_type: str, message: str) -> Di
         "message": message
     }
 
+@mcp.tool()
+async def start_monitoring_topic(topic_name: str) -> Dict[str, Any]:
+    """
+    Start monitoring a topic and stream messages via MCP logging
+    
+    Args:
+        topic_name: Name of the topic to monitor
+        
+    Returns:
+        Status of the monitoring start operation
+    """
+    import asyncio
+    from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+    
+    # Check if already monitoring this topic
+    if topic_name in active_monitors:
+        return {
+            "success": False,
+            "topic": topic_name,
+            "message": "Topic is already being monitored"
+        }
+    
+    # Get the topic type using rclpy
+    topic_names_and_types = rclpy_node.get_topic_names_and_types()
+    
+    # Create a lookup dictionary for faster access
+    topic_type_map = {name: types[0] if types else None for name, types in topic_names_and_types}
+    
+    topic_type_str = topic_type_map.get(topic_name)
+    
+    if topic_type_str is None:
+        raise RuntimeError(f"Topic '{topic_name}' not found or has no type information")
+    
+    # Import the message type dynamically
+    try:
+        package_name, msg_type = topic_type_str.split('/', 1)
+        module_name = package_name + '.msg'
+        msg_class_name = msg_type.split('/')[-1]
+        
+        msg_module = __import__(module_name, fromlist=[msg_class_name])
+        msg_class = getattr(msg_module, msg_class_name)
+    except Exception as e:
+        raise RuntimeError(f"Failed to import message type {topic_type_str}: {str(e)}")
+    
+    # Create a queue for message passing
+    message_queue = asyncio.Queue()
+    
+    # Callback to put messages in the queue
+    def message_callback(msg):
+        try:
+            message_data = {
+                "timestamp": rclpy_node.get_clock().now().to_msg().sec + rclpy_node.get_clock().now().to_msg().nanosec / 1e9,
+                "topic": topic_name,
+                "type": topic_type_str,
+                "data": str(msg)
+            }
+            message_queue.put_nowait(message_data)
+            
+            # Store the last message for this topic
+            if topic_name in active_monitors:
+                active_monitors[topic_name]["last_message"] = message_data
+            
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+    
+    # Create subscription with best effort QoS for streaming
+    qos_profile = QoSProfile(
+        reliability=ReliabilityPolicy.BEST_EFFORT,
+        durability=DurabilityPolicy.VOLATILE,
+        depth=10
+    )
+    
+    subscription = rclpy_node.create_subscription(
+        msg_class,
+        topic_name,
+        message_callback,
+        qos_profile
+    )
+    
+    # Create monitoring task
+    async def monitor_task():
+        message_count = 0
+        try:
+            while True:
+                try:
+                    # Wait for a message with a short timeout
+                    message = await asyncio.wait_for(message_queue.get(), timeout=1.0)
+                    message_count += 1
+                    
+                    # Send message via MCP progress to the LLM
+                    timestamp_str = datetime.fromtimestamp(message["timestamp"]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                    mcp.progress(
+                        token=f"topic_monitor_{topic_name}",
+                        value=message_count,
+                        message=f"[{timestamp_str}] {json.dumps(message)}"
+                    )
+                    
+                except asyncio.TimeoutError:
+                    # Check if we should stop monitoring
+                    if topic_name not in active_monitors:
+                        break
+                    continue
+        except Exception as e:
+            logger.error(f"Error in monitoring task for {topic_name}: {e}")
+        finally:
+            logger.info(f"Stopped monitoring {topic_name} after {message_count} messages")
+    
+    # Start the monitoring task
+    task = asyncio.create_task(monitor_task())
+    
+    # Store the monitor info
+    active_monitors[topic_name] = {
+        "task": task,
+        "subscription": subscription,
+        "start_time": asyncio.get_event_loop().time(),
+        "topic_type": topic_type_str,
+        "last_message": None
+    }
+    
+    return {
+        "success": True,
+        "topic": topic_name,
+        "type": topic_type_str,
+        "message": "Started monitoring topic"
+    }
+
+@mcp.tool()
+async def stop_monitoring_topic(topic_name: str) -> Dict[str, Any]:
+    """
+    Stop monitoring a topic
+    
+    Args:
+        topic_name: Name of the topic to stop monitoring
+        
+    Returns:
+        Status of the monitoring stop operation
+    """
+    if topic_name not in active_monitors:
+        return {
+            "success": False,
+            "topic": topic_name,
+            "message": "Topic is not being monitored"
+        }
+    
+    monitor_info = active_monitors[topic_name]
+    
+    # Cancel the monitoring task
+    monitor_info["task"].cancel()
+    
+    # Destroy the subscription
+    rclpy_node.destroy_subscription(monitor_info["subscription"])
+    
+    # Calculate duration
+    duration = asyncio.get_event_loop().time() - monitor_info["start_time"]
+    
+    # Remove from active monitors
+    del active_monitors[topic_name]
+    
+    return {
+        "success": True,
+        "topic": topic_name,
+        "type": monitor_info["topic_type"],
+        "duration_seconds": round(duration, 2),
+        "message": "Stopped monitoring topic"
+    }
+
+@mcp.tool()
+async def list_monitored_topics() -> List[Dict[str, Any]]:
+    """
+    List currently monitored topics
+    
+    Returns:
+        List of monitored topics with their info
+    """
+    monitored = []
+    current_time = asyncio.get_event_loop().time()
+    
+    for topic_name, monitor_info in active_monitors.items():
+        duration = current_time - monitor_info["start_time"]
+        has_last_message = monitor_info.get("last_message") is not None
+        monitored.append({
+            "topic": topic_name,
+            "type": monitor_info["topic_type"],
+            "duration_seconds": round(duration, 2),
+            "start_time": monitor_info["start_time"],
+            "has_last_message": has_last_message
+        })
+    
+    return monitored
+
+@mcp.tool()
+async def get_last_topic_message(topic_name: str) -> Dict[str, Any]:
+    """
+    Get the last message received for a monitored topic
+    
+    Args:
+        topic_name: Name of the monitored topic
+        
+    Returns:
+        Last message data or error if topic not monitored
+    """
+    if topic_name not in active_monitors:
+        return {
+            "success": False,
+            "topic": topic_name,
+            "error": "Topic is not being monitored"
+        }
+    
+    monitor_info = active_monitors[topic_name]
+    last_message = monitor_info.get("last_message")
+    
+    if last_message is None:
+        return {
+            "success": False,
+            "topic": topic_name,
+            "error": "No messages received yet"
+        }
+    
+    return {
+        "success": True,
+        "topic": topic_name,
+        "type": monitor_info["topic_type"],
+        "last_message": last_message
+    }
 # --- Service Commands ---
 
 @mcp.tool()
@@ -220,24 +395,14 @@ async def list_services(show_types: bool = False) -> List[Dict[str, str]]:
     Returns:
         List of services with optional type information
     """
-    result = subprocess.run(["ros2", "service", "list", "-t" if show_types else ""], 
-                           capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to list services: {result.stderr}")
+    service_names_and_types = rclpy_node.get_service_names_and_types()
     
     services = []
-    lines = result.stdout.strip().split('\n')
-    
-    for line in lines:
-        if not line:  # Skip empty lines
-            continue
-            
-        if show_types and ' ' in line:
-            service, service_type = line.split(' ', 1)
-            services.append({"name": service, "type": service_type})
+    for service_name, service_types in service_names_and_types:
+        if show_types and service_types:
+            services.append({"name": service_name, "type": service_types[0]})
         else:
-            services.append({"name": line})
+            services.append({"name": service_name})
     
     return services
 
@@ -391,24 +556,14 @@ async def list_actions(show_types: bool = False) -> List[Dict[str, str]]:
     Returns:
         List of actions with optional type information
     """
-    result = subprocess.run(["ros2", "action", "list", "-t" if show_types else ""], 
-                           capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to list actions: {result.stderr}")
+    action_names_and_types = rclpy_node.get_action_names_and_types()
     
     actions = []
-    lines = result.stdout.strip().split('\n')
-    
-    for line in lines:
-        if not line:  # Skip empty lines
-            continue
-            
-        if show_types and ' ' in line:
-            action, action_type = line.split(' ', 1)
-            actions.append({"name": action, "type": action_type})
+    for action_name, action_types in action_names_and_types:
+        if show_types and action_types:
+            actions.append({"name": action_name, "type": action_types[0]})
         else:
-            actions.append({"name": line})
+            actions.append({"name": action_name})
     
     return actions
 
@@ -472,7 +627,7 @@ async def send_action_goal(action_name: str, action_type: str, goal: str, feedba
         if result.returncode != 0:
             raise RuntimeError(f"Failed to send action goal: {result.stderr}")
         
-        output = result.stdout.strip()
+        output = result.stdout.strip();
         
         return {
             "success": True,
