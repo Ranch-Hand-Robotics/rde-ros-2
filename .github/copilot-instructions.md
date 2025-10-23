@@ -1,9 +1,12 @@
 # General
 Create test cases in the test directory for all new features and bug fixes.
 Do not create summary documents.
-If you need to execute ROS commands, source the ROS 2 setup script in the terminal before running the command. We're testing on Kilted, so use /opt/ros/kilted/setup.bash when running on a Linux system or c:\pixi_ws\ros2-windows\local_setup.bat on Windows.
+If you need to execute ROS commands, source the ROS 2 setup script in the terminal before running the command. We're testing on Kilted, so use /opt/ros/kilted/setup.bash when running on a Linux system or the configured Pixi setup script on Windows (defaults to c:\pixi_ws\ros2-windows\local_setup.bat but configurable via ROS2.pixiRoot setting).
 This project compiles typescript using `npm run build`
 Require statements should always be at the top of a file, never in the middle.
+Be concise and to the point.
+If a command is unclear or results in numerous changes, ask for clarification before proceeding.
+Do not use vcpkg for dependency management, use Pixi instead.
 
 # Library specifications
 * This is a Visual Studio Code extension which provides tools to help develop ROS 2 code, which includes rclpy, rclcpp, rclrust and rcldonet.

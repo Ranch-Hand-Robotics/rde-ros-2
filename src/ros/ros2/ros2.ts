@@ -198,8 +198,11 @@ export class ROS2 implements ros.ROSApi {
     }
 
     public activateRostest(launchFilepath: string, argument: string): vscode.Terminal {
-        console.error("ROS2 rostest equivalent not implemented yet");
-        return;
+        const terminal = ros_utils.createTerminal(this.context);
+        // In ROS 2, tests are typically run with launch files using ros2 launch
+        // or with colcon test for package-level testing
+        terminal.sendText(`ros2 launch ${launchFilepath} ${argument}`);
+        return terminal;
     }
 
     public async getLifecycleNodes(): Promise<string[]> {

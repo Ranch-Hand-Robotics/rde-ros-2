@@ -42,6 +42,10 @@
         "onLanguage:csharp",
         "onCommand",
         "workspaceContains:**/package.xml",
+        "workspaceContains:**/test_*.py",
+        "workspaceContains:**/*_test.py",
+        "workspaceContains:**/*Test.cpp",
+        "workspaceContains:**/test_*.launch.py",
         "onWebviewPanel:ros2Status",
         "onDebug",
         "onDebugInitialConfigurations:ros2",
@@ -139,6 +143,24 @@
                 "command": "ROS2.lifecycle.triggerTransition",
                 "title": "Trigger Lifecycle Transition",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.tests.refresh",
+                "title": "Refresh Test Discovery",
+                "category": "ROS2",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "ROS2.tests.runAll",
+                "title": "Run All ROS 2 Tests",
+                "category": "ROS2",
+                "icon": "$(play)"
+            },
+            {
+                "command": "ROS2.tests.debugAll",
+                "title": "Debug All ROS 2 Tests",
+                "category": "ROS2",
+                "icon": "$(debug-alt)"
             }
         ],
         "mcpServerDefinitionProviders": [
@@ -157,7 +179,7 @@
                 },
                 "ROS2.rosSetupScript": {
                     "type": "string",
-                    "description": "ROS workspace setup script path. If empty, defaults to 'c:\\pixi_ws\\ros2-windows\\local_setup.bat' on Windows. On other platforms, you must specify the full path unless 'usePixiOnAllPlatforms' is enabled. Supports '${workspaceFolder}' variable substitution."
+                    "description": "ROS workspace setup script path. If empty, defaults to '<pixiRoot>\\ros2-windows\\local_setup.bat' when pixiRoot is configured (works on all platforms). Otherwise, you must specify the full path. Supports '${workspaceFolder}' variable substitution."
                 },
                 "ROS2.mcpServerPort": {
                     "type": "integer",
@@ -169,15 +191,15 @@
                     "default": true,
                     "description": "Automatically show the ROS 2 output channel when there are warnings or errors."
                 },
-                "ROS2.usePixiOnAllPlatforms": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Enable Pixi environment setup on all platforms (Linux, macOS, Windows). When disabled, Pixi is only used by default on Windows. When enabled, the extension will attempt to use the configured ROS setup script on all platforms."
-                },
                 "ROS2.debugPythonUsingSourceFiles": {
                     "type": "boolean",
                     "default": false,
                     "description": "(experimental) Automatically find and use source files instead of installed executables. This allows setting breakpoints in your source code rather than the copied files in the install directory."
+                },
+                "ROS2.pixiRoot": {
+                    "type": "string",
+                    "default": "c:\\pixi_ws",
+                    "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
                 }
             }
         },
@@ -426,6 +448,12 @@
                         "description": "Command line arguments to colcon"
                     }
                 }
+            }
+        ],
+        "testExplorer": [
+            {
+                "id": "ros2-test-provider",
+                "label": "ROS 2 Tests"
             }
         ]
     },

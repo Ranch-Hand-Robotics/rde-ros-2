@@ -21,7 +21,7 @@ RoboStack provides a community-driven distribution of ROS 2 packages, which incl
 6. **Configure Pixi in RDE**
     - Open the Workspace settings.
     - Set the `ROS2.usePixiOnAllPlatforms` setting to `true` if you want to use Pixi on all platforms. This will allow the extension to automatically configure the ROS 2 environment using Pixi.
-    - Set the `ROS2.rosSetupScript` setting to the path of your ROS 2 setup script. If you are using Pixi, this will typically be `c:\pixi_ws\ros2-windows\local_setup.bat` on Windows or `/opt/pixi/ros2-linux/local_setup.bash` on Linux.
+    - Set the `ROS2.rosSetupScript` setting to the path of your ROS 2 setup script. If you are using Pixi, this will typically be `<pixiRoot>\ros2-windows\local_setup.bat` on Windows (where `pixiRoot` defaults to `c:\pixi_ws` but is configurable via the `ROS2.pixiRoot` setting) or `/opt/pixi/ros2-linux/local_setup.bash` on Linux.
 7. **Open a ROS 2 Workspace**: Open a folder containing a ROS 2 workspace. The Robot Developer Extensions will automatically detect the ROS 2 environment and configure the workspace accordingly.
 
 ## Troubleshooting

@@ -15,6 +15,7 @@
     "exclude": [
         "node_modules",
         ".vscode-test",
-        "samples"
+        "samples",
+        "vscode.d.ts"
     ]
 }

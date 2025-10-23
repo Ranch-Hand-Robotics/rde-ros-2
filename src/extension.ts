@@ -22,6 +22,7 @@ import * as lifecycle from "./ros/ros2/lifecycle";
 import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
+import { RosTestProvider } from "./test-provider/ros-test-provider";
 
 /**
  * The sourced ROS environment.
@@ -33,6 +34,7 @@ export let extPath: string;
 export let outputChannel: vscode.OutputChannel;
 export let mcpServerTerminal: vscode.Terminal | null = null;
 export let extensionContext: vscode.ExtensionContext | null = null;
+export let rosTestProvider: RosTestProvider | null = null;
 
 let onEnvChanged = new vscode.EventEmitter<void>();
 
@@ -61,6 +63,9 @@ export enum Commands {
     Rostest = "ROS2.rostest",
     Rosdep = "ROS2.rosdep",
     ShowCoreStatus = "ROS2.showCoreStatus",
+    TestsRefresh = "ROS2.tests.refresh",
+    TestsRunAll = "ROS2.tests.runAll",
+    TestsDebugAll = "ROS2.tests.debugAll",
     StartRosCore = "ROS2.startCore",
     TerminateRosCore = "ROS2.stopCore",
     UpdateCppProperties = "ROS2.updateCppProperties",
@@ -363,6 +368,38 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    // Register Test commands
+    vscode.commands.registerCommand(Commands.TestsRefresh, () => {
+        ensureErrorMessageOnException(() => {
+            if (rosTestProvider) {
+                rosTestProvider.refresh();
+                vscode.window.showInformationMessage("ROS 2 test discovery refreshed");
+            } else {
+                vscode.window.showWarningMessage("ROS 2 test provider not initialized");
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.TestsRunAll, () => {
+        ensureErrorMessageOnException(async () => {
+            if (rosTestProvider) {
+                await vscode.commands.executeCommand('test-explorer.run-all');
+            } else {
+                vscode.window.showWarningMessage("ROS 2 test provider not initialized");
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.TestsDebugAll, () => {
+        ensureErrorMessageOnException(async () => {
+            if (rosTestProvider) {
+                await vscode.commands.executeCommand('test-explorer.debug-all');
+            } else {
+                vscode.window.showWarningMessage("ROS 2 test provider not initialized");
+            }
+        });
+    });
+
     // Register Lifecycle commands
     vscode.commands.registerCommand(Commands.LifecycleListNodes, async () => {
         ensureErrorMessageOnException(async () => {
@@ -499,6 +536,12 @@ export async function deactivate() {
     await telemetry.clearReporter();
     shutdownMcpServer();
     
+    // Clean up test provider
+    if (rosTestProvider) {
+        rosTestProvider.dispose();
+        rosTestProvider = null;
+    }
+    
     // Clean up MCP terminal
     if (mcpServerTerminal && !mcpServerTerminal.exitStatus) {
         mcpServerTerminal.dispose();
@@ -566,6 +609,12 @@ async function activateEnvironment(context: vscode.ExtensionContext) {
     subscriptions.push(...registerRosShellTaskProvider());
 
     debug_manager.registerRosDebugManager(context);
+    
+    // Initialize ROS 2 test provider
+    if (!rosTestProvider) {
+        rosTestProvider = new RosTestProvider(context);
+        subscriptions.push(rosTestProvider);
+    }
 
     // Register commands dependent on a workspace
     if (buildToolDetected) {
@@ -603,9 +652,8 @@ async function sourceRosAndWorkspace(): Promise<void> {
 
     let rosSetupScript = config.get("rosSetupScript", "");
 
-    // If no setup script is configured, use platform defaults
-    const usePixiOnAllPlatforms = config.get("usePixiOnAllPlatforms", false);
-    if (!rosSetupScript && (process.platform === "win32" || usePixiOnAllPlatforms)) {
+    // If no setup script is configured, try to get one from the workspace (e.g., via pixi if configured)
+    if (!rosSetupScript) {
         rosSetupScript = vscode_utils.getRosSetupScript();
     }
 

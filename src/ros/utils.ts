@@ -140,7 +140,8 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
             // On Windows, create a composite environment by sourcing multiple setup scripts
             // Use a temporary batch file to avoid command line length limitations
             const tempDir = os.tmpdir();
-            const tempBatchFile = path.join(tempDir, `ros_env_setup_${Date.now()}.bat`);
+            const timestamp = Date.now();
+            const tempBatchFile = path.join(tempDir, `ros_env_setup_${timestamp}.bat`);
             
             const setupCommands: string[] = [
                 "@echo off",
@@ -151,7 +152,6 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
             const vsInstallations = findVisualStudioInstallations();
             
             // Add VS environment setup if available (only call the first one found)
-            setupCommands.push("REM Setup Visual Studio environment");
             for (const vsPath of vsInstallations) {
                 setupCommands.push(`if exist "${vsPath}" (`);
                 setupCommands.push(`    call "${vsPath}" x64`);
@@ -161,15 +161,33 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
             setupCommands.push(":vs_done");
             
             // 2. Pixi shell hook (if available)
+            const config = vscode_utils.getExtensionConfiguration();
+            const pixiRoot = config.get("pixiRoot", "c:\\pixi_ws");
             setupCommands.push("REM Setup Pixi environment");
-            setupCommands.push("where pixi >nul 2>nul && pixi shell-hook");
+            setupCommands.push(`if exist "${pixiRoot}" (`);
+            setupCommands.push(`    cd /d "${pixiRoot}"`);
+            setupCommands.push("    where pixi >nul 2>nul");
+            setupCommands.push("    if %errorlevel% equ 0 (");
+            setupCommands.push("        echo Setting up Pixi environment from " + pixiRoot);
+            setupCommands.push(`        set "PIXI_TEMP_BAT=%TEMP%\\pixi_env_${timestamp}.bat"`);
+            setupCommands.push("        pixi shell-hook > \"%PIXI_TEMP_BAT%\" 2>nul");
+            setupCommands.push("        if exist \"%PIXI_TEMP_BAT%\" (");
+            setupCommands.push("            call \"%PIXI_TEMP_BAT%\"");
+            setupCommands.push("            del \"%PIXI_TEMP_BAT%\" >nul 2>nul");
+            setupCommands.push("        ) else (");
+            setupCommands.push("            echo Pixi shell-hook failed to generate environment file");
+            setupCommands.push("        )");
+            setupCommands.push("    ) else (");
+            setupCommands.push("        echo Pixi command not found in PATH");
+            setupCommands.push("    )");
+            setupCommands.push(") else (");
+            setupCommands.push(`    echo Pixi root directory does not exist: ${pixiRoot}`);
+            setupCommands.push(")");
             
             // 3. Source the requested setup file
-            setupCommands.push("REM Setup target file");
             setupCommands.push(`call "${filename}"`);
             
             // 4. Output environment variables
-            setupCommands.push("REM Output environment");
             setupCommands.push("set");
             
             // Write the batch file
@@ -220,7 +238,7 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
         };
         
         child_process.exec(exportEnvCommand, processOptions, (error, stdout, stderr) => {
-            // Clean up temporary batch file on Windows
+            // Clean up temporary batch files on Windows
             if (process.platform === "win32" && exportEnvCommand.includes("ros_env_setup_")) {
                 const fs = require("fs");
                 try {
@@ -228,9 +246,16 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
                     if (tempFile) {
                         fs.unlinkSync(tempFile);
                         extension.outputChannel.appendLine(`Cleaned up temporary batch file: ${tempFile}`);
+                        
+                        // Also try to clean up the pixi temp file if it exists
+                        const pixiTempFile = tempFile.replace("ros_env_setup_", "pixi_env_");
+                        if (fs.existsSync(pixiTempFile)) {
+                            fs.unlinkSync(pixiTempFile);
+                            extension.outputChannel.appendLine(`Cleaned up pixi temporary batch file: ${pixiTempFile}`);
+                        }
                     }
                 } catch (cleanupError) {
-                    extension.outputChannel.appendLine(`Failed to cleanup temporary file: ${cleanupError}`);
+                    extension.outputChannel.appendLine(`Failed to cleanup temporary files: ${cleanupError}`);
                 }
             }
             
@@ -242,6 +267,14 @@ export function sourceSetupFile(filename: string, env?: any): Promise<any> {
                 reject(error);
                 return;
             }
+
+            if (stderr) {
+                extension.outputChannel.appendLine(`Shell stderr: ${stderr}`);
+            }
+
+            if (stdout) {
+                extension.outputChannel.appendLine(`Shell stdout: ${stdout}`);
+            }                
 
             try {
                 // Parse environment variables with better error handling
