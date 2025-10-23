@@ -652,9 +652,8 @@ async function sourceRosAndWorkspace(): Promise<void> {
 
     let rosSetupScript = config.get("rosSetupScript", "");
 
-    // If no setup script is configured, use pixi setup if pixiRoot is configured
-    const pixiRoot = config.get("pixiRoot", "");
-    if (!rosSetupScript && pixiRoot) {
+    // If no setup script is configured, try to get one from the workspace (e.g., via pixi if configured)
+    if (!rosSetupScript) {
         rosSetupScript = vscode_utils.getRosSetupScript();
     }
 
