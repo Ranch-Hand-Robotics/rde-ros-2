@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0" disabled="0" errors="0" time="5.057" timestamp="2025-10-22T22:49:12.735" name="AllTests">
+  <testsuite name="TestRdePublisher" tests="1" failures="0" disabled="0" skipped="1" errors="0" time="5.046" timestamp="2025-10-22T22:49:12.746">
+    <testcase name="TestPublisherExists" file="/home/polyhobbyist/ws/rde-ros-2/samples/cpp/src/rde_cpp/test/test_publisher.cpp" line="53" status="run" result="skipped" time="5.046" timestamp="2025-10-22T22:49:12.746" classname="TestRdePublisher">
+      <skipped message="/home/polyhobbyist/ws/rde-ros-2/samples/cpp/src/rde_cpp/test/test_publisher.cpp:69&#x0A;Publisher not found - rde_publisher node may not be running&#x0A;"><![CDATA[/home/polyhobbyist/ws/rde-ros-2/samples/cpp/src/rde_cpp/test/test_publisher.cpp:69
+Publisher not found - rde_publisher node may not be running
+]]></skipped>
+    </testcase>
+  </testsuite>
+</testsuites>

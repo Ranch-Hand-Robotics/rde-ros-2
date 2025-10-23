@@ -48,6 +48,37 @@ install(DIRECTORY
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
+  
+  # Add GTest
+  find_package(ament_cmake_gtest REQUIRED)
+  
+  # Test publisher
+  ament_add_gtest(test_publisher test/test_publisher.cpp)
+  target_link_libraries(test_publisher
+    ${rclcpp_LIBRARIES}
+    ${std_msgs_LIBRARIES}
+  )
+  ament_target_dependencies(test_publisher
+    rclcpp
+    std_msgs
+  )
+  
+  # Test subscriber
+  ament_add_gtest(test_subscriber test/test_subscriber.cpp)
+  target_link_libraries(test_subscriber
+    ${rclcpp_LIBRARIES}
+    ${std_msgs_LIBRARIES}
+  )
+  ament_target_dependencies(test_subscriber
+    rclcpp
+    std_msgs
+  )
+  
+  # Install test launch files
+  install(DIRECTORY
+    test
+    DESTINATION share/${PROJECT_NAME}
+  )
 endif()
 
 ament_package()

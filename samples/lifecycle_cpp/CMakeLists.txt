@@ -34,6 +34,28 @@ install(DIRECTORY
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
+  
+  # Add GTest
+  find_package(ament_cmake_gtest REQUIRED)
+  
+  # Test lifecycle node
+  ament_add_gtest(test_lifecycle_node test/test_lifecycle_node.cpp)
+  target_link_libraries(test_lifecycle_node
+    ${rclcpp_LIBRARIES}
+    ${rclcpp_lifecycle_LIBRARIES}
+    ${lifecycle_msgs_LIBRARIES}
+  )
+  ament_target_dependencies(test_lifecycle_node
+    rclcpp
+    rclcpp_lifecycle
+    lifecycle_msgs
+  )
+  
+  # Install test launch files
+  install(DIRECTORY
+    test
+    DESTINATION share/${PROJECT_NAME}
+  )
 endif()
 
 ament_package()
