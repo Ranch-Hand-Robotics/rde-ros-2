@@ -26,6 +26,7 @@ RoboStack provides a community-driven distribution of ROS 2 packages, which incl
 
 ## Troubleshooting
 If you encounter issues with Pixi or the Robot Developer Extensions, consider the following:
+
 - Ensure that Pixi is installed correctly and the `pixi` command is available in your terminal.
 - Check the [Visual Studio Code output panel](./troubleshooting.md) for any error messages related to the Robot Developer Extensions.
 - If you are using RoboStack, ensure that the ROS 2 packages are installed correctly and the environment is set up properly outside of the extension.
