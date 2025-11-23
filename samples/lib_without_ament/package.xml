@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rde_lib_without_ament</name>
+  <version>0.1.0</version>
+  <description>A c++ library that does not depend on ament and ROS.</description>
+  <maintainer email="developer@example.com">ROS 2 Developer</maintainer>
+  <license>Apache License 2.0</license>
+  <buildtool_depend">cmake</buildtool_depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>
