@@ -231,4 +231,307 @@ suite('ROS Message Providers Test Suite', () => {
         assert.ok(hoverText.includes('int32 sec') || hoverText.includes('uint32 nanosec'), 
             'Hover should show properties from Duration message (sec and nanosec)');
     });
+    
+    test('Hover over fixed-size array should show array size annotation', async () => {
+        // Open ComplexMessage.msg which has fixed-size arrays
+        const complexMsgPath = path.join(samplesPath, 'ComplexMessage.msg');
+        const doc = await vscode.workspace.openTextDocument(complexMsgPath);
+        await vscode.window.showTextDocument(doc);
+        
+        // Find line with int32[6] joint_efforts
+        let targetLine = -1;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const lineText = doc.lineAt(i).text;
+            if (lineText.includes('int32[6] joint_efforts')) {
+                targetLine = i;
+                break;
+            }
+        }
+        
+        assert.notStrictEqual(targetLine, -1, 'Could not find int32[6] joint_efforts in ComplexMessage.msg');
+        
+        // Position cursor on the type
+        const position = new vscode.Position(targetLine, 2); // Position within "int32"
+        
+        // Execute hover provider
+        const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+            'vscode.executeHoverProvider',
+            doc.uri,
+            position
+        );
+        
+        assert.ok(hovers && hovers.length > 0, 'No hover information returned');
+        
+        const hover = hovers[0];
+        const contents = hover.contents;
+        assert.ok(contents.length > 0, 'Hover contents are empty');
+        
+        const markdown = contents[0] as vscode.MarkdownString;
+        const hoverText = markdown.value;
+        
+        // Check for array annotation
+        assert.ok(hoverText.includes('Array'), 'Hover should mention Array');
+        assert.ok(hoverText.includes('Fixed size') && hoverText.includes('[6]'), 
+            'Hover should show fixed array size [6]');
+    });
+    
+    test('Hover over dynamic array should show dynamic array annotation', async () => {
+        // Open ComplexMessage.msg which has dynamic arrays
+        const complexMsgPath = path.join(samplesPath, 'ComplexMessage.msg');
+        const doc = await vscode.workspace.openTextDocument(complexMsgPath);
+        await vscode.window.showTextDocument(doc);
+        
+        // Find line with float64[] joint_positions
+        let targetLine = -1;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const lineText = doc.lineAt(i).text;
+            if (lineText.includes('float64[] joint_positions')) {
+                targetLine = i;
+                break;
+            }
+        }
+        
+        assert.notStrictEqual(targetLine, -1, 'Could not find float64[] joint_positions in ComplexMessage.msg');
+        
+        // Position cursor on the type
+        const position = new vscode.Position(targetLine, 2); // Position within "float64"
+        
+        // Execute hover provider
+        const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+            'vscode.executeHoverProvider',
+            doc.uri,
+            position
+        );
+        
+        assert.ok(hovers && hovers.length > 0, 'No hover information returned');
+        
+        const hover = hovers[0];
+        const contents = hover.contents;
+        assert.ok(contents.length > 0, 'Hover contents are empty');
+        
+        const markdown = contents[0] as vscode.MarkdownString;
+        const hoverText = markdown.value;
+        
+        // Check for array annotation
+        assert.ok(hoverText.includes('Array'), 'Hover should mention Array');
+        assert.ok(hoverText.includes('Dynamic size') && hoverText.includes('[]'), 
+            'Hover should show dynamic array size []');
+    });
+    
+    test('Hover over field with inline comment should display comment', async () => {
+        // Open SensorData.msg which has inline comments
+        const sensorDataPath = path.join(samplesPath, 'SensorData.msg');
+        const doc = await vscode.workspace.openTextDocument(sensorDataPath);
+        await vscode.window.showTextDocument(doc);
+        
+        // Find line with temperature field and comment
+        let targetLine = -1;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const lineText = doc.lineAt(i).text;
+            if (lineText.includes('float64 temperature') && lineText.includes('# Celsius')) {
+                targetLine = i;
+                break;
+            }
+        }
+        
+        assert.notStrictEqual(targetLine, -1, 'Could not find temperature field with comment in SensorData.msg');
+        
+        // Position cursor on the field name
+        const lineText = doc.lineAt(targetLine).text;
+        const fieldNameIndex = lineText.indexOf('temperature');
+        const position = new vscode.Position(targetLine, fieldNameIndex + 2);
+        
+        // Execute hover provider
+        const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+            'vscode.executeHoverProvider',
+            doc.uri,
+            position
+        );
+        
+        assert.ok(hovers && hovers.length > 0, 'No hover information returned');
+        
+        const hover = hovers[0];
+        const contents = hover.contents;
+        assert.ok(contents.length > 0, 'Hover contents are empty');
+        
+        const markdown = contents[0] as vscode.MarkdownString;
+        const hoverText = markdown.value;
+        
+        // Check that comment is included
+        assert.ok(hoverText.includes('Celsius'), 'Hover should include inline comment about Celsius');
+    });
+    
+    test('Hover over field with default value should display default value', async () => {
+        // Open BasicTypes.msg which has fields with default values
+        const basicTypesPath = path.join(samplesPath, 'BasicTypes.msg');
+        const doc = await vscode.workspace.openTextDocument(basicTypesPath);
+        await vscode.window.showTextDocument(doc);
+        
+        // Find line with is_active field with default value
+        let targetLine = -1;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const lineText = doc.lineAt(i).text;
+            if (lineText.includes('bool is_active true')) {
+                targetLine = i;
+                break;
+            }
+        }
+        
+        assert.notStrictEqual(targetLine, -1, 'Could not find is_active field in BasicTypes.msg');
+        
+        // Position cursor on the field name
+        const lineText = doc.lineAt(targetLine).text;
+        const fieldNameIndex = lineText.indexOf('is_active');
+        const position = new vscode.Position(targetLine, fieldNameIndex + 2);
+        
+        // Execute hover provider
+        const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+            'vscode.executeHoverProvider',
+            doc.uri,
+            position
+        );
+        
+        assert.ok(hovers && hovers.length > 0, 'No hover information returned');
+        
+        const hover = hovers[0];
+        const contents = hover.contents;
+        assert.ok(contents.length > 0, 'Hover contents are empty');
+        
+        const markdown = contents[0] as vscode.MarkdownString;
+        const hoverText = markdown.value;
+        
+        // Check that default value is shown
+        assert.ok(hoverText.includes('true'), 'Hover should show default value "true"');
+        assert.ok(hoverText.includes('Default') || hoverText.includes('='), 
+            'Hover should indicate this is a default value');
+    });
+    
+    test('Hover over constant field should display constant value', async () => {
+        // Open BasicTypes.msg which has constants
+        const basicTypesPath = path.join(samplesPath, 'BasicTypes.msg');
+        const doc = await vscode.workspace.openTextDocument(basicTypesPath);
+        await vscode.window.showTextDocument(doc);
+        
+        // Find line with MAX_SPEED constant
+        let targetLine = -1;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const lineText = doc.lineAt(i).text;
+            if (lineText.includes('int32 MAX_SPEED=100')) {
+                targetLine = i;
+                break;
+            }
+        }
+        
+        assert.notStrictEqual(targetLine, -1, 'Could not find MAX_SPEED constant in BasicTypes.msg');
+        
+        // Position cursor on the constant name
+        const lineText = doc.lineAt(targetLine).text;
+        const constantNameIndex = lineText.indexOf('MAX_SPEED');
+        const position = new vscode.Position(targetLine, constantNameIndex + 2);
+        
+        // Execute hover provider
+        const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+            'vscode.executeHoverProvider',
+            doc.uri,
+            position
+        );
+        
+        assert.ok(hovers && hovers.length > 0, 'No hover information returned');
+        
+        const hover = hovers[0];
+        const contents = hover.contents;
+        assert.ok(contents.length > 0, 'Hover contents are empty');
+        
+        const markdown = contents[0] as vscode.MarkdownString;
+        const hoverText = markdown.value;
+        
+        // Check that constant value is shown
+        assert.ok(hoverText.includes('100'), 'Hover should show constant value "100"');
+        assert.ok(hoverText.includes('Constant') || hoverText.includes('='), 
+            'Hover should indicate this is a constant');
+    });
+    
+    test('Hover over custom type with package qualifier should show package info', async () => {
+        // Open ComplexMessage.msg
+        const complexMsgPath = path.join(samplesPath, 'ComplexMessage.msg');
+        const doc = await vscode.workspace.openTextDocument(complexMsgPath);
+        await vscode.window.showTextDocument(doc);
+        
+        // Find line with geometry_msgs/Point
+        let targetLine = -1;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const lineText = doc.lineAt(i).text;
+            if (lineText.includes('geometry_msgs/Point position')) {
+                targetLine = i;
+                break;
+            }
+        }
+        
+        assert.notStrictEqual(targetLine, -1, 'Could not find geometry_msgs/Point in ComplexMessage.msg');
+        
+        // Position cursor on the type
+        const position = new vscode.Position(targetLine, 5); // Position within the type
+        
+        // Execute hover provider
+        const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+            'vscode.executeHoverProvider',
+            doc.uri,
+            position
+        );
+        
+        assert.ok(hovers && hovers.length > 0, 'No hover information returned');
+        
+        const hover = hovers[0];
+        const contents = hover.contents;
+        assert.ok(contents.length > 0, 'Hover contents are empty');
+        
+        const markdown = contents[0] as vscode.MarkdownString;
+        const hoverText = markdown.value;
+        
+        // Check that package info is shown
+        assert.ok(hoverText.includes('Package'), 'Hover should show Package information');
+        assert.ok(hoverText.includes('geometry_msgs'), 'Hover should show package name');
+    });
+    
+    test('Hover over custom type without package qualifier should provide go-to-definition hint', async () => {
+        // Open ComplexMessage.msg which references BasicTypes without package
+        const complexMsgPath = path.join(samplesPath, 'ComplexMessage.msg');
+        const doc = await vscode.workspace.openTextDocument(complexMsgPath);
+        await vscode.window.showTextDocument(doc);
+        
+        // Find line with BasicTypes (no package qualifier)
+        let targetLine = -1;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const lineText = doc.lineAt(i).text;
+            if (lineText.includes('BasicTypes robot_config')) {
+                targetLine = i;
+                break;
+            }
+        }
+        
+        assert.notStrictEqual(targetLine, -1, 'Could not find BasicTypes in ComplexMessage.msg');
+        
+        // Position cursor on the type
+        const position = new vscode.Position(targetLine, 2); // Position within "BasicTypes"
+        
+        // Execute hover provider
+        const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+            'vscode.executeHoverProvider',
+            doc.uri,
+            position
+        );
+        
+        assert.ok(hovers && hovers.length > 0, 'No hover information returned');
+        
+        const hover = hovers[0];
+        const contents = hover.contents;
+        assert.ok(contents.length > 0, 'Hover contents are empty');
+        
+        const markdown = contents[0] as vscode.MarkdownString;
+        const hoverText = markdown.value;
+        
+        // Check that F12 hint is shown for custom type without package
+        assert.ok(hoverText.includes('F12') || hoverText.includes('definition'), 
+            'Hover should suggest using F12 to go to definition for unqualified custom types');
+    });
 });
