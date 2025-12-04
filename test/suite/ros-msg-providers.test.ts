@@ -27,12 +27,14 @@ function createMockDocument(content: string): vscode.TextDocument {
         lineAt: (lineOrPosition: number | vscode.Position) => {
             const lines = content.split('\n');
             const lineNum = typeof lineOrPosition === 'number' ? lineOrPosition : lineOrPosition.line;
-            const text = lines[lineNum] || '';
+            // Bounds checking
+            const validLineNum = Math.max(0, Math.min(lineNum, lines.length - 1));
+            const text = lines[validLineNum] || '';
             return {
-                lineNumber: lineNum,
+                lineNumber: validLineNum,
                 text,
-                range: new vscode.Range(lineNum, 0, lineNum, text.length),
-                rangeIncludingLineBreak: new vscode.Range(lineNum, 0, lineNum + 1, 0),
+                range: new vscode.Range(validLineNum, 0, validLineNum, text.length),
+                rangeIncludingLineBreak: new vscode.Range(validLineNum, 0, validLineNum + 1, 0),
                 firstNonWhitespaceCharacterIndex: text.search(/\S/),
                 isEmptyOrWhitespace: text.trim().length === 0
             };
@@ -474,7 +476,7 @@ uint8 STATUS_OK=0`;
 int8 temperature_celsius = -25
 uint8 battery_percentage = 85
 float32 velocity = 3.14159
-string robot_name = "TestBot-2025"`;
+string robot_name = "TestBot"`;
         
         const doc = createMockDocument(content);
         const result = parseMessageFile(doc);
