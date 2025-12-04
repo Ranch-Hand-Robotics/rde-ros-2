@@ -107,7 +107,8 @@ export function parseEnvFile(envFilePath: string): { [key: string]: string } {
             }
         }
     } catch (error) {
-        extension.outputChannel.appendLine(`Warning: Failed to read env file ${envFilePath}: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        extension.outputChannel.appendLine(`Warning: Failed to read env file ${envFilePath}: ${errorMessage}`);
     }
     
     return envVars;
@@ -134,8 +135,12 @@ export function mergeEnvFile(
         let resolvedEnvFilePath = envFile;
         
         // If the path is not absolute, resolve it relative to workspace folder
-        if (!path.isAbsolute(envFile) && workspaceFolder) {
-            resolvedEnvFilePath = path.join(workspaceFolder.uri.fsPath, envFile);
+        if (!path.isAbsolute(envFile)) {
+            if (workspaceFolder) {
+                resolvedEnvFilePath = path.join(workspaceFolder.uri.fsPath, envFile);
+            } else {
+                extension.outputChannel.appendLine(`Warning: envFile "${envFile}" is a relative path but no workspace folder is available. The path may not resolve correctly.`);
+            }
         }
         
         const envFileVars = parseEnvFile(resolvedEnvFilePath);
