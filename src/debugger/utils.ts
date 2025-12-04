@@ -3,6 +3,8 @@
 
 import * as vscode from "vscode";
 import * as util from "util";
+import * as fs from "fs";
+import * as path from "path";
 
 import * as extension from "../extension";
 import * as telemetry from "../telemetry-helper";
@@ -60,4 +62,90 @@ export async function getPtvsdInjectCommand(host: string, port: number, pid: num
         }
     }
     throw new Error("Failed to retrieve ptvsd from Python extension!");
+}
+
+/**
+ * Parse environment variables from a .env file.
+ * Supports basic KEY=VALUE format, ignoring comments and empty lines.
+ * 
+ * @param envFilePath Path to the .env file
+ * @returns Object containing the parsed environment variables
+ */
+export function parseEnvFile(envFilePath: string): { [key: string]: string } {
+    const envVars: { [key: string]: string } = {};
+    
+    try {
+        const content = fs.readFileSync(envFilePath, 'utf8');
+        const lines = content.split('\n');
+        
+        for (const line of lines) {
+            // Trim whitespace
+            const trimmedLine = line.trim();
+            
+            // Skip empty lines and comments
+            if (!trimmedLine || trimmedLine.startsWith('#')) {
+                continue;
+            }
+            
+            // Find the first = character
+            const separatorIndex = trimmedLine.indexOf('=');
+            if (separatorIndex === -1) {
+                continue; // Skip lines without =
+            }
+            
+            const key = trimmedLine.substring(0, separatorIndex).trim();
+            let value = trimmedLine.substring(separatorIndex + 1).trim();
+            
+            // Remove surrounding quotes if present
+            if ((value.startsWith('"') && value.endsWith('"')) ||
+                (value.startsWith("'") && value.endsWith("'"))) {
+                value = value.substring(1, value.length - 1);
+            }
+            
+            if (key) {
+                envVars[key] = value;
+            }
+        }
+    } catch (error) {
+        extension.outputChannel.appendLine(`Warning: Failed to read env file ${envFilePath}: ${error.message}`);
+    }
+    
+    return envVars;
+}
+
+/**
+ * Merge environment variables from an envFile with existing env object.
+ * The env object takes precedence over envFile values.
+ * 
+ * @param env Existing environment variables object
+ * @param envFile Path to the .env file (can be relative to workspace)
+ * @param workspaceFolder Optional workspace folder for resolving relative paths
+ * @returns Merged environment variables
+ */
+export function mergeEnvFile(
+    env: { [key: string]: string } | undefined,
+    envFile: string | undefined,
+    workspaceFolder?: vscode.WorkspaceFolder
+): { [key: string]: string } {
+    const mergedEnv: { [key: string]: string } = {};
+    
+    // First, add variables from envFile if provided
+    if (envFile) {
+        let resolvedEnvFilePath = envFile;
+        
+        // If the path is not absolute, resolve it relative to workspace folder
+        if (!path.isAbsolute(envFile) && workspaceFolder) {
+            resolvedEnvFilePath = path.join(workspaceFolder.uri.fsPath, envFile);
+        }
+        
+        const envFileVars = parseEnvFile(resolvedEnvFilePath);
+        Object.assign(mergedEnv, envFileVars);
+    }
+    
+    // Then, merge in the env object (which takes precedence)
+    if (env) {
+        Object.assign(mergedEnv, env);
+    }
+    
+    return mergedEnv;
 }
