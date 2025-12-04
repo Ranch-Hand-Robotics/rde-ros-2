@@ -40,7 +40,7 @@ function createMockDocument(content: string): vscode.TextDocument {
         offsetAt: (position: vscode.Position) => {
             const lines = content.split('\n');
             let offset = 0;
-            for (let i = 0; i < position.line; i++) {
+            for (let i = 0; i < position.line && i < lines.length; i++) {
                 offset += lines[i].length + 1; // +1 for newline
             }
             return offset + position.character;
