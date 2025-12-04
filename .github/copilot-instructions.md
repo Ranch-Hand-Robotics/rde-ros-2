@@ -13,8 +13,8 @@ This is the **Robot Developer Extensions for ROS 2** - a Visual Studio Code exte
 
 ## Building and Testing
 1. **Install dependencies**: `npm ci` (preferred over `npm install`)
-2. **Build the project**: `npm run build` (runs webpack in production mode to create distributable package)
-3. **Lint code**: Focus on passing the build; `npm run lint` exists but may need ESLint configuration
+2. **Build the project**: `npm run build` (runs `npm run package` which executes webpack in production mode)
+3. **Lint code**: Focus on passing the build; `npm run lint` is configured but ESLint setup needs verification
 4. **Run tests**: Open Debug viewlet (`Ctrl+Shift+D`), select `Tests`, then hit `F5`
 5. **Debug extension**: Open Debug viewlet, select `Extension`, then hit `F5`
 
