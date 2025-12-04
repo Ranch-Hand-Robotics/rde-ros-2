@@ -7,7 +7,7 @@ This is the **Robot Developer Extensions for ROS 2** - a Visual Studio Code exte
 * **Build Tool**: Webpack + npm
 * **Testing**: Mocha (via VS Code test runner)
 * **Target ROS**: ROS 2 Humble or greater (no ROS 1 support)
-* **Supported Languages**: rclpy (Python), rclcpp (C++), rclrust (Rust), rcldonet (.NET)
+* **Supported Languages**: rclpy (Python), rclcpp (C++), rclrust (Rust), rcldotnet (.NET)
 
 # Contribution Guidelines
 
