@@ -14,7 +14,7 @@ This is the **Robot Developer Extensions for ROS 2** - a Visual Studio Code exte
 ## Building and Testing
 1. **Install dependencies**: `npm ci` (preferred over `npm install`)
 2. **Build the project**: `npm run build` (compiles TypeScript using webpack)
-3. **Lint code**: Note - linting configuration needs attention (package.json has `eslint` but repo uses `tslint.json`)
+3. **Lint code**: Linting setup is transitional (package.json references ESLint but `tslint.json` exists; TSLint deprecated since 2019)
 4. **Run tests**: Open Debug viewlet (`Ctrl+Shift+D`), select `Tests`, then hit `F5`
 5. **Debug extension**: Open Debug viewlet, select `Extension`, then hit `F5`
 
@@ -84,7 +84,6 @@ interface LaunchConfig {
 
 ## Forbidden Actions
 * **Never** commit secrets, API keys, or credentials to the repository
-* **Never** modify or delete files in `.github/agents/` directory (reserved for agent configurations)
 * **Never** remove or disable security-related code without explicit justification
 * **Do not** create summary documents or planning files (work in memory)
 * **Do not** use vcpkg for dependency management (use Pixi instead)
