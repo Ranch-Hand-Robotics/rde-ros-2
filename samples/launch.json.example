@@ -1,0 +1,43 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ROS2: Launch Python Publisher (with envFile)",
+            "type": "ros2",
+            "request": "launch",
+            "target": "${workspaceFolder}/samples/py/src/rde_py/launch/rde_publisher.launch.py",
+            "envFile": "${workspaceFolder}/samples/.env.sample",
+            "comments": "This configuration loads environment variables from .env.sample"
+        },
+        {
+            "name": "ROS2: Launch Python Publisher (with env and envFile)",
+            "type": "ros2",
+            "request": "launch",
+            "target": "${workspaceFolder}/samples/py/src/rde_py/launch/rde_publisher.launch.py",
+            "envFile": "${workspaceFolder}/samples/.env.sample",
+            "env": {
+                "ROS_DOMAIN_ID": "99",
+                "MY_ROBOT_NAME": "override_robot"
+            },
+            "comments": "This configuration demonstrates that env overrides envFile values"
+        },
+        {
+            "name": "ROS2: Launch CPP Publisher (with envFile)",
+            "type": "ros2",
+            "request": "launch",
+            "target": "${workspaceFolder}/samples/cpp/src/rde_cpp/launch/rde_publisher.launch.py",
+            "envFile": "${workspaceFolder}/samples/.env.sample"
+        },
+        {
+            "name": "ROS2: Launch Demo (traditional env)",
+            "type": "ros2",
+            "request": "launch",
+            "target": "${workspaceFolder}/samples/py/src/rde_py/launch/rde_demo.launch.py",
+            "env": {
+                "ROS_DOMAIN_ID": "42",
+                "ROS_LOCALHOST_ONLY": "1"
+            },
+            "comments": "This configuration uses the traditional env approach without envFile"
+        }
+    ]
+}

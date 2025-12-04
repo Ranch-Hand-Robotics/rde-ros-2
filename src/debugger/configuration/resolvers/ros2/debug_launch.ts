@@ -46,10 +46,13 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             throw new Error("Launch request requires an extension '.py' or '.xml' as target.");
         }
 
+        // Merge environment variables from envFile and env
+        const mergedEnv = utils.mergeEnvFile(config.env, config.envFile, folder);
+        
         const rosExecOptions: child_process.ExecOptions = {
             env: {
                 ...await extension.resolvedEnv(),
-                ...config.env,
+                ...mergedEnv,
             },
         };
 

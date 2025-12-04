@@ -393,10 +393,13 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             extension.outputChannel.appendLine("Waited " + timeWaited + " for ROS 2 Daemon to start. Proceeding without the Daemon.");
         }
 
+        // Merge environment variables from envFile and env
+        const mergedEnv = utils.mergeEnvFile(config.env, config.envFile, folder);
+        
         const rosExecOptions: child_process.ExecOptions = {
             env: {
                 ...await extension.resolvedEnv(),
-                ...config.env,
+                ...mergedEnv,
             },
         };
 

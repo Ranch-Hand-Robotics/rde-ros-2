@@ -43,3 +43,89 @@ If you have an existing `launch.json` file (or if there is an extension conflict
 }  
 ```
 Be sure to include the full path to your launch file, including file extension.
+
+### Environment Variables
+
+You can pass environment variables to your ROS 2 launch configuration in two ways:
+
+#### Using the `env` property
+
+You can define environment variables directly in your launch.json using the `env` property:
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ROS2: Launch with env",
+            "request": "launch",
+            "target": "${workspaceFolder}/launch/my_launch.py",
+            "type": "ros2",
+            "env": {
+                "ROS_DOMAIN_ID": "42",
+                "ROS_LOCALHOST_ONLY": "1",
+                "MY_CUSTOM_VAR": "value"
+            }
+        }
+    ]
+}
+```
+
+#### Using the `envFile` property
+
+You can also load environment variables from a file using the `envFile` property. This is useful when you have many environment variables or want to share them across multiple configurations.
+
+Create a `.env` file in your workspace (e.g., `.env` or `.env.ros2`):
+
+```bash
+# .env file
+ROS_DOMAIN_ID=42
+ROS_LOCALHOST_ONLY=1
+MY_CUSTOM_VAR=value
+PATH_TO_CONFIG=/path/to/config
+
+# Comments and empty lines are ignored
+# Quotes are optional but can be used for values with spaces
+MESSAGE="Hello ROS 2"
+```
+
+Then reference it in your launch.json:
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ROS2: Launch with envFile",
+            "request": "launch",
+            "target": "${workspaceFolder}/launch/my_launch.py",
+            "type": "ros2",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
+```
+
+#### Combining `env` and `envFile`
+
+You can use both `env` and `envFile` together. Variables defined in `env` take precedence over those in `envFile`:
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ROS2: Launch with env and envFile",
+            "request": "launch",
+            "target": "${workspaceFolder}/launch/my_launch.py",
+            "type": "ros2",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "ROS_DOMAIN_ID": "99"  // This overrides the value from .env
+            }
+        }
+    ]
+}
+```
+
+This allows you to have a common set of environment variables in a file and override specific ones as needed.

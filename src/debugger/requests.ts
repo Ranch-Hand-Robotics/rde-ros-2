@@ -14,4 +14,5 @@ export interface IAttachRequest extends vscode.DebugConfiguration, debug_protoco
 export interface ILaunchRequest extends vscode.DebugConfiguration, debug_protocol.DebugProtocol.LaunchRequestArguments {
     target: string;
     args: Array<string>;
+    envFile?: string;
 }

@@ -237,6 +237,11 @@
                                     "type": "string"
                                 }
                             },
+                            "envFile": {
+                                "type": "string",
+                                "description": "Absolute path to a file containing environment variable definitions. This file has key value pairs separated by an equals sign per line. E.g. KEY=VALUE. Variables in 'env' take precedence over 'envFile'.",
+                                "default": ""
+                            },
                             "symbolSearchPath": {
                                 "type": "string",
                                 "description": "Semicolon separated list of directories to use to search for symbol (that is, pdb) files. Example: \"c:\\dir1;c:\\dir2\"",
@@ -286,6 +291,11 @@
                                 "additionalProperties": {
                                     "type": "string"
                                 }
+                            },
+                            "envFile": {
+                                "type": "string",
+                                "description": "Absolute path to a file containing environment variable definitions. This file has key value pairs separated by an equals sign per line. E.g. KEY=VALUE. Variables in 'env' take precedence over 'envFile'.",
+                                "default": ""
                             }
                         }
                     },
