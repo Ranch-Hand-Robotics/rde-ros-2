@@ -107,6 +107,13 @@ class MessageFileCache {
     }
 
     /**
+     * Dispose the cache and clear all entries
+     */
+    dispose(): void {
+        this.clear();
+    }
+
+    /**
      * Parse a message file
      */
     private parseDocument(document: vscode.TextDocument): ParsedMessage {
@@ -535,5 +542,10 @@ export function registerRosMessageProviders(context: vscode.ExtensionContext): v
         }
     });
     
-    return [definitionProvider, hoverProvider, changeListener, closeListener];
+    // Dispose cache when extension is disposed
+    const cacheDisposer = {
+        dispose: () => messageFileCache.dispose()
+    };
+    
+    return [definitionProvider, hoverProvider, changeListener, closeListener, cacheDisposer];
 }
