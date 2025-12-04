@@ -76,9 +76,16 @@ const parsedMessageCache = new Map<string, ParsedMessageCacheEntry>();
 const MAX_CACHE_SIZE = 100;
 
 /**
+ * Cache for parsed message files to avoid redundant parsing
+ * Limited to 100 entries to prevent unbounded memory growth
+ */
+const parsedMessageCache = new Map<string, ParsedMessageCacheEntry>();
+const MAX_CACHE_SIZE = 100;
+
+/**
  * Parses a ROS message or service file with caching
  */
-export function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
+function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
     const cacheKey = document.uri.toString();
     const cachedEntry = parsedMessageCache.get(cacheKey);
     

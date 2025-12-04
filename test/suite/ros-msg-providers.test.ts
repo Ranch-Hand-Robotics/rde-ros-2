@@ -592,9 +592,8 @@ suite('ROS Message Providers Test Suite', () => {
         assert.ok(hoverText.includes('F12') || hoverText.includes('definition'), 
             'Hover should suggest using F12 to go to definition for unqualified custom types');
     });
-});
 
-suite('parseMessageFile Unit Tests', () => {
+  suite('parseMessageFile Unit Tests', () => {
     test('Should parse basic field definitions with primitive types', () => {
         const content = `int32 counter
 float64 temperature
