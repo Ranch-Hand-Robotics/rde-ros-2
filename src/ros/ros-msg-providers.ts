@@ -136,9 +136,9 @@ function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
 
     const parsed = { fields, comments };
     
-    // Store in cache with simple LRU eviction (remove oldest entry if cache is full)
+    // Store in cache with FIFO eviction (remove oldest inserted entry if cache is full)
     if (parsedMessageCache.size >= MAX_CACHE_SIZE) {
-        // Remove the first (oldest) entry
+        // Remove the first (oldest inserted) entry
         const firstKey = parsedMessageCache.keys().next().value;
         if (firstKey) {
             parsedMessageCache.delete(firstKey);
