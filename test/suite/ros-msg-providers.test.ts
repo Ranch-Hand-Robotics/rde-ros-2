@@ -5,6 +5,62 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { parseMessageFile, MessageField, ParsedMessage } from '../../src/ros/ros-msg-providers';
+
+/**
+ * Helper function to create a mock TextDocument for testing parseMessageFile
+ */
+function createMockDocument(content: string): vscode.TextDocument {
+    return {
+        getText: () => content,
+        uri: vscode.Uri.file('/test.msg'),
+        fileName: '/test.msg',
+        languageId: 'rosmsg',
+        version: 1,
+        isDirty: false,
+        isClosed: false,
+        isUntitled: false,
+        eol: vscode.EndOfLine.LF,
+        lineCount: content.split('\n').length,
+        encoding: undefined,
+        save: () => Promise.resolve(true),
+        lineAt: (lineOrPosition: number | vscode.Position) => {
+            const lines = content.split('\n');
+            const lineNum = typeof lineOrPosition === 'number' ? lineOrPosition : lineOrPosition.line;
+            const text = lines[lineNum] || '';
+            return {
+                lineNumber: lineNum,
+                text,
+                range: new vscode.Range(lineNum, 0, lineNum, text.length),
+                rangeIncludingLineBreak: new vscode.Range(lineNum, 0, lineNum + 1, 0),
+                firstNonWhitespaceCharacterIndex: text.search(/\S/),
+                isEmptyOrWhitespace: text.trim().length === 0
+            };
+        },
+        offsetAt: (position: vscode.Position) => {
+            const lines = content.split('\n');
+            let offset = 0;
+            for (let i = 0; i < position.line; i++) {
+                offset += lines[i].length + 1; // +1 for newline
+            }
+            return offset + position.character;
+        },
+        positionAt: (offset: number) => {
+            const lines = content.split('\n');
+            let currentOffset = 0;
+            for (let i = 0; i < lines.length; i++) {
+                if (currentOffset + lines[i].length >= offset) {
+                    return new vscode.Position(i, offset - currentOffset);
+                }
+                currentOffset += lines[i].length + 1; // +1 for newline
+            }
+            return new vscode.Position(lines.length - 1, lines[lines.length - 1].length);
+        },
+        getWordRangeAtPosition: () => undefined,
+        validateRange: (range: vscode.Range) => range,
+        validatePosition: (position: vscode.Position) => position
+    } as vscode.TextDocument;
+}
 
 suite('ROS Message Providers Test Suite', () => {
     const samplesPath = path.join(__dirname, '..', '..', '..', 'samples', 'msg_interfaces', 'msg');
@@ -230,5 +286,390 @@ suite('ROS Message Providers Test Suite', () => {
         assert.ok(hoverText.includes('Properties'), 'Hover should contain Properties section');
         assert.ok(hoverText.includes('int32 sec') || hoverText.includes('uint32 nanosec'), 
             'Hover should show properties from Duration message (sec and nanosec)');
+    });
+});
+
+suite('parseMessageFile Unit Tests', () => {
+    test('Should parse basic field definitions with primitive types', () => {
+        const content = `int32 counter
+float64 temperature
+string robot_name
+bool is_active`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 4, 'Should parse 4 fields');
+        
+        // Check int32 field
+        const counterField = result.fields[0];
+        assert.strictEqual(counterField.type, 'int32');
+        assert.strictEqual(counterField.name, 'counter');
+        assert.strictEqual(counterField.isConstant, false);
+        assert.strictEqual(counterField.arraySize, undefined);
+        assert.strictEqual(counterField.line, 0);
+        
+        // Check float64 field
+        const tempField = result.fields[1];
+        assert.strictEqual(tempField.type, 'float64');
+        assert.strictEqual(tempField.name, 'temperature');
+        
+        // Check string field
+        const nameField = result.fields[2];
+        assert.strictEqual(nameField.type, 'string');
+        assert.strictEqual(nameField.name, 'robot_name');
+        
+        // Check bool field
+        const activeField = result.fields[3];
+        assert.strictEqual(activeField.type, 'bool');
+        assert.strictEqual(activeField.name, 'is_active');
+    });
+    
+    test('Should handle unbounded array syntax []', () => {
+        const content = `float64[] joint_positions
+string[] error_messages
+geometry_msgs/Point[] waypoints`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 array fields');
+        
+        const field1 = result.fields[0];
+        assert.strictEqual(field1.type, 'float64');
+        assert.strictEqual(field1.name, 'joint_positions');
+        assert.strictEqual(field1.arraySize, '', 'Unbounded array should have empty string as arraySize');
+        
+        const field2 = result.fields[1];
+        assert.strictEqual(field2.type, 'string');
+        assert.strictEqual(field2.name, 'error_messages');
+        assert.strictEqual(field2.arraySize, '');
+        
+        const field3 = result.fields[2];
+        assert.strictEqual(field3.type, 'geometry_msgs/Point');
+        assert.strictEqual(field3.name, 'waypoints');
+        assert.strictEqual(field3.arraySize, '');
+    });
+    
+    test('Should handle fixed-size array syntax [N]', () => {
+        const content = `uint8[10] sensor_array
+float32[9] rotation_matrix
+int32[6] joint_efforts`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 fixed-size array fields');
+        
+        const field1 = result.fields[0];
+        assert.strictEqual(field1.type, 'uint8');
+        assert.strictEqual(field1.name, 'sensor_array');
+        assert.strictEqual(field1.arraySize, '10');
+        
+        const field2 = result.fields[1];
+        assert.strictEqual(field2.type, 'float32');
+        assert.strictEqual(field2.name, 'rotation_matrix');
+        assert.strictEqual(field2.arraySize, '9');
+        
+        const field3 = result.fields[2];
+        assert.strictEqual(field3.type, 'int32');
+        assert.strictEqual(field3.name, 'joint_efforts');
+        assert.strictEqual(field3.arraySize, '6');
+    });
+    
+    test('Should handle bounded array syntax [<=N]', () => {
+        const content = `uint8[<=10] status_codes
+string[<=5] recent_messages
+geometry_msgs/Pose[<=100] path`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 bounded array fields');
+        
+        const field1 = result.fields[0];
+        assert.strictEqual(field1.type, 'uint8');
+        assert.strictEqual(field1.name, 'status_codes');
+        assert.strictEqual(field1.arraySize, '<=10');
+        
+        const field2 = result.fields[1];
+        assert.strictEqual(field2.type, 'string');
+        assert.strictEqual(field2.name, 'recent_messages');
+        assert.strictEqual(field2.arraySize, '<=5');
+        
+        const field3 = result.fields[2];
+        assert.strictEqual(field3.type, 'geometry_msgs/Pose');
+        assert.strictEqual(field3.name, 'path');
+        assert.strictEqual(field3.arraySize, '<=100');
+    });
+    
+    test('Should extract inline comments', () => {
+        const content = `# Header comment
+int32 counter  # This is a counter
+float64 temperature # Temperature in Celsius
+string robot_name   # Name of the robot
+# Another standalone comment
+bool is_active      # Active status`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 4, 'Should parse 4 fields');
+        assert.strictEqual(result.comments.size, 5, 'Should extract 5 comments');
+        
+        // Check that comments are extracted with correct line numbers
+        assert.strictEqual(result.comments.get(0), 'Header comment');
+        assert.strictEqual(result.comments.get(1), 'This is a counter');
+        assert.strictEqual(result.comments.get(2), 'Temperature in Celsius');
+        assert.strictEqual(result.comments.get(3), 'Name of the robot');
+        assert.strictEqual(result.comments.get(4), 'Another standalone comment');
+        assert.strictEqual(result.comments.get(5), 'Active status');
+    });
+    
+    test('Should handle constants with default values', () => {
+        const content = `int32 MAX_SPEED=100
+float64 PI=3.141592653589793
+string DEFAULT_MODE="autonomous"
+bool SAFETY_ENABLED=true
+uint8 STATUS_OK=0`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 5, 'Should parse 5 constant fields');
+        
+        const field1 = result.fields[0];
+        assert.strictEqual(field1.type, 'int32');
+        assert.strictEqual(field1.name, 'MAX_SPEED');
+        assert.strictEqual(field1.defaultValue, '100');
+        assert.strictEqual(field1.isConstant, true);
+        
+        const field2 = result.fields[1];
+        assert.strictEqual(field2.type, 'float64');
+        assert.strictEqual(field2.name, 'PI');
+        assert.strictEqual(field2.defaultValue, '3.141592653589793');
+        assert.strictEqual(field2.isConstant, true);
+        
+        const field3 = result.fields[2];
+        assert.strictEqual(field3.type, 'string');
+        assert.strictEqual(field3.name, 'DEFAULT_MODE');
+        assert.strictEqual(field3.defaultValue, '"autonomous"');
+        assert.strictEqual(field3.isConstant, true);
+        
+        const field4 = result.fields[3];
+        assert.strictEqual(field4.type, 'bool');
+        assert.strictEqual(field4.name, 'SAFETY_ENABLED');
+        assert.strictEqual(field4.defaultValue, 'true');
+        assert.strictEqual(field4.isConstant, true);
+        
+        const field5 = result.fields[4];
+        assert.strictEqual(field5.type, 'uint8');
+        assert.strictEqual(field5.name, 'STATUS_OK');
+        assert.strictEqual(field5.defaultValue, '0');
+        assert.strictEqual(field5.isConstant, true);
+    });
+    
+    test('Should handle fields with default values (non-constants)', () => {
+        const content = `bool is_active true
+int8 temperature_celsius -25
+uint8 battery_percentage 85
+float32 velocity 3.14159
+string robot_name "TestBot-2025"`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 5, 'Should parse 5 fields with default values');
+        
+        const field1 = result.fields[0];
+        assert.strictEqual(field1.type, 'bool');
+        assert.strictEqual(field1.name, 'is_active');
+        assert.strictEqual(field1.defaultValue, 'true');
+        assert.strictEqual(field1.isConstant, true); // Has = implicitly
+        
+        const field2 = result.fields[1];
+        assert.strictEqual(field2.type, 'int8');
+        assert.strictEqual(field2.name, 'temperature_celsius');
+        assert.strictEqual(field2.defaultValue, '-25');
+        
+        const field3 = result.fields[2];
+        assert.strictEqual(field3.type, 'uint8');
+        assert.strictEqual(field3.name, 'battery_percentage');
+        assert.strictEqual(field3.defaultValue, '85');
+    });
+    
+    test('Should skip empty lines', () => {
+        const content = `int32 counter
+
+float64 temperature
+
+string robot_name`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 fields, skipping empty lines');
+        assert.strictEqual(result.fields[0].line, 0);
+        assert.strictEqual(result.fields[1].line, 2);
+        assert.strictEqual(result.fields[2].line, 4);
+    });
+    
+    test('Should skip comment-only lines', () => {
+        const content = `# This is a header comment
+int32 counter
+# Another comment
+float64 temperature
+# Final comment`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 2, 'Should parse 2 fields, skipping comment lines');
+        assert.strictEqual(result.comments.size, 3, 'Should extract 3 standalone comments');
+    });
+    
+    test('Should skip separator lines (---)', () => {
+        const content = `int32 counter
+---
+float64 temperature
+------
+string robot_name`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 fields, skipping separator lines');
+        assert.strictEqual(result.fields[0].line, 0);
+        assert.strictEqual(result.fields[1].line, 2);
+        assert.strictEqual(result.fields[2].line, 4);
+    });
+    
+    test('Should handle optional fields with @optional modifier', () => {
+        const content = `@optional int32 optional_counter
+@optional float64 optional_temperature
+int32 required_field`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 fields including optional');
+        
+        const field1 = result.fields[0];
+        assert.strictEqual(field1.type, 'int32');
+        assert.strictEqual(field1.name, 'optional_counter');
+        
+        const field2 = result.fields[1];
+        assert.strictEqual(field2.type, 'float64');
+        assert.strictEqual(field2.name, 'optional_temperature');
+        
+        const field3 = result.fields[2];
+        assert.strictEqual(field3.type, 'int32');
+        assert.strictEqual(field3.name, 'required_field');
+    });
+    
+    test('Should handle nested message types', () => {
+        const content = `std_msgs/Header header
+geometry_msgs/Point position
+geometry_msgs/Quaternion orientation
+builtin_interfaces/Time timestamp`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 4, 'Should parse 4 nested message fields');
+        
+        const field1 = result.fields[0];
+        assert.strictEqual(field1.type, 'std_msgs/Header');
+        assert.strictEqual(field1.name, 'header');
+        
+        const field2 = result.fields[1];
+        assert.strictEqual(field2.type, 'geometry_msgs/Point');
+        assert.strictEqual(field2.name, 'position');
+        
+        const field3 = result.fields[2];
+        assert.strictEqual(field3.type, 'geometry_msgs/Quaternion');
+        assert.strictEqual(field3.name, 'orientation');
+        
+        const field4 = result.fields[3];
+        assert.strictEqual(field4.type, 'builtin_interfaces/Time');
+        assert.strictEqual(field4.name, 'timestamp');
+    });
+    
+    test('Should correctly identify column position of type', () => {
+        const content = `int32 counter
+  float64 temperature
+    string robot_name`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 fields');
+        
+        assert.strictEqual(result.fields[0].column, 0, 'First field type starts at column 0');
+        assert.strictEqual(result.fields[1].column, 2, 'Second field type starts at column 2');
+        assert.strictEqual(result.fields[2].column, 4, 'Third field type starts at column 4');
+    });
+    
+    test('Should handle complex message with all features', () => {
+        const content = `# Complex message demonstrating all features
+std_msgs/Header header
+
+# Primitive types
+int32 counter
+float64 temperature  # Temperature in Celsius
+
+# Arrays
+float64[] joint_positions
+int32[6] joint_efforts
+uint8[<=10] status_codes
+
+# Constants
+int32 MAX_SPEED=100
+string DEFAULT_MODE="autonomous"
+
+---
+
+# Optional fields
+@optional string optional_message
+
+# Nested types
+geometry_msgs/Point position
+builtin_interfaces/Time timestamp`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 11, 'Should parse all fields correctly');
+        assert.ok(result.comments.size > 0, 'Should extract comments');
+        
+        // Verify a few key fields
+        const headerField = result.fields.find(f => f.name === 'header');
+        assert.ok(headerField);
+        assert.strictEqual(headerField.type, 'std_msgs/Header');
+        
+        const arrayField = result.fields.find(f => f.name === 'joint_positions');
+        assert.ok(arrayField);
+        assert.strictEqual(arrayField.arraySize, '');
+        
+        const constantField = result.fields.find(f => f.name === 'MAX_SPEED');
+        assert.ok(constantField);
+        assert.strictEqual(constantField.isConstant, true);
+        assert.strictEqual(constantField.defaultValue, '100');
+    });
+    
+    test('Should handle constants with inline comments', () => {
+        const content = `int32 MAX_SPEED=100  # Maximum speed in m/s
+float64 PI=3.14159   # Pi constant
+string MODE="auto"   # Default mode`;
+        
+        const doc = createMockDocument(content);
+        const result = parseMessageFile(doc);
+        
+        assert.strictEqual(result.fields.length, 3, 'Should parse 3 constant fields');
+        assert.strictEqual(result.comments.size, 3, 'Should extract 3 inline comments');
+        
+        assert.strictEqual(result.comments.get(0), 'Maximum speed in m/s');
+        assert.strictEqual(result.comments.get(1), 'Pi constant');
+        assert.strictEqual(result.comments.get(2), 'Default mode');
     });
 });

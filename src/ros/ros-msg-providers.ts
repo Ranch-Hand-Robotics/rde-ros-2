@@ -44,7 +44,7 @@ const COMMON_PACKAGES: { [key: string]: string } = {
     "visualization_msgs": "Visualization markers and displays"
 };
 
-interface MessageField {
+export interface MessageField {
     type: string;
     name: string;
     arraySize?: string;
@@ -55,7 +55,7 @@ interface MessageField {
     column: number;
 }
 
-interface ParsedMessage {
+export interface ParsedMessage {
     fields: MessageField[];
     comments: Map<number, string>;
 }
@@ -63,7 +63,7 @@ interface ParsedMessage {
 /**
  * Parses a ROS message or service file
  */
-function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
+export function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
     const fields: MessageField[] = [];
     const comments = new Map<number, string>();
     const text = document.getText();
