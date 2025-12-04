@@ -7,6 +7,7 @@ nav:
       - usage.md
       - tutorials.md
       - configuration.md
+      - intellisense.md
       - openvsx.md
       - pixi.md
   - Debugging:

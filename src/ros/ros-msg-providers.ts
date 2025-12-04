@@ -132,7 +132,7 @@ function parseQualifiedType(type: string): { package?: string; message: string }
 }
 
 /**
- * Finds message definition files in the workspace
+ * Finds message definition files in the workspace and ROS packages
  */
 async function findMessageDefinitions(
     workspaceFolders: readonly vscode.WorkspaceFolder[],
@@ -141,6 +141,7 @@ async function findMessageDefinitions(
 ): Promise<vscode.Uri[]> {
     const results: vscode.Uri[] = [];
     
+    // First, search in workspace folders
     for (const folder of workspaceFolders) {
         // Search patterns for message files
         const patterns = [
@@ -182,6 +183,38 @@ async function findMessageDefinitions(
 
                 results.push(file);
             }
+        }
+    }
+
+    // If we have a specific package and message name but found nothing in workspace,
+    // search in ROS package paths (e.g., system-installed packages)
+    if (packageName && messageName && results.length === 0) {
+        try {
+            const packages = await rosApi.getPackages();
+            if (packages[packageName]) {
+                const pkgPath = await packages[packageName]();
+                
+                // Search for message files in the package directory
+                const msgExtensions = ['.msg', '.srv', '.action'];
+                for (const ext of msgExtensions) {
+                    const msgFilePath = path.join(pkgPath, 'msg', `${messageName}${ext}`);
+                    const srvFilePath = path.join(pkgPath, 'srv', `${messageName}${ext}`);
+                    const actionFilePath = path.join(pkgPath, 'action', `${messageName}${ext}`);
+                    
+                    for (const filePath of [msgFilePath, srvFilePath, actionFilePath]) {
+                        if (fs.existsSync(filePath)) {
+                            results.push(vscode.Uri.file(filePath));
+                            break; // Found the file, no need to check other paths
+                        }
+                    }
+                    
+                    if (results.length > 0) {
+                        break; // Found the file, no need to check other extensions
+                    }
+                }
+            }
+        } catch (error) {
+            // Ignore errors - package may not be available
         }
     }
 
@@ -245,6 +278,103 @@ export class RosMessageDefinitionProvider implements vscode.DefinitionProvider {
 }
 
 /**
+ * Helper function to generate type documentation with properties
+ */
+async function generateTypeDocumentation(
+    typeName: string,
+    arraySize?: string
+): Promise<vscode.MarkdownString> {
+    const markdown = new vscode.MarkdownString();
+    
+    // Check if it's a built-in type
+    if (isBuiltinType(typeName)) {
+        const description = BUILTIN_TYPES[typeName];
+        markdown.appendCodeblock(typeName, 'rosmsg');
+        markdown.appendMarkdown(`\n${description}`);
+        
+        if (arraySize !== undefined) {
+            markdown.appendMarkdown(`\n\n**Array**: ${arraySize ? `Fixed size [${arraySize}]` : 'Dynamic size []'}`);
+        }
+        
+        return markdown;
+    }
+    
+    // Parse qualified type for custom messages
+    const { package: pkgName, message: msgName } = parseQualifiedType(typeName);
+    
+    if (pkgName) {
+        markdown.appendCodeblock(`${pkgName}/${msgName}`, 'rosmsg');
+        
+        // Add package description if it's a known package
+        if (pkgName in COMMON_PACKAGES) {
+            markdown.appendMarkdown(`\n**Package**: ${COMMON_PACKAGES[pkgName]}`);
+        } else {
+            markdown.appendMarkdown(`\n**Package**: ${pkgName}`);
+        }
+        markdown.appendMarkdown(`\n\n**Message Type**: ${msgName}`);
+    } else {
+        markdown.appendCodeblock(msgName, 'rosmsg');
+        markdown.appendMarkdown(`\n**Custom Message Type**`);
+        markdown.appendMarkdown(`\n\nPress **F12** to go to definition`);
+    }
+    
+    if (arraySize !== undefined) {
+        markdown.appendMarkdown(`\n\n**Array**: ${arraySize ? `Fixed size [${arraySize}]` : 'Dynamic size []'}`);
+    }
+    
+    // Try to find and show the definition with properties
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders) {
+        const definitions = await findMessageDefinitions(workspaceFolders, pkgName, msgName);
+        if (definitions.length > 0) {
+            const defUri = definitions[0];
+            try {
+                const defDoc = await vscode.workspace.openTextDocument(defUri);
+                const defParsed = parseMessageFile(defDoc);
+                
+                if (defParsed.fields.length > 0) {
+                    markdown.appendMarkdown('\n\n**Properties**:');
+                    
+                    // Create a formatted list of properties
+                    const propertyLines: string[] = [];
+                    for (const defField of defParsed.fields) {
+                        let fieldStr: string;
+                        
+                        // Format the type with array notation if applicable
+                        if (defField.arraySize !== undefined) {
+                            fieldStr = `${defField.type}[${defField.arraySize}] ${defField.name}`;
+                        } else {
+                            fieldStr = `${defField.type} ${defField.name}`;
+                        }
+                        
+                        // Add default value or constant value
+                        if (defField.isConstant && defField.defaultValue) {
+                            fieldStr += ` = ${defField.defaultValue}`;
+                        } else if (defField.defaultValue) {
+                            fieldStr += ` = ${defField.defaultValue}`;
+                        }
+                        
+                        // Add inline comment if available
+                        const fieldComment = defParsed.comments.get(defField.line);
+                        if (fieldComment) {
+                            fieldStr += `  # ${fieldComment}`;
+                        }
+                        
+                        propertyLines.push(fieldStr);
+                    }
+                    
+                    markdown.appendCodeblock(propertyLines.join('\n'), 'rosmsg');
+                }
+            } catch {
+                // Ignore errors reading the definition
+            }
+        }
+    }
+    
+    return markdown;
+}
+
+/**
  * Hover provider for ROS message files
  */
 export class RosMessageHoverProvider implements vscode.HoverProvider {
@@ -274,74 +404,19 @@ export class RosMessageHoverProvider implements vscode.HoverProvider {
         
         if (position.character >= typeStartCol && position.character <= typeEndCol) {
             // Hovering over a type
-            if (isBuiltinType(field.type)) {
-                // Built-in type
-                const description = BUILTIN_TYPES[field.type];
-                const markdown = new vscode.MarkdownString();
-                markdown.appendCodeblock(field.type, 'rosmsg');
-                markdown.appendMarkdown(`\n${description}`);
-                
-                if (field.arraySize) {
-                    markdown.appendMarkdown(`\n\n**Array**: ${field.arraySize ? `Fixed size [${field.arraySize}]` : 'Dynamic size []'}`);
-                }
-                
-                return new vscode.Hover(markdown, wordRange);
-            } else {
-                // Custom type - show package and message info
-                const { package: pkgName, message: msgName } = parseQualifiedType(field.type);
-                const markdown = new vscode.MarkdownString();
-                
-                if (pkgName) {
-                    markdown.appendCodeblock(`${pkgName}/${msgName}`, 'rosmsg');
-                    
-                    // Add package description if it's a known package
-                    if (pkgName in COMMON_PACKAGES) {
-                        markdown.appendMarkdown(`\n**Package**: ${COMMON_PACKAGES[pkgName]}`);
-                    } else {
-                        markdown.appendMarkdown(`\n**Package**: ${pkgName}`);
-                    }
-                    markdown.appendMarkdown(`\n\n**Message Type**: ${msgName}`);
-                } else {
-                    markdown.appendCodeblock(msgName, 'rosmsg');
-                    markdown.appendMarkdown(`\n**Custom Message Type**`);
-                    markdown.appendMarkdown(`\n\nPress **F12** to go to definition`);
-                }
-                
-                if (field.arraySize) {
-                    markdown.appendMarkdown(`\n\n**Array**: ${field.arraySize ? `Fixed size [${field.arraySize}]` : 'Dynamic size []'}`);
-                }
-                
-                // Try to find and show the definition preview
-                const workspaceFolders = vscode.workspace.workspaceFolders;
-                if (workspaceFolders) {
-                    const definitions = await findMessageDefinitions(workspaceFolders, pkgName, msgName);
-                    if (definitions.length > 0) {
-                        const defUri = definitions[0];
-                        try {
-                            const defDoc = await vscode.workspace.openTextDocument(defUri);
-                            const preview = defDoc.getText().split('\n').slice(0, 10).join('\n');
-                            if (preview) {
-                                markdown.appendMarkdown('\n\n**Preview**:');
-                                markdown.appendCodeblock(preview.trim(), 'rosmsg');
-                            }
-                        } catch {
-                            // Ignore errors reading the definition
-                        }
-                    }
-                }
-                
-                return new vscode.Hover(markdown, new vscode.Range(
-                    position.line,
-                    typeStartCol,
-                    position.line,
-                    typeEndCol
-                ));
-            }
+            const markdown = await generateTypeDocumentation(field.type, field.arraySize);
+            return new vscode.Hover(markdown, new vscode.Range(
+                position.line,
+                typeStartCol,
+                position.line,
+                typeEndCol
+            ));
         }
 
         // Check if we're hovering over a field name
         const fieldNameMatch = line.match(/\s+([a-zA-Z0-9_]+)(\s*=|\s*#|\s*$)/);
         if (fieldNameMatch && word === fieldNameMatch[1]) {
+            // Show field declaration first
             const markdown = new vscode.MarkdownString();
             markdown.appendCodeblock(`${field.type} ${field.name}`, 'rosmsg');
             
@@ -356,6 +431,11 @@ export class RosMessageHoverProvider implements vscode.HoverProvider {
             if (comment) {
                 markdown.appendMarkdown(`\n\n${comment}`);
             }
+            
+            // Add type documentation and properties
+            markdown.appendMarkdown('\n\n---\n\n');
+            const typeDoc = await generateTypeDocumentation(field.type, field.arraySize);
+            markdown.appendMarkdown(typeDoc.value);
             
             return new vscode.Hover(markdown, wordRange);
         }
