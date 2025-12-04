@@ -70,8 +70,10 @@ interface ParsedMessageCacheEntry {
 
 /**
  * Cache for parsed message files to avoid redundant parsing
+ * Limited to 100 entries to prevent unbounded memory growth
  */
 const parsedMessageCache = new Map<string, ParsedMessageCacheEntry>();
+const MAX_CACHE_SIZE = 100;
 
 /**
  * Parses a ROS message or service file with caching
@@ -134,7 +136,15 @@ function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
 
     const parsed = { fields, comments };
     
-    // Store in cache
+    // Store in cache with simple LRU eviction (remove oldest entry if cache is full)
+    if (parsedMessageCache.size >= MAX_CACHE_SIZE) {
+        // Remove the first (oldest) entry
+        const firstKey = parsedMessageCache.keys().next().value;
+        if (firstKey) {
+            parsedMessageCache.delete(firstKey);
+        }
+    }
+    
     parsedMessageCache.set(cacheKey, {
         version: document.version,
         parsed
