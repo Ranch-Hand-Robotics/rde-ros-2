@@ -469,12 +469,12 @@ uint8 STATUS_OK=0`;
         assert.strictEqual(field5.isConstant, true);
     });
     
-    test('Should handle fields with default values (non-constants)', () => {
-        const content = `bool is_active true
-int8 temperature_celsius -25
-uint8 battery_percentage 85
-float32 velocity 3.14159
-string robot_name "TestBot-2025"`;
+    test('Should handle constants with spaces around equals', () => {
+        const content = `bool is_active = true
+int8 temperature_celsius = -25
+uint8 battery_percentage = 85
+float32 velocity = 3.14159
+string robot_name = "TestBot-2025"`;
         
         const doc = createMockDocument(content);
         const result = parseMessageFile(doc);
@@ -485,17 +485,19 @@ string robot_name "TestBot-2025"`;
         assert.strictEqual(field1.type, 'bool');
         assert.strictEqual(field1.name, 'is_active');
         assert.strictEqual(field1.defaultValue, 'true');
-        assert.strictEqual(field1.isConstant, true); // Has = implicitly
+        assert.strictEqual(field1.isConstant, true);
         
         const field2 = result.fields[1];
         assert.strictEqual(field2.type, 'int8');
         assert.strictEqual(field2.name, 'temperature_celsius');
         assert.strictEqual(field2.defaultValue, '-25');
+        assert.strictEqual(field2.isConstant, true);
         
         const field3 = result.fields[2];
         assert.strictEqual(field3.type, 'uint8');
         assert.strictEqual(field3.name, 'battery_percentage');
         assert.strictEqual(field3.defaultValue, '85');
+        assert.strictEqual(field3.isConstant, true);
     });
     
     test('Should skip empty lines', () => {
