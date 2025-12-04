@@ -415,7 +415,7 @@ bool is_active      # Active status`;
         const result = parseMessageFile(doc);
         
         assert.strictEqual(result.fields.length, 4, 'Should parse 4 fields');
-        assert.strictEqual(result.comments.size, 5, 'Should extract 5 comments');
+        assert.strictEqual(result.comments.size, 6, 'Should extract 6 comments');
         
         // Check that comments are extracted with correct line numbers
         assert.strictEqual(result.comments.get(0), 'Header comment');
