@@ -61,9 +61,31 @@ interface ParsedMessage {
 }
 
 /**
- * Parses a ROS message or service file
+ * Cache entry for parsed message files
+ */
+interface ParsedMessageCacheEntry {
+    version: number;
+    parsed: ParsedMessage;
+}
+
+/**
+ * Cache for parsed message files to avoid redundant parsing
+ */
+const parsedMessageCache = new Map<string, ParsedMessageCacheEntry>();
+
+/**
+ * Parses a ROS message or service file with caching
  */
 function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
+    const cacheKey = document.uri.toString();
+    const cachedEntry = parsedMessageCache.get(cacheKey);
+    
+    // Return cached result if the document version hasn't changed
+    if (cachedEntry && cachedEntry.version === document.version) {
+        return cachedEntry.parsed;
+    }
+
+    // Parse the document
     const fields: MessageField[] = [];
     const comments = new Map<number, string>();
     const text = document.getText();
@@ -110,7 +132,15 @@ function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
         }
     }
 
-    return { fields, comments };
+    const parsed = { fields, comments };
+    
+    // Store in cache
+    parsedMessageCache.set(cacheKey, {
+        version: document.version,
+        parsed
+    });
+
+    return parsed;
 }
 
 /**
@@ -460,5 +490,17 @@ export function registerRosMessageProviders(context: vscode.ExtensionContext): v
         new RosMessageHoverProvider()
     );
     
-    return [definitionProvider, hoverProvider];
+    // Set up cache invalidation
+    const documentCloseListener = vscode.workspace.onDidCloseTextDocument(document => {
+        const cacheKey = document.uri.toString();
+        parsedMessageCache.delete(cacheKey);
+    });
+    
+    const documentChangeListener = vscode.workspace.onDidChangeTextDocument(event => {
+        // Clear cache entry when document changes (will be reparsed on next access)
+        const cacheKey = event.document.uri.toString();
+        parsedMessageCache.delete(cacheKey);
+    });
+    
+    return [definitionProvider, hoverProvider, documentCloseListener, documentChangeListener];
 }
