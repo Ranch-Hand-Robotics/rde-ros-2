@@ -61,56 +61,116 @@ interface ParsedMessage {
 }
 
 /**
- * Parses a ROS message or service file
+ * Cache entry for parsed message files
  */
-function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
-    const fields: MessageField[] = [];
-    const comments = new Map<number, string>();
-    const text = document.getText();
-    const lines = text.split('\n');
+interface CacheEntry {
+    version: number;
+    parsed: ParsedMessage;
+}
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const lineNumber = i;
+/**
+ * Cache for parsed message files to avoid re-parsing on every hover/definition request
+ */
+class MessageFileCache {
+    private cache = new Map<string, CacheEntry>();
 
-        // Extract comments
-        const commentMatch = line.match(/#\s*(.+)$/);
-        if (commentMatch) {
-            comments.set(lineNumber, commentMatch[1].trim());
+    /**
+     * Get parsed message from cache or parse and cache it
+     */
+    get(document: vscode.TextDocument): ParsedMessage {
+        const key = document.uri.toString();
+        const cached = this.cache.get(key);
+
+        // Return cached result if version matches
+        if (cached && cached.version === document.version) {
+            return cached.parsed;
         }
 
-        // Skip empty lines, comment-only lines, and separators
-        if (line.trim() === '' || line.trim().startsWith('#') || line.trim().match(/^-{3,}$/)) {
-            continue;
-        }
-
-        // Match field definitions: type[array] name [= value] [# comment]
-        const fieldMatch = line.match(/^\s*(@optional\s+)?([a-zA-Z0-9_/]+)(\[[^\]]*\])?\s+([a-zA-Z0-9_]+)(\s*=\s*(.+?))?(\s*#.*)?$/);
-        
-        if (fieldMatch) {
-            const isOptional = !!fieldMatch[1];
-            const typeStr = fieldMatch[2];
-            const arraySize = fieldMatch[3]?.replace(/[\[\]]/g, '') || undefined;
-            const fieldName = fieldMatch[4];
-            const defaultValue = fieldMatch[6]?.trim();
-            const isConstant = !!defaultValue && line.includes('=');
-            
-            // Find the column position of the type
-            const column = line.indexOf(typeStr);
-
-            fields.push({
-                type: typeStr,
-                name: fieldName,
-                arraySize,
-                defaultValue,
-                isConstant,
-                line: lineNumber,
-                column
-            });
-        }
+        // Parse and cache the document
+        const parsed = this.parseDocument(document);
+        this.cache.set(key, { version: document.version, parsed });
+        return parsed;
     }
 
-    return { fields, comments };
+    /**
+     * Clear cache for a specific document
+     */
+    invalidate(uri: vscode.Uri): void {
+        this.cache.delete(uri.toString());
+    }
+
+    /**
+     * Clear entire cache
+     */
+    clear(): void {
+        this.cache.clear();
+    }
+
+    /**
+     * Parse a message file
+     */
+    private parseDocument(document: vscode.TextDocument): ParsedMessage {
+        const fields: MessageField[] = [];
+        const comments = new Map<number, string>();
+        const text = document.getText();
+        const lines = text.split('\n');
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const lineNumber = i;
+
+            // Extract comments
+            const commentMatch = line.match(/#\s*(.+)$/);
+            if (commentMatch) {
+                comments.set(lineNumber, commentMatch[1].trim());
+            }
+
+            // Skip empty lines, comment-only lines, and separators
+            if (line.trim() === '' || line.trim().startsWith('#') || line.trim().match(/^-{3,}$/)) {
+                continue;
+            }
+
+            // Match field definitions: type[array] name [= value] [# comment]
+            const fieldMatch = line.match(/^\s*(@optional\s+)?([a-zA-Z0-9_/]+)(\[[^\]]*\])?\s+([a-zA-Z0-9_]+)(\s*=\s*(.+?))?(\s*#.*)?$/);
+            
+            if (fieldMatch) {
+                const isOptional = !!fieldMatch[1];
+                const typeStr = fieldMatch[2];
+                const arraySize = fieldMatch[3]?.replace(/[\[\]]/g, '') || undefined;
+                const fieldName = fieldMatch[4];
+                const defaultValue = fieldMatch[6]?.trim();
+                const isConstant = !!defaultValue && line.includes('=');
+                
+                // Find the column position of the type
+                const column = line.indexOf(typeStr);
+
+                fields.push({
+                    type: typeStr,
+                    name: fieldName,
+                    arraySize,
+                    defaultValue,
+                    isConstant,
+                    line: lineNumber,
+                    column
+                });
+            }
+        }
+
+        return { fields, comments };
+    }
+}
+
+/**
+ * Global cache instance for parsed message files
+ */
+const messageFileCache = new MessageFileCache();
+
+/**
+ * Parses a ROS message or service file
+ * @deprecated Use messageFileCache.get() instead for better performance
+ */
+function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
+    return messageFileCache.get(document);
 }
 
 /**
@@ -236,7 +296,7 @@ export class RosMessageDefinitionProvider implements vscode.DefinitionProvider {
         }
 
         const line = document.lineAt(position.line).text;
-        const parsed = parseMessageFile(document);
+        const parsed = messageFileCache.get(document);
 
         // Find the field at the current position
         const field = parsed.fields.find(f => f.line === position.line);
@@ -330,7 +390,7 @@ async function generateTypeDocumentation(
             const defUri = definitions[0];
             try {
                 const defDoc = await vscode.workspace.openTextDocument(defUri);
-                const defParsed = parseMessageFile(defDoc);
+                const defParsed = messageFileCache.get(defDoc);
                 
                 if (defParsed.fields.length > 0) {
                     markdown.appendMarkdown('\n\n**Properties**:');
@@ -390,7 +450,7 @@ export class RosMessageHoverProvider implements vscode.HoverProvider {
 
         const word = document.getText(wordRange);
         const line = document.lineAt(position.line).text;
-        const parsed = parseMessageFile(document);
+        const parsed = messageFileCache.get(document);
 
         // Check if we're hovering over a type
         const field = parsed.fields.find(f => f.line === position.line);
@@ -460,5 +520,20 @@ export function registerRosMessageProviders(context: vscode.ExtensionContext): v
         new RosMessageHoverProvider()
     );
     
-    return [definitionProvider, hoverProvider];
+    // Set up cache invalidation on document changes
+    const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+        // Invalidate cache when document content changes
+        if (event.document.languageId === 'rosmsg') {
+            messageFileCache.invalidate(event.document.uri);
+        }
+    });
+    
+    const closeListener = vscode.workspace.onDidCloseTextDocument((document) => {
+        // Clean up cache when document is closed
+        if (document.languageId === 'rosmsg') {
+            messageFileCache.invalidate(document.uri);
+        }
+    });
+    
+    return [definitionProvider, hoverProvider, changeListener, closeListener];
 }
