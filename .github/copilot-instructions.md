@@ -1,38 +1,126 @@
-# General
-Create test cases in the test directory for all new features and bug fixes.
-Do not create summary documents.
-If you need to execute ROS commands, source the ROS 2 setup script in the terminal before running the command. We're testing on Kilted, so use /opt/ros/kilted/setup.bash when running on a Linux system or the configured Pixi setup script on Windows (defaults to c:\pixi_ws\ros2-windows\local_setup.bat but configurable via ROS2.pixiRoot setting).
-This project compiles typescript using `npm run build`
-Require statements should always be at the top of a file, never in the middle.
-Be concise and to the point.
-If a command is unclear or results in numerous changes, ask for clarification before proceeding.
-Do not use vcpkg for dependency management, use Pixi instead.
+# Project Overview
+This is the **Robot Developer Extensions for ROS 2** - a Visual Studio Code extension that provides debugging and development support for Robot Operating System 2 (ROS 2). The extension works with Visual Studio Code and Cursor.
 
-# Library specifications
-* This is a Visual Studio Code extension which provides tools to help develop ROS 2 code, which includes rclpy, rclcpp, rclrust and rcldonet.
-* The extension is written in TypeScript and uses the Visual Studio Code API.
-* The extension includes python code which is called from the TypeScript code when directly interfacing with ROS 2.
-* to support modern ubuntu, the extension attempts to manage a virtual environment for python code which lives in the extension directory.
-* The extension works with the language debuggers, by attempting to identify the language of the file being debugged and then using the appropriate debugger. Currently this is only implemented for python and C++.
-* This extension used to support ROS 1, so some ROS 1 code may be present in the extension. This code is not used by the extension, and may be removed if encoundered. Do not get confused by this code.
-* This extension is used with ROS 2 Humble or Greater, and does not support ROS 1.
-* The extension works with latest versions Visual Studio Code and Cursor.
+## Technology Stack
+* **Language**: TypeScript + Python
+* **Framework**: VS Code Extension API
+* **Build Tool**: Webpack + npm
+* **Testing**: Mocha (via VS Code test runner)
+* **Target ROS**: ROS 2 Humble or greater (no ROS 1 support)
+* **Supported Languages**: rclpy (Python), rclcpp (C++), rclrust (Rust), rcldonet (.NET)
 
-# ROS 2 Launch File Dumper
-This extension provides a tool to dump the contents of a ROS 2 python based launch file to enable the extension to launch each ROS node under
-a debugger. The file ros2_launch_dumper.py is included in the extension and run using the system python interpreter. 
-Since launch files can be python files, the dumper iterates over the objects in the launch file and dumps important contents to the stdout which is parsed
-by the extension.
+# Contribution Guidelines
 
+## Building and Testing
+1. **Install dependencies**: `npm ci` (preferred over `npm install`)
+2. **Build the project**: `npm run build` (compiles TypeScript using webpack)
+3. **Lint code**: Use `npx eslint -p ./` (eslint is not installed globally)
+4. **Run tests**: Open Debug viewlet (`Ctrl+Shift+D`), select `Tests`, then hit `F5`
+5. **Debug extension**: Open Debug viewlet, select `Extension`, then hit `F5`
 
-# ROS 2 Lifecycle Node support
-This extension supports ROS 2 Lifecycle Nodes, which are a type of node that can transition between different states. 
-The extension provides tools to help develop and debug Lifecycle Nodes, including:
-* The ability to set the initial state of a Lifecycle Node.
-* The ability to transition a Lifecycle Node between states.
-* The ability to view the current state of a Lifecycle Node.
-* The ability to view the available transitions for a Lifecycle Node.
-* During debugging, the extension dumps the contents of the launch file. If the launch file contains Lifecycle Nodes, the extension will automatically set the initial state of the Lifecycle Node to "unconfigured" and will allow you to transition the node to "inactive", "active", and "finalized" states.
-* If the launch file contains launch file event emitters, these are exported from the dumper, and after starting the debuggers.
+## Code Quality Requirements
+* All new features and bug fixes **must** include test cases in the `test` directory
+* Changes must pass linting and build successfully
+* Require/import statements must always be at the top of a file, never in the middle
+* Follow `.editorconfig` settings: 2 spaces, LF line endings, insert final newline
+* Be concise and to the point in code and documentation
 
-These abilities are exposed through the command palette, and through the ROS 2 Status Webview.
+## Acceptance Criteria for Changes
+* Code must build without errors: `npm run build`
+* Existing tests must continue to pass
+* New functionality must include tests
+* No introduction of security vulnerabilities
+* Changes must not break ROS 2 environment detection or debugging capabilities
+
+# Directory Structure
+```
+├── src/              # TypeScript source code
+│   ├── debugger/     # Debugging functionality (attach, launch, process picker)
+│   ├── ros/          # ROS-specific implementations (ROS 2 commands, lifecycle nodes)
+│   ├── build-tool/   # Build tool integration (colcon)
+│   └── test-provider/ # Test discovery and execution
+├── test/             # Test suites and fixtures
+│   ├── suite/        # Test implementations
+│   └── launch/       # ROS launch file test fixtures
+├── assets/           # Scripts and resources bundled with extension
+├── scripts/          # Build and maintenance scripts
+├── samples/          # Sample ROS 2 workspaces for testing
+├── dist/             # Compiled output (do not commit)
+└── docs/             # Documentation source files
+```
+
+# Code Style and Conventions
+
+## TypeScript Style
+```typescript
+// Good: Use async/await for asynchronous operations
+async function fetchRosNodes(): Promise<string[]> {
+    const nodes = await ros2.getNodeList();
+    return nodes;
+}
+
+// Good: Proper error handling
+try {
+    await debugManager.launchNode(config);
+} catch (error) {
+    vscode.window.showErrorMessage(`Failed to launch: ${error}`);
+    throw error;
+}
+
+// Good: Use typed interfaces
+interface LaunchConfig {
+    target: string;
+    arguments: string[];
+    env?: Record<string, string>;
+}
+```
+
+## Python Style
+* Python code is used for interfacing directly with ROS 2
+* Python code runs in a managed virtual environment in the extension directory
+* Follow Python best practices for ROS 2 integration
+
+# Security and Safety Boundaries
+
+## Forbidden Actions
+* **Never** commit secrets, API keys, or credentials to the repository
+* **Never** modify or delete files in `.github/agents/` directory (reserved for agent configurations)
+* **Never** remove or disable security-related code without explicit justification
+* **Do not** create summary documents or planning files (work in memory)
+* **Do not** use vcpkg for dependency management (use Pixi instead)
+
+## Protected Areas
+* `.venv/` directories contain Python virtual environments (git-ignored)
+* `node_modules/` contains npm dependencies (git-ignored)
+* Build artifacts in `dist/` and `out/` directories (git-ignored)
+* Do not commit `.vscode/settings.json` or `.vscode/c_cpp_properties.json`
+
+# Special Considerations
+
+## ROS 2 Environment Setup
+* When executing ROS commands, source the ROS 2 setup script first:
+  * **Linux**: `/opt/ros/kilted/setup.bash` (we test on ROS 2 Kilted)
+  * **Windows Pixi**: `c:\pixi_ws\ros2-windows\local_setup.bat` (configurable via `ROS2.pixiRoot` setting)
+* The extension automatically detects and configures ROS environments
+
+## ROS 2 Launch File Dumper
+* `ros2_launch_dumper.py` is a critical component in the `assets` directory
+* It analyzes Python-based launch files to enable per-node debugging
+* The dumper iterates over launch file objects and outputs structured data parsed by the extension
+* **Do not modify** without testing with multiple launch file configurations
+
+## ROS 2 Lifecycle Node Support
+The extension provides comprehensive lifecycle node management:
+* Set initial state and transition lifecycle nodes between states
+* View current state and available transitions
+* During debugging, launch files with lifecycle nodes start in "unconfigured" state
+* Transitions managed through command palette and ROS 2 Status Webview
+* Launch file event emitters are exported and handled after debugger startup
+
+## Legacy Code Warning
+* Some ROS 1 code may still exist in the codebase
+* **ROS 1 is not supported** - such code can be removed if encountered
+* Do not be confused by ROS 1 references; focus on ROS 2 implementation
+
+# Getting Clarification
+If a command or requirement is unclear or would result in numerous changes, **ask for clarification before proceeding**.
