@@ -14,7 +14,7 @@ This is the **Robot Developer Extensions for ROS 2** - a Visual Studio Code exte
 ## Building and Testing
 1. **Install dependencies**: `npm ci` (preferred over `npm install`)
 2. **Build the project**: `npm run build` (compiles TypeScript using webpack)
-3. **Lint code**: Linting setup is transitional (package.json references ESLint but `tslint.json` exists; TSLint deprecated since 2019)
+3. **Lint code**: Focus on passing the build; linting setup is transitional (TSLint deprecated, migration to ESLint in progress)
 4. **Run tests**: Open Debug viewlet (`Ctrl+Shift+D`), select `Tests`, then hit `F5`
 5. **Debug extension**: Open Debug viewlet, select `Extension`, then hit `F5`
 
@@ -103,7 +103,7 @@ interface LaunchConfig {
 * The extension automatically detects and configures ROS environments
 
 ## ROS 2 Launch File Dumper
-* `ros2_launch_dumper.py` is a critical component in the `assets` directory
+* `ros2_launch_dumper.py` is a critical component in `assets/scripts/`
 * It analyzes Python-based launch files to enable per-node debugging
 * The dumper iterates over launch file objects and outputs structured data parsed by the extension
 * **Do not modify** without testing with multiple launch file configurations
