@@ -8,7 +8,13 @@ You can access the following commands from the [Visual Studio Code command palle
 | ROS2: Show Status | Open a detail view showing ROS core runtime status. |
 | ROS2: Start | Start ROS1 core or ROS2 Daemon. |
 | ROS2: Stop  | Terminate ROS core or ROS2 Daemon. |
-| ROS2: Update C++ Properties | Update the C++ IntelliSense configuration to include ROS and your ROS components. |
-| ROS2: Update Python Path | Update the Python IntelliSense configuration to include ROS. |
+| ROS2: Update C++ Properties | Update the C++ IntelliSense configuration to include ROS and your ROS components. See [IntelliSense](intellisense.md) for more details. |
+| ROS2: Update Python Path | Update the Python IntelliSense configuration to include ROS. See [IntelliSense](intellisense.md) for more details. |
 | ROS2: Preview URDF | Preview URDF and Xacro files. The display will update after the root URDF changes are saved. |
 | ROS2: Install ROS Dependencies for this workspace using rosdep | Shortcut for `rosdep install --from-paths src --ignore-src -r -y`. |
+
+## IntelliSense Features
+
+The extension provides rich IntelliSense support for ROS message files (`.msg`, `.srv`, `.action`). 
+
+For detailed information about hover tooltips, go-to-definition, and other IntelliSense features, see the [IntelliSense documentation](intellisense.md).
