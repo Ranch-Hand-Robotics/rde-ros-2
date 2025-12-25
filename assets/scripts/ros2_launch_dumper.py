@@ -34,6 +34,12 @@ from launch import Action
 from launch.actions import ExecuteProcess
 from launch.actions import IncludeLaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import LogInfo
+from launch.actions import OpaqueFunction
+from launch.actions import SetEnvironmentVariable
+from launch.actions import UnsetEnvironmentVariable
+from launch.actions import AppendEnvironmentVariable
+from launch.actions import PrependEnvironmentVariable
 from launch.launch_context import LaunchContext
 from launch_ros.actions import PushRosNamespace
 from launch_ros.actions import LifecycleNode
@@ -282,6 +288,17 @@ if __name__ == "__main__":
         sys.stdout = my_stdout
         while walker:
             entity = walker.pop()
+            
+            # Skip non-process actions that don't represent debuggable entities
+            # - LogInfo: prints informational messages
+            # - DeclareLaunchArgument: declares launch file arguments
+            # - OpaqueFunction: executes Python functions without creating processes
+            # - Environment/Configuration actions: modify environment/config without creating processes
+            if is_a(entity, (LogInfo, DeclareLaunchArgument, OpaqueFunction, 
+                           SetEnvironmentVariable, UnsetEnvironmentVariable,
+                           AppendEnvironmentVariable, PrependEnvironmentVariable)):
+                continue
+            
             try:
                 visit_future = entity.visit(context)
                 if visit_future is not None:
