@@ -44,7 +44,7 @@ export class TestDiscoveryUtils {
                 }
                 
                 // Calculate indentation level
-                const indentation = line.length - line.trimLeft().length;
+                const indentation = line.length - line.trimStart().length;
                 
                 // If we're at module level (no indentation) and have a current class, reset it
                 if (indentation === 0 && currentClass !== null && !trimmedLine.startsWith('class ')) {
