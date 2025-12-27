@@ -42,30 +42,22 @@ export function getRosSetupScript(): string {
     const config = getExtensionConfiguration();
     let rosSetupScript = config.get("rosSetupScript", "");
     
-    console.log('[getRosSetupScript] Initial value from config:', rosSetupScript);
-    
     // First, handle workspace folder variable substitution if present
     const regex = /\$\{workspaceFolder\}/g;
     if (rosSetupScript.includes("${workspaceFolder}")) {
-        console.log('[getRosSetupScript] Found workspaceFolder variable');
         if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length >= 1) {
             const wsFolder = vscode.workspace.workspaceFolders[0].uri.fsPath;
-            console.log('[getRosSetupScript] Substituting with:', wsFolder);
             rosSetupScript = rosSetupScript.replace(regex, wsFolder);
-            console.log('[getRosSetupScript] After substitution:', rosSetupScript);
         } else {
             // If workspace folder variable is present but no workspace is open, return empty
-            console.log('[getRosSetupScript] workspaceFolders not available, returning empty');
             return "";
         }
     }
     
     // If still empty after substitution, check for pixiRoot default
     if (!rosSetupScript) {
-        console.log('[getRosSetupScript] rosSetupScript is empty, checking pixiRoot');
         // If pixiRoot is configured, use it on any platform
         const pixiRoot = config.get("pixiRoot", "");
-        console.log('[getRosSetupScript] pixiRoot:', pixiRoot);
         
         if (pixiRoot) {
             const shellInfo = ros_utils.detectUserShell();
@@ -77,14 +69,12 @@ export function getRosSetupScript(): string {
             console.log('[getRosSetupScript] Using pixi path:', rosSetupScript);
         } else {
             // No pixiRoot configured - return empty string to indicate no default
-            console.log('[getRosSetupScript] No pixiRoot configured, returning empty');
             return "";
         }
     }
     
     // Normalize path separators for current platform
     const normalized = path.normalize(rosSetupScript);
-    console.log('[getRosSetupScript] Final normalized path:', normalized);
     return normalized;
 }
 
