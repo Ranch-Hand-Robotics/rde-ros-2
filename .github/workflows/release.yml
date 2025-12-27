@@ -7,6 +7,9 @@ on:
         description: 'Prerelease'    
         required: true
         default: 'true'
+        options:
+          - 'true'
+          - 'false'
       tags:
         description: 'Version Tag'
         required: true
@@ -20,11 +23,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/checkout@v4
         with:
-          node-version: 22.x
+          fetch-depth: 0
+      
+      - name: Checkout tag if it exists
+        run: |
+          if git rev-parse "refs/tags/${{ github.event.inputs.tags }}" >/dev/null 2>&1; then
+            echo "Tag ${{ github.event.inputs.tags }} exists, checking it out"
+            git checkout "refs/tags/${{ github.event.inputs.tags }}"
+          else
+            echo "Tag ${{ github.event.inputs.tags }} does not exist, using current branch"
+          fi
+      
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
       - run: npm install
       
       # Update version in package.json
@@ -60,17 +75,17 @@ jobs:
       
       # Release flow
       - name: Build Release VSIX package
-        if: ${{ github.event.inputs.prerelease == 'false' }}
+        if: ${{ github.event.inputs.prerelease != 'true' }}
         run: |
           vsce package -o rde-ros-2-${{ github.event.inputs.tags }}.vsix
       
       - name: Publish Release to Marketplace
-        if: ${{ github.event.inputs.prerelease == 'false' }}
+        if: ${{ github.event.inputs.prerelease != 'true' }}
         run: |
           vsce publish -p ${{ secrets.VSCE_PAT }}
       
       - name: Create GitHub Release
-        if: ${{ github.event.inputs.prerelease == 'false' }}
+        if: ${{ github.event.inputs.prerelease != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
