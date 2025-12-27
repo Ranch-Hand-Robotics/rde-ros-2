@@ -67,8 +67,6 @@ describe("ROS Setup Script Configuration Tests", () => {
             // Use Workspace target to avoid Global/user overrides; await update so value is applied
             await config.update("rosSetupScript", scriptWithVariable, vscode.ConfigurationTarget.Workspace);
             
-            const afterUpdate = config.get("rosSetupScript");
-            
             const setupScriptPath = vscode_utils.getRosSetupScript();
             
             if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length === 1) {
