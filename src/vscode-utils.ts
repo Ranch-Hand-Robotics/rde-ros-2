@@ -62,7 +62,11 @@ export function getRosSetupScript(): string {
         if (pixiRoot) {
             const shellInfo = ros_utils.detectUserShell();
             const setupFileName = `local_setup${shellInfo.scriptExtension}`;
-            rosSetupScript = path.join(pixiRoot, `ros2-windows`, setupFileName);
+            const pixiRosPath = process.platform === "win32"
+                ? path.join(pixiRoot, "ros2-windows")
+                : pixiRoot;
+            rosSetupScript = path.join(pixiRosPath, setupFileName);
+            console.log('[getRosSetupScript] Using pixi path:', rosSetupScript);
         } else {
             // No pixiRoot configured - return empty string to indicate no default
             return "";
