@@ -14,9 +14,14 @@ export function run(): Promise<void> {
         ui: 'bdd',
         color: true,
         timeout: 20000, // 20 second timeout for tests
-        reporter: 'json',
+        reporter: 'mochawesome',
         reporterOptions: {
-            mochaFile: path.resolve(__dirname, '../../test-results.json')
+            reportDir: path.resolve(__dirname, '../../test-results'),
+            reportFilename: 'mochawesome',
+            overwrite: true,
+            quiet: true,
+            html: false,
+            json: true
         }
     });
 
