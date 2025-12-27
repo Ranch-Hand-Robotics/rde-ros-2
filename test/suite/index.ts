@@ -5,6 +5,7 @@
  */
 
 import * as path from 'path';
+import * as fs from 'fs';
 import * as Mocha from 'mocha';
 import { glob } from 'glob';
 
@@ -13,16 +14,7 @@ export function run(): Promise<void> {
     const mocha = new Mocha({
         ui: 'bdd',
         color: true,
-        timeout: 20000, // 20 second timeout for tests
-        reporter: 'mochawesome',
-        reporterOptions: {
-            reportDir: path.resolve(__dirname, '../../test-results'),
-            reportFilename: 'mochawesome',
-            overwrite: true,
-            quiet: true,
-            html: false,
-            json: true
-        }
+        timeout: 20000 // 20 second timeout for tests
     });
 
     const testsRoot = path.resolve(__dirname, '..');

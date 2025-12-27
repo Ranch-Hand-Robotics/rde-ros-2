@@ -38,22 +38,6 @@ jobs:
           sudo apt-get install -y xvfb
       - name: Run unit tests (headless)
         run: npm run headless-test
-      - name: Publish test results
-        if: always()  # Run even if tests fail
-        uses: dorny/test-reporter@v1
-        with:
-          name: Unit Test Results
-          path: 'out/test-results/mochawesome.json'
-          reporter: 'mochawesome'
-      - name: Run unit tests
-        run: npm run test
-      - name: Publish test results
-        if: always()  # Run even if tests fail
-        uses: dorny/test-reporter@v1
-        with:
-          name: Unit Test Results
-          path: 'test-results.json'
-          reporter: 'mocha-json'
   archive-vsix:
     runs-on: ubuntu-latest
     needs: [build]
