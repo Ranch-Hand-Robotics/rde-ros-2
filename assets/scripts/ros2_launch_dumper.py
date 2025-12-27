@@ -430,7 +430,7 @@ if __name__ == "__main__":
                                 arguments=args
                             )
                     except Exception as extract_ex:
-                        output_handler.add_error(f"giving up on {type(entity).__name__}: {visit_ex}")
+                        output_handler.add_error(f"giving up on {type(entity).__name__}: {extract_ex}")
                 
                 continue
 
