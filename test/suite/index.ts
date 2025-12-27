@@ -14,7 +14,11 @@ export function run(): Promise<void> {
     const mocha = new Mocha({
         ui: 'bdd',
         color: true,
-        timeout: 20000 // 20 second timeout for tests
+        timeout: 20000, // 20 second timeout for tests
+        reporter: 'mocha-junit-reporter',
+        reporterOptions: {
+            mochaFile: path.resolve(__dirname, '../../test-results/junit.xml')
+        }
     });
 
     const testsRoot = path.resolve(__dirname, '..');
