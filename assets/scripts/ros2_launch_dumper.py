@@ -337,18 +337,20 @@ if __name__ == "__main__":
             # - OpaqueFunction: executes Python functions without creating processes
             # - Environment/Configuration actions: modify environment/config without creating processes
             # - IncludeLaunchDescription: container action (visits to expand contents)
-            skip_types = [LogInfo, DeclareLaunchArgument, OpaqueFunction, IncludeLaunchDescription]
-            if SetEnvironmentVariable is not None:
-                skip_types.append(SetEnvironmentVariable)
-            if UnsetEnvironmentVariable is not None:
-                skip_types.append(UnsetEnvironmentVariable)
-            if AppendEnvironmentVariable is not None:
-                skip_types.append(AppendEnvironmentVariable)
-            if PrependEnvironmentVariable is not None:
-                skip_types.append(PrependEnvironmentVariable)
+            if 'skip_types_tuple' not in locals():
+                skip_types_list = [LogInfo, DeclareLaunchArgument, OpaqueFunction, IncludeLaunchDescription]
+                if SetEnvironmentVariable is not None:
+                    skip_types_list.append(SetEnvironmentVariable)
+                if UnsetEnvironmentVariable is not None:
+                    skip_types_list.append(UnsetEnvironmentVariable)
+                if AppendEnvironmentVariable is not None:
+                    skip_types_list.append(AppendEnvironmentVariable)
+                if PrependEnvironmentVariable is not None:
+                    skip_types_list.append(PrependEnvironmentVariable)
+                skip_types_tuple = tuple(skip_types_list)
             
             # Use isinstance instead of safe_is_a to avoid type checking issues
-            is_skip_type = isinstance(entity, tuple(skip_types))
+            is_skip_type = isinstance(entity, skip_types_tuple)
             
             if is_skip_type:
                 # For IncludeLaunchDescription and other skip types, still try to visit and expand
