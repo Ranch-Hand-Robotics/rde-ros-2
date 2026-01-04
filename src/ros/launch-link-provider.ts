@@ -19,8 +19,9 @@ export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
     /**
      * Regular expression to extract package name from find-pkg-share substitution
      * Matches: $(find-pkg-share package_name)
+     * Package names can contain letters, numbers, underscores, and hyphens
      */
-    private readonly findPkgShareRegex = /\$\(find-pkg-share\s+([^\)]+)\)/;
+    private readonly findPkgShareRegex = /\$\(find-pkg-share\s+([a-zA-Z0-9_-]+)\s*\)/;
 
     async provideDocumentLinks(
         document: vscode.TextDocument,

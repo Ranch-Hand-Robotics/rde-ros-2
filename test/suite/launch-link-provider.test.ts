@@ -8,7 +8,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 suite('Launch Link Provider Test Suite', () => {
-    const testLaunchDir = path.join(__dirname, '..', '..', '..', 'test', 'launch');
+    // Use __dirname to construct a more robust path to the test directory
+    const workspaceRoot = path.resolve(__dirname, '../../..');
+    const testLaunchDir = path.join(workspaceRoot, 'test', 'launch');
     
     test('Should provide links for include statements in XML launch files', async () => {
         // Create a test launch file with include statements
