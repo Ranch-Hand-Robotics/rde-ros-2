@@ -19,6 +19,7 @@ import * as ros_utils from "./ros/utils";
 import { rosApi, selectROSApi } from "./ros/ros";
 import * as lifecycle from "./ros/ros2/lifecycle";
 import { registerRosMessageProviders } from "./ros/ros-msg-providers";
+import { registerLaunchLinkProvider } from "./ros/launch-link-provider";
 
 import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
@@ -270,6 +271,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register ROS message language providers (Definition and Hover)
     context.subscriptions.push(...registerRosMessageProviders(context));
+
+    // Register launch file link provider
+    context.subscriptions.push(registerLaunchLinkProvider());
 
     // Source the environment, and re-source on config change.
     let config = vscode_utils.getExtensionConfiguration();
