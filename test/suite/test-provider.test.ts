@@ -7,9 +7,9 @@ import * as fs from 'fs';
 import { TestDiscoveryUtils } from '../../src/test-provider/test-discovery-utils';
 import { TestType } from '../../src/test-provider/ros-test-provider';
 
-suite('ROS 2 Test Provider Tests', () => {
+describe('ROS 2 Test Provider Tests', () => {
     
-    test('TestDiscoveryUtils.isTestFile identifies Python test files correctly', () => {
+    it('TestDiscoveryUtils.isTestFile identifies Python test files correctly', () => {
         // Positive cases
         assert.strictEqual(TestDiscoveryUtils.isTestFile('test_example.py').isTest, true);
         assert.strictEqual(TestDiscoveryUtils.isTestFile('example_test.py').isTest, true);
@@ -20,7 +20,7 @@ suite('ROS 2 Test Provider Tests', () => {
         assert.strictEqual(TestDiscoveryUtils.isTestFile('src/main.py').isTest, false);
     });
     
-    test('TestDiscoveryUtils.isTestFile identifies C++ test files correctly', () => {
+    it('TestDiscoveryUtils.isTestFile identifies C++ test files correctly', () => {
         // Positive cases
         assert.strictEqual(TestDiscoveryUtils.isTestFile('test_example.cpp').isTest, true);
         assert.strictEqual(TestDiscoveryUtils.isTestFile('exampleTest.cpp').isTest, true);
@@ -31,7 +31,7 @@ suite('ROS 2 Test Provider Tests', () => {
         assert.strictEqual(TestDiscoveryUtils.isTestFile('src/main.cpp').isTest, false);
     });
     
-    test('TestDiscoveryUtils.isTestFile identifies launch test files correctly', () => {
+    it('TestDiscoveryUtils.isTestFile identifies launch test files correctly', () => {
         // Positive cases
         assert.strictEqual(TestDiscoveryUtils.isTestFile('test_example.launch.py').isTest, true);
         assert.strictEqual(TestDiscoveryUtils.isTestFile('example_test.launch.py').isTest, true);
@@ -40,7 +40,7 @@ suite('ROS 2 Test Provider Tests', () => {
         assert.strictEqual(TestDiscoveryUtils.isTestFile('example.launch.py').isTest, false);
     });
     
-    test('TestDiscoveryUtils.parsePythonTestFile parses test methods correctly', () => {
+    it('TestDiscoveryUtils.parsePythonTestFile parses test methods correctly', () => {
         // Create a temporary test file
         const testContent = `
 import unittest
@@ -69,7 +69,7 @@ class NotATestClass:
             // Should find the test class and methods
             const testClass = results.find(r => r.name === 'TestExample');
             assert.ok(testClass, 'Should find TestExample class');
-            assert.strictEqual(testClass.type, 'class');
+            assert.ok(testClass && testClass.type === 'class', 'TestExample should be a class type');
             
             const testMethods = results.filter(r => r.type === 'method');
             assert.strictEqual(testMethods.length, 3, 'Should find 3 test methods');
@@ -90,7 +90,7 @@ class NotATestClass:
         }
     });
     
-    test('TestDiscoveryUtils.parseCppTestFile parses GTest cases correctly', () => {
+    it('TestDiscoveryUtils.parseCppTestFile parses GTest cases correctly', () => {
         const testContent = `
 #include <gtest/gtest.h>
 
@@ -134,7 +134,7 @@ void regular_function() {
         }
     });
     
-    test('TestDiscoveryUtils.getPythonTestCommand builds correct command', () => {
+    it('TestDiscoveryUtils.getPythonTestCommand builds correct command', () => {
         const testData = {
             type: TestType.PythonUnitTest,
             filePath: '/path/to/test_file.py',
@@ -144,7 +144,7 @@ void regular_function() {
         
         const command = TestDiscoveryUtils.getPythonTestCommand(testData);
         
-        assert.ok(command.includes('python'), 'Should include python');
+        assert.ok(command.includes('python3') || command.includes('python'), 'Should include python or python3');
         assert.ok(command.includes('pytest'), 'Should include pytest');
         assert.ok(command.includes('/path/to/test_file.py::TestClass::test_method'), 'Should include correct test selector');
     });

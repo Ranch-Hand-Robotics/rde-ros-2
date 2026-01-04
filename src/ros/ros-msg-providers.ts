@@ -114,7 +114,10 @@ function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
         if (fieldMatch) {
             const isOptional = !!fieldMatch[1];
             const typeStr = fieldMatch[2];
-            const arraySize = fieldMatch[3]?.replace(/[\[\]]/g, '') || undefined;
+            const arrayBrackets = fieldMatch[3]; // e.g., "[]" or "[10]" or undefined
+            // If there are brackets, extract the content (empty string for [], "10" for [10], etc.)
+            // If no brackets, arraySize is undefined
+            const arraySize = arrayBrackets ? arrayBrackets.replace(/[\[\]]/g, '') : undefined;
             const fieldName = fieldMatch[4];
             const defaultValue = fieldMatch[6]?.trim();
             const isConstant = !!defaultValue && line.includes('=');
@@ -131,6 +134,8 @@ function parseMessageFile(document: vscode.TextDocument): ParsedMessage {
                 line: lineNumber,
                 column
             });
+        } else {
+            // Non-matching lines are silently skipped (comments, empty lines, etc.)
         }
     }
 
@@ -364,50 +369,56 @@ async function generateTypeDocumentation(
     
     // Try to find and show the definition with properties
     const workspaceFolders = vscode.workspace.workspaceFolders;
+    
     if (workspaceFolders) {
-        const definitions = await findMessageDefinitions(workspaceFolders, pkgName, msgName);
-        if (definitions.length > 0) {
-            const defUri = definitions[0];
-            try {
-                const defDoc = await vscode.workspace.openTextDocument(defUri);
-                const defParsed = parseMessageFile(defDoc);
-                
-                if (defParsed.fields.length > 0) {
-                    markdown.appendMarkdown('\n\n**Properties**:');
+        try {
+            const definitions = await findMessageDefinitions(workspaceFolders, pkgName, msgName);
+            
+            if (definitions.length > 0) {
+                const defUri = definitions[0];
+                try {
+                    const defDoc = await vscode.workspace.openTextDocument(defUri);
+                    const defParsed = parseMessageFile(defDoc);
                     
-                    // Create a formatted list of properties
-                    const propertyLines: string[] = [];
-                    for (const defField of defParsed.fields) {
-                        let fieldStr: string;
+                    if (defParsed.fields.length > 0) {
+                        markdown.appendMarkdown('\n\n**Properties**:');
                         
-                        // Format the type with array notation if applicable
-                        if (defField.arraySize !== undefined) {
-                            fieldStr = `${defField.type}[${defField.arraySize}] ${defField.name}`;
-                        } else {
-                            fieldStr = `${defField.type} ${defField.name}`;
+                        // Create a formatted list of properties
+                        const propertyLines: string[] = [];
+                        for (const defField of defParsed.fields) {
+                            let fieldStr: string;
+                            
+                            // Format the type with array notation if applicable
+                            if (defField.arraySize !== undefined) {
+                                fieldStr = `${defField.type}[${defField.arraySize}] ${defField.name}`;
+                            } else {
+                                fieldStr = `${defField.type} ${defField.name}`;
+                            }
+                            
+                            // Add default value or constant value
+                            if (defField.isConstant && defField.defaultValue) {
+                                fieldStr += ` = ${defField.defaultValue}`;
+                            } else if (defField.defaultValue) {
+                                fieldStr += ` = ${defField.defaultValue}`;
+                            }
+                            
+                            // Add inline comment if available
+                            const fieldComment = defParsed.comments.get(defField.line);
+                            if (fieldComment) {
+                                fieldStr += `  # ${fieldComment}`;
+                            }
+                            
+                            propertyLines.push(fieldStr);
                         }
                         
-                        // Add default value or constant value
-                        if (defField.isConstant && defField.defaultValue) {
-                            fieldStr += ` = ${defField.defaultValue}`;
-                        } else if (defField.defaultValue) {
-                            fieldStr += ` = ${defField.defaultValue}`;
-                        }
-                        
-                        // Add inline comment if available
-                        const fieldComment = defParsed.comments.get(defField.line);
-                        if (fieldComment) {
-                            fieldStr += `  # ${fieldComment}`;
-                        }
-                        
-                        propertyLines.push(fieldStr);
+                        markdown.appendCodeblock(propertyLines.join('\n'), 'rosmsg');
                     }
-                    
-                    markdown.appendCodeblock(propertyLines.join('\n'), 'rosmsg');
+                } catch (err) {
+                    // Ignore errors reading the definition
                 }
-            } catch {
-                // Ignore errors reading the definition
             }
+        } catch (err) {
+            // Ignore errors finding definitions
         }
     }
     
@@ -430,6 +441,7 @@ export class RosMessageHoverProvider implements vscode.HoverProvider {
 
         const word = document.getText(wordRange);
         const line = document.lineAt(position.line).text;
+        
         const parsed = parseMessageFile(document);
 
         // Check if we're hovering over a type

@@ -24,7 +24,9 @@ async function main() {
             extensionTestsPath,
             launchArgs: [
                 '--disable-extensions', // Disable other extensions during testing
-                '--disable-workspace-trust' // Skip workspace trust dialog
+                '--disable-workspace-trust', // Skip workspace trust dialog
+                // Open the workspace folder so tests can access workspace files
+                path.resolve(__dirname, '../../samples')
             ]
         });
     } catch (err) {

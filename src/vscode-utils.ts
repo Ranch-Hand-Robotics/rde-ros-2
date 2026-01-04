@@ -42,6 +42,19 @@ export function getRosSetupScript(): string {
     const config = getExtensionConfiguration();
     let rosSetupScript = config.get("rosSetupScript", "");
     
+    // First, handle workspace folder variable substitution if present
+    const regex = /\$\{workspaceFolder\}/g;
+    if (rosSetupScript.includes("${workspaceFolder}")) {
+        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length >= 1) {
+            const wsFolder = vscode.workspace.workspaceFolders[0].uri.fsPath;
+            rosSetupScript = rosSetupScript.replace(regex, wsFolder);
+        } else {
+            // If workspace folder variable is present but no workspace is open, return empty
+            return "";
+        }
+    }
+    
+    // If still empty after substitution, check for pixiRoot default
     if (!rosSetupScript) {
         // If pixiRoot is configured, use it on any platform
         const pixiRoot = config.get("pixiRoot", "");
@@ -49,23 +62,20 @@ export function getRosSetupScript(): string {
         if (pixiRoot) {
             const shellInfo = ros_utils.detectUserShell();
             const setupFileName = `local_setup${shellInfo.scriptExtension}`;
-            rosSetupScript = path.join(pixiRoot, `ros2-windows`, setupFileName);
+            const pixiRosPath = process.platform === "win32"
+                ? path.join(pixiRoot, "ros2-windows")
+                : pixiRoot;
+            rosSetupScript = path.join(pixiRosPath, setupFileName);
+            console.log('[getRosSetupScript] Using pixi path:', rosSetupScript);
         } else {
             // No pixiRoot configured - return empty string to indicate no default
             return "";
         }
     }
     
-    // Handle workspace folder variable substitution
-    const regex = /\$\{workspaceFolder\}/g;
-    if (rosSetupScript.includes("${workspaceFolder}")) {
-        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length === 1) {
-            rosSetupScript = rosSetupScript.replace(regex, vscode.workspace.workspaceFolders[0].uri.fsPath);
-        }
-    }
-    
     // Normalize path separators for current platform
-    return path.normalize(rosSetupScript);
+    const normalized = path.normalize(rosSetupScript);
+    return normalized;
 }
 
 export function createOutputChannel(): vscode.OutputChannel {
@@ -229,4 +239,30 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 export function isLldbExtensionInstalled(): boolean {
     const lldbExtension = vscode.extensions.getExtension('vadimcn.vscode-lldb');
     return lldbExtension !== undefined;
+}
+
+/**
+ * Detects if the Microsoft C/C++ extension is installed
+ * @returns true if the C/C++ extension is installed, false otherwise
+ */
+export function isCppToolsExtensionInstalled(): boolean {
+    const cppToolsExtension = vscode.extensions.getExtension('ms-vscode.cpptools');
+    return cppToolsExtension !== undefined;
+}
+
+/**
+ * Detects if the Microsoft Python extension is installed
+ * @returns true if the Python extension is installed, false otherwise
+ */
+export function isPythonExtensionInstalled(): boolean {
+    const pythonExtension = vscode.extensions.getExtension('ms-python.python');
+    return pythonExtension !== undefined;
+}
+
+/**
+ * Detects if running in Cursor editor
+ * @returns true if running in Cursor, false otherwise
+ */
+export function isCursorEditor(): boolean {
+    return vscode.env.appName.includes('Cursor');
 }
