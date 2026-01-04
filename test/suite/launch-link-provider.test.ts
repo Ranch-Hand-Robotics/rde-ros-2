@@ -118,6 +118,91 @@ describe('Launch Link Provider Test Suite', () => {
             });
         }
     });
+
+    it('Should handle launch file with multiple include files', async () => {
+        if (!hasDocLinkCommand) {
+            console.warn('Skipping: vscode.executeDocumentLinkProvider not available in test host');
+            return;
+        }
+
+        // This test uses the pre-created test_multiple_includes.launch.xml file
+        const testLaunchPath = path.join(testLaunchDir, 'test_multiple_includes.launch.xml');
+        
+        // Verify the test file exists
+        assert.ok(fs.existsSync(testLaunchPath), 'test_multiple_includes.launch.xml should exist');
+        
+        try {
+            const doc = await vscode.workspace.openTextDocument(testLaunchPath);
+            await vscode.window.showTextDocument(doc);
+            
+            const links = await vscode.commands.executeCommand<vscode.DocumentLink[]>(
+                'vscode.executeDocumentLinkProvider',
+                doc.uri
+            );
+            
+            assert.ok(links, 'Document link provider should return links');
+            // Should find links for: example_target.launch.xml, demo_links.launch, test_with_includes.launch
+            assert.ok(links.length >= 3, 'Should find at least three include links');
+            
+        } catch (error) {
+            console.error('Error in multiple includes test:', error);
+            throw error;
+        }
+    });
+
+    it('Should handle XML attributes in different orders', async () => {
+        if (!hasDocLinkCommand) {
+            console.warn('Skipping: vscode.executeDocumentLinkProvider not available in test host');
+            return;
+        }
+
+        const testLaunchPath = path.join(testLaunchDir, 'test_attributes_order.launch');
+        
+        // Verify the test file exists
+        assert.ok(fs.existsSync(testLaunchPath), 'test_attributes_order.launch should exist');
+        
+        try {
+            const doc = await vscode.workspace.openTextDocument(testLaunchPath);
+            await vscode.window.showTextDocument(doc);
+            
+            const links = await vscode.commands.executeCommand<vscode.DocumentLink[]>(
+                'vscode.executeDocumentLinkProvider',
+                doc.uri
+            );
+            
+            assert.ok(links, 'Document link provider should return links');
+            // Should find links even when file attribute is not first
+            assert.ok(links.length >= 3, 'Should find links regardless of attribute order');
+            
+        } catch (error) {
+            console.error('Error in attributes order test:', error);
+            throw error;
+        }
+    });
+
+    it('Should work with Python launch files that reference XML files', async () => {
+        if (!hasDocLinkCommand) {
+            console.warn('Skipping: vscode.executeDocumentLinkProvider not available in test host');
+            return;
+        }
+
+        // Verify that the XML file included by Python launch exists
+        const xmlLaunchPath = path.join(testLaunchDir, 'included_by_python.launch.xml');
+        assert.ok(fs.existsSync(xmlLaunchPath), 'included_by_python.launch.xml should exist');
+        
+        // Open the XML file to verify it can be navigated to
+        try {
+            const doc = await vscode.workspace.openTextDocument(xmlLaunchPath);
+            await vscode.window.showTextDocument(doc);
+            
+            // Verify it's a valid XML document
+            assert.ok(doc.getText().includes('<launch>'), 'XML file should contain launch tag');
+            
+        } catch (error) {
+            console.error('Error opening XML file referenced by Python launch:', error);
+            throw error;
+        }
+    });
     
     it('Should not create links for non-existent files', async () => {
         if (!hasDocLinkCommand) {

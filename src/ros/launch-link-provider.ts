@@ -12,16 +12,19 @@ import { rosApi } from "./ros";
 export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
     /**
      * Regular expression to match include file attributes in XML launch files
-     * Matches patterns like: <include file="$(find-pkg-share package)/launch/file.launch.xml"/>
+     * Matches patterns like: <include file="$(find-pkg-share package)/launch/file.launch.xml"/> or
+     * <include ns="my_namespace" file="$(find-pkg-share package)/launch/file.launch.xml"/>
+     * Handles attributes in any order
      */
-    private readonly includeRegex = /<include\s+file="([^"]+)"\s*\/?>/g;
+    private readonly includeRegex = /<include\b[^>]*\bfile="([^"]+)"[^>]*\/?>/g;
 
     /**
      * Regular expression to extract package name from find-pkg-share substitution
      * Matches: $(find-pkg-share package_name)
      * Package names can contain letters, numbers, underscores, and hyphens
+     * Global flag allows replacing multiple occurrences in the same path
      */
-    private readonly findPkgShareRegex = /\$\(find-pkg-share\s+([a-zA-Z0-9_-]+)\s*\)/;
+    private readonly findPkgShareRegex = /\$\(find-pkg-share\s+([a-zA-Z0-9_-]+)\s*\)/g;
 
     async provideDocumentLinks(
         document: vscode.TextDocument,
@@ -35,6 +38,11 @@ export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
 
         let match: RegExpExecArray | null;
         while ((match = this.includeRegex.exec(text)) !== null) {
+            // Check for cancellation before processing each match
+            if (token.isCancellationRequested) {
+                return links;
+            }
+
             const fullMatch = match[0];
             const filePath = match[1];
             const matchIndex = match.index;
@@ -46,7 +54,7 @@ export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
             const range = new vscode.Range(startPos, endPos);
 
             // Try to resolve the file path
-            const resolvedPath = await this.resolveFilePath(filePath, document.uri);
+            const resolvedPath = await this.resolveFilePath(filePath, document.uri, token);
             
             if (resolvedPath) {
                 const link = new vscode.DocumentLink(range, resolvedPath);
@@ -64,21 +72,37 @@ export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
      */
     private async resolveFilePath(
         filePath: string,
-        documentUri: vscode.Uri
+        documentUri: vscode.Uri,
+        token: vscode.CancellationToken
     ): Promise<vscode.Uri | null> {
         // Check if the path contains $(find-pkg-share ...)
+        // Reset regex state for global flag
+        this.findPkgShareRegex.lastIndex = 0;
         const pkgShareMatch = this.findPkgShareRegex.exec(filePath);
         
         if (pkgShareMatch) {
+            // Check for cancellation before expensive ROS API call
+            if (token.isCancellationRequested) {
+                return null;
+            }
+
             const packageName = pkgShareMatch[1].trim();
             
             try {
                 // Get the package path using ROS API
                 const packages = await rosApi.getPackages();
+                
+                // Check for cancellation after async operation
+                if (token.isCancellationRequested) {
+                    return null;
+                }
+
                 if (packages[packageName]) {
                     const pkgPath = await packages[packageName]();
                     
-                    // Replace $(find-pkg-share package_name) with the actual package path
+                    // Replace all $(find-pkg-share package_name) occurrences with the actual package path
+                    // Reset regex state before replace
+                    this.findPkgShareRegex.lastIndex = 0;
                     const relativePath = filePath.replace(this.findPkgShareRegex, pkgPath);
                     
                     // Check if the resolved file exists
