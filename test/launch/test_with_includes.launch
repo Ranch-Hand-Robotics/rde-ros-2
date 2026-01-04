@@ -1,0 +1,14 @@
+<launch>
+  <!-- Test launch file with include statements -->
+  
+  <!-- This include has a relative path -->
+  <include file="example_target.launch.xml"/>
+  
+  <!-- Example of what the user wants: includes with $(find-pkg-share ...) -->
+  <!-- Note: This won't resolve unless the package exists in ROS -->
+  <!-- <include file="$(find-pkg-share some_package)/launch/some.launch.xml"/> -->
+  
+  <arg name="test_arg" default="value"/>
+  
+  <node pkg="test_pkg" exec="test_node" name="test" output="screen"/>
+</launch>

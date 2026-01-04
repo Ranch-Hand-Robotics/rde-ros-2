@@ -1,0 +1,22 @@
+<launch>
+  <!-- Demo launch file for testing link provider -->
+  
+  <!-- Test 1: Relative path - should work if example_target.launch.xml exists in same directory -->
+  <include file="example_target.launch.xml"/>
+  
+  <!-- Test 2: Relative path with subdirectory -->
+  <!-- <include file="subdirectory/another.launch"/> -->
+  
+  <!-- Test 3: find-pkg-share substitution (won't work without actual ROS package) -->
+  <!-- <include file="$(find-pkg-share nav2_bringup)/launch/navigation.launch.py"/> -->
+  
+  <!-- Test 4: Absolute path (modify to use actual path on your system) -->
+  <!-- <include file="/opt/ros/humble/share/demo_nodes_cpp/launch/talker_listener.launch.py"/> -->
+  
+  <arg name="robot_namespace" default="robot1"/>
+  <arg name="use_sim_time" default="true"/>
+  
+  <node pkg="demo_pkg" exec="demo_node" name="demo" output="screen">
+    <param name="namespace" value="$(arg robot_namespace)"/>
+  </node>
+</launch>

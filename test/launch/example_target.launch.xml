@@ -1,0 +1,7 @@
+<launch>
+  <!-- This is a target launch file -->
+  <arg name="robot_name" default="my_robot"/>
+  <arg name="use_sim_time" default="false"/>
+  
+  <node pkg="example_pkg" exec="example_node" name="example" output="screen"/>
+</launch>
