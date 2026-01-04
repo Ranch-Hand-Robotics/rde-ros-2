@@ -50,7 +50,8 @@ export async function getPackages(workspaceRoot: string): Promise<Package[]> {
         
         return packages;
     } catch (error) {
-        extension.outputChannel.appendLine(`Error getting packages: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        extension.outputChannel.appendLine(`Error getting packages: ${errorMessage}`);
         return [];
     }
 }
