@@ -13,6 +13,30 @@ const PYTHON_AUTOCOMPLETE_PATHS = "python.autoComplete.extraPaths";
 const PYTHON_ANALYSIS_PATHS = "python.analysis.extraPaths";
 
 /**
+ * Converts an absolute path to a workspace-relative path.
+ * If the path is within the workspace, returns a relative path.
+ * Otherwise, returns the original absolute path.
+ */
+function makeWorkspaceRelative(absolutePath: string, workspaceRoot: string): string {
+    if (!absolutePath || !workspaceRoot) {
+        return absolutePath;
+    }
+    
+    // Normalize both paths for comparison
+    const normalizedAbsolute = path.normalize(absolutePath);
+    const normalizedWorkspace = path.normalize(workspaceRoot);
+    
+    // Check if the path is within the workspace
+    if (normalizedAbsolute.startsWith(normalizedWorkspace)) {
+        const relativePath = path.relative(normalizedWorkspace, normalizedAbsolute);
+        return relativePath;
+    }
+    
+    // Path is outside the workspace, return as-is
+    return absolutePath;
+}
+
+/**
  * Creates config files which don't exist.
  */
 export async function createConfigFiles() {
@@ -57,8 +81,16 @@ async function updateCppPropertiesInternal(): Promise<void> {
         includes.push(path.join("/", "usr", "include"));
     }
 
-    // append ** so the IntelliSense engine will do a recursive search for hearder files starting from that directory
+    const workspaceRoot = vscode.workspace.rootPath;
+    
+    // Convert paths to workspace-relative where possible
     includes = includes.map((include: string) => {
+        const relativePath = makeWorkspaceRelative(include, workspaceRoot);
+        // If it's a relative path, prepend ${workspaceFolder}/
+        if (relativePath !== include && !path.isAbsolute(relativePath)) {
+            return "${workspaceFolder}/" + relativePath + "/**";
+        }
+        // Otherwise append ** to the absolute path
         return path.join(include, "**");
     });
 
@@ -129,14 +161,26 @@ export function updatePythonPath(context: vscode.ExtensionContext) {
  * Updates the python autocomplete path to support ROS.
  */
 function updatePythonAutoCompletePathInternal() {
-    vscode.workspace.getConfiguration().update(PYTHON_AUTOCOMPLETE_PATHS, extension.env.PYTHONPATH.split(path.delimiter));
+    const pythonPaths = extension.env.PYTHONPATH ? extension.env.PYTHONPATH.split(path.delimiter) : [];
+    const workspaceRoot = vscode.workspace.rootPath;
+    
+    // Convert absolute paths to relative paths where possible
+    const relativePaths = pythonPaths.map((p: string) => makeWorkspaceRelative(p, workspaceRoot));
+    
+    vscode.workspace.getConfiguration().update(PYTHON_AUTOCOMPLETE_PATHS, relativePaths);
 }
 
 /**
  * Updates the python analysis path to support ROS.
  */
 function updatePythonAnalysisPathInternal() {
-    vscode.workspace.getConfiguration().update(PYTHON_ANALYSIS_PATHS, extension.env.PYTHONPATH.split(path.delimiter));
+    const pythonPaths = extension.env.PYTHONPATH ? extension.env.PYTHONPATH.split(path.delimiter) : [];
+    const workspaceRoot = vscode.workspace.rootPath;
+    
+    // Convert absolute paths to relative paths where possible
+    const relativePaths = pythonPaths.map((p: string) => makeWorkspaceRelative(p, workspaceRoot));
+    
+    vscode.workspace.getConfiguration().update(PYTHON_ANALYSIS_PATHS, relativePaths);
 }
 
 function getCppStandard() {
