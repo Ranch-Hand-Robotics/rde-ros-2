@@ -4,6 +4,7 @@
 import * as assert from "assert";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as vscode from "vscode";
 
 import * as install_ros from "../../src/ros/install-ros";
@@ -12,8 +13,8 @@ suite("Install ROS Test Suite", () => {
   let testWorkspaceFolder: string;
 
   setup(async () => {
-    // Create a temporary test workspace
-    testWorkspaceFolder = path.join(__dirname, "..", "..", "..", "test-workspace-install");
+    // Create a temporary test workspace in the system temp directory
+    testWorkspaceFolder = path.join(os.tmpdir(), "test-workspace-install-" + Date.now());
     if (!fs.existsSync(testWorkspaceFolder)) {
       fs.mkdirSync(testWorkspaceFolder, { recursive: true });
     }

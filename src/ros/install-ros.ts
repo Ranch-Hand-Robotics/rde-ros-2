@@ -4,11 +4,17 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as child_process from "child_process";
 
 import * as pfs from "../promise-fs";
 import * as vscode_utils from "../vscode-utils";
 import * as extension from "../extension";
+
+/**
+ * Maximum length for environment variable values in diagnostic output
+ */
+const MAX_ENV_VALUE_LENGTH = 500;
 
 /**
  * ROS 2 distribution information
@@ -466,12 +472,12 @@ async function offerCopilotHelp(distro: RosDistro): Promise<void> {
     }
 
     // Gather diagnostic information
-    const osInfo = `${process.platform} ${process.arch} (${require("os").release()})`;
+    const osInfo = `${process.platform} ${process.arch} (${os.release()})`;
     const envInfo = JSON.stringify(
       {
         ROS_DISTRO: extension.env?.ROS_DISTRO,
         ROS_VERSION: extension.env?.ROS_VERSION,
-        PATH: process.env.PATH?.substring(0, 500), // Truncate to avoid huge output
+        PATH: process.env.PATH?.substring(0, MAX_ENV_VALUE_LENGTH), // Truncate to avoid huge output
         PYTHONPATH: process.env.PYTHONPATH,
         CMAKE_PREFIX_PATH: extension.env?.CMAKE_PREFIX_PATH,
       },
