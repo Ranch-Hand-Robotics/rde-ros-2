@@ -32,6 +32,7 @@ export class TestDiscoveryUtils {
             const lines = content.split('\n');
             
             let currentClass: string | null = null;
+            let classIndentation = -1;
             
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
@@ -42,10 +43,20 @@ export class TestDiscoveryUtils {
                     continue;
                 }
                 
+                // Calculate indentation level
+                const indentation = line.length - line.trimStart().length;
+                
+                // If we're at module level (no indentation) and have a current class, reset it
+                if (indentation === 0 && currentClass !== null && !trimmedLine.startsWith('class ')) {
+                    currentClass = null;
+                    classIndentation = -1;
+                }
+                
                 // Detect test classes (class names containing 'Test' or ending with 'Test')
                 const classMatch = trimmedLine.match(/^class\s+(\w*[Tt]est\w*)\s*\(/);
                 if (classMatch) {
                     currentClass = classMatch[1];
+                    classIndentation = indentation;
                     results.push({
                         name: currentClass,
                         type: 'class',
@@ -58,17 +69,20 @@ export class TestDiscoveryUtils {
                 const methodMatch = trimmedLine.match(/^def\s+(test_\w+)\s*\(/);
                 if (methodMatch) {
                     const methodName = methodMatch[1];
+                    // Only set parent if we're indented under a class
+                    const parent = (currentClass && indentation > classIndentation) ? currentClass : undefined;
                     results.push({
                         name: methodName,
                         type: 'method',
                         line: i,
-                        parent: currentClass || undefined
+                        parent: parent
                     });
                 }
                 
                 // Reset current class when we encounter a new top-level class
                 if (trimmedLine.startsWith('class ') && !classMatch) {
                     currentClass = null;
+                    classIndentation = -1;
                 }
             }
         } catch (error) {

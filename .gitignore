@@ -2,6 +2,7 @@
 out
 dist/**
 node_modules
+test-results
 
 # vscode-test
 .vscode-test

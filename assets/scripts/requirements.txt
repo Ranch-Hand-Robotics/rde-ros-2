@@ -8,3 +8,4 @@ jinja2
 setuptools
 typeguard
 launch-ros
+lark-parser

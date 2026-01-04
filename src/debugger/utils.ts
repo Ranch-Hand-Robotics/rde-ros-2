@@ -8,6 +8,7 @@ import * as path from "path";
 
 import * as extension from "../extension";
 import * as telemetry from "../telemetry-helper";
+import * as vscode_utils from "../vscode-utils";
 
 export async function oneTimePromiseFromEvent(eventCall, filter = undefined) : Promise<any> {
     return new Promise(resolve => {
@@ -38,30 +39,39 @@ export async function getPtvsdInjectCommand(host: string, port: number, pid: num
     // use ptvsd shipped with vscode-python to avoid potential version mismatch
 
     const pyExtensionId: string = "ms-python.python";
-    const pyExtension: vscode.Extension<IPythonExtensionApi> = vscode.extensions.getExtension(pyExtensionId);
-    if (pyExtension) {
-        if (!pyExtension.isActive) {
-            await pyExtension.activate();
-        }
-
-        // tslint:disable-next-line:strict-boolean-expressions
-        if (pyExtension.exports && pyExtension.exports.debug) {
-            // hack python extension's api to get command for injecting ptvsd
-
-            // pass false for waitForDebugger so the --wait flag won't be added
-            const waitForDebugger: boolean = false;
-            const ptvsdCommand = await pyExtension.exports.debug.getRemoteLauncherCommand(host, port, waitForDebugger);
-
-            // prepend python interpreter
-            ptvsdCommand.unshift("python");
-            // append the --pid flag
-            ptvsdCommand.push("--pid", pid.toString());
-            return ptvsdCommand.join(" ");
-        } else {
-            throw new Error(`Update extension [${pyExtensionId}] to debug Python projects.`);
-        }
+    if (!vscode_utils.isPythonExtensionInstalled()) {
+        const message = "Python debugging requires the Microsoft Python extension (ms-python.python).";
+        vscode.window.showErrorMessage(message);
+        throw new Error(message);
     }
-    throw new Error("Failed to retrieve ptvsd from Python extension!");
+
+    const pyExtension: vscode.Extension<IPythonExtensionApi> | undefined = vscode.extensions.getExtension(pyExtensionId);
+    if (!pyExtension) {
+        const message = "Python debugging requires the Microsoft Python extension (ms-python.python).";
+        vscode.window.showErrorMessage(message);
+        throw new Error(message);
+    }
+
+    if (!pyExtension.isActive) {
+        await pyExtension.activate();
+    }
+
+    // tslint:disable-next-line:strict-boolean-expressions
+    if (pyExtension.exports && pyExtension.exports.debug) {
+        // hack python extension's api to get command for injecting ptvsd
+
+        // pass false for waitForDebugger so the --wait flag won't be added
+        const waitForDebugger: boolean = false;
+        const ptvsdCommand = await pyExtension.exports.debug.getRemoteLauncherCommand(host, port, waitForDebugger);
+
+        // prepend python interpreter
+        ptvsdCommand.unshift("python");
+        // append the --pid flag
+        ptvsdCommand.push("--pid", pid.toString());
+        return ptvsdCommand.join(" ");
+    } else {
+        throw new Error(`Update extension [${pyExtensionId}] to debug Python projects.`);
+    }
 }
 
 /**
@@ -108,7 +118,10 @@ export function parseEnvFile(envFilePath: string): { [key: string]: string } {
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        extension.outputChannel.appendLine(`Warning: Failed to read env file ${envFilePath}: ${errorMessage}`);
+        // Only log if extension.outputChannel exists (may not exist in tests)
+        if (extension.outputChannel) {
+            extension.outputChannel.appendLine(`Warning: Failed to read env file ${envFilePath}: ${errorMessage}`);
+        }
     }
     
     return envVars;

@@ -5,15 +5,25 @@
  */
 
 import * as path from 'path';
+import * as fs from 'fs';
 import * as Mocha from 'mocha';
 import { glob } from 'glob';
 
 export function run(): Promise<void> {
+    // Ensure test-results directory exists in workspace root
+    const testResultsDir = path.resolve(__dirname, '../../../test-results');
+    fs.mkdirSync(testResultsDir, { recursive: true });
+    
     // Create the mocha test
     const mocha = new Mocha({
         ui: 'bdd',
         color: true,
-        timeout: 20000 // 20 second timeout for tests
+        timeout: 20000, // 20 second timeout for tests
+        reporter: 'mocha-junit-reporter',
+        reporterOptions: {
+            mochaFile: path.resolve(testResultsDir, 'junit.xml'),
+            toConsole: true
+        }
     });
 
     const testsRoot = path.resolve(__dirname, '..');
