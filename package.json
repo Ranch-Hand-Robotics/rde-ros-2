@@ -105,6 +105,11 @@
                 "category": "ROS2"
             },
             {
+                "command": "ROS2.installRos",
+                "title": "Install ROS 2",
+                "category": "ROS2"
+            },
+            {
                 "command": "ROS2.doctor",
                 "title": "Runs ROS 2 Doctor for diagnosing ROS 2 issues",
                 "category": "ROS2"
@@ -200,6 +205,11 @@
                     "type": "string",
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
+                },
+                "ROS2.neverInstallRos": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Never prompt to install ROS 2 for this workspace, even if not detected."
                 }
             }
         },
