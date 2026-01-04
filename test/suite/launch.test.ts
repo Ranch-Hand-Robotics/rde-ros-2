@@ -15,7 +15,7 @@ describe('Launch Dumper Test', () => {
         // __dirname is out/test/suite, so we need to go up 3 levels to reach workspace root
         const workspaceRoot = path.join(__dirname, '../../../');
         const dumperScript = path.join(workspaceRoot, 'assets', 'scripts', 'ros2_launch_dumper.py');
-        const testLaunchFile = path.join(workspaceRoot, 'test', 'launch', 'test_launch.py');
+        const testLaunchFile = path.join(workspaceRoot, 'samples', 'launch_examples', 'launch','test_launch.py');
 
         // Verify files exist
         assert.ok(fs.existsSync(dumperScript), 'ros2_launch_dumper.py should exist');

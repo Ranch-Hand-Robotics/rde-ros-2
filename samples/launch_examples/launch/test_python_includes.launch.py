@@ -56,31 +56,29 @@ def generate_launch_description():
     # Method 4: Include using FindPackageShare (REAL ROS package pattern)
     # This is the standard approach for including launch files from other packages
     # Example: Including a launch file from another ROS package
-    # Uncomment and modify for your specific package:
-    #
-    # included_package_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource([
-    #         PathJoinSubstitution([
-    #             FindPackageShare('nav2_bringup'),  # Replace with actual package name
-    #             'launch',
-    #             'navigation_launch.py'  # Replace with actual launch file
-    #         ])
-    #     ])
-    # )
-    # launch_actions.append(included_package_launch)
-    #
+    included_package_launch = IncludeLaunchDescription(
+         PythonLaunchDescriptionSource([
+             PathJoinSubstitution([
+                 FindPackageShare('rde_launch_examples'),  # Replace with actual package name
+                 'launch',
+                 'simple_lifecycle_launch.py'  # Replace with actual launch file
+             ])
+         ])
+     )
+    launch_actions.append(included_package_launch)
+
     # For XML launch files from packages (requires launch_xml):
-    # if HAS_XML_LAUNCH_SOURCE:
-    #     included_package_xml = IncludeLaunchDescription(
-    #         XMLLaunchDescriptionSource([
-    #             PathJoinSubstitution([
-    #                 FindPackageShare('your_package'),
-    #                 'launch',
-    #                 'your_file.launch.xml'
-    #             ])
-    #         ])
-    #     )
-    #     launch_actions.append(included_package_xml)
+    if HAS_XML_LAUNCH_SOURCE:
+        included_package_xml = IncludeLaunchDescription(
+            XMLLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare('rde_launch_examples'),
+                    'launch',
+                    'included_by_python.launch.xml'
+                ])
+            ])
+        )
+        launch_actions.append(included_package_xml)
     
     return LaunchDescription(launch_actions)
 
