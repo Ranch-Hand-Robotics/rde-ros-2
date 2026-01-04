@@ -22,9 +22,8 @@ export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
      * Regular expression to extract package name from find-pkg-share substitution
      * Matches: $(find-pkg-share package_name)
      * Package names can contain letters, numbers, underscores, and hyphens
-     * Global flag allows replacing multiple occurrences in the same path
      */
-    private readonly findPkgShareRegex = /\$\(find-pkg-share\s+([a-zA-Z0-9_-]+)\s*\)/g;
+    private readonly findPkgSharePattern = /\$\(find-pkg-share\s+([a-zA-Z0-9_-]+)\s*\)/g;
 
     async provideDocumentLinks(
         document: vscode.TextDocument,
@@ -76,9 +75,9 @@ export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
         token: vscode.CancellationToken
     ): Promise<vscode.Uri | null> {
         // Check if the path contains $(find-pkg-share ...)
-        // Reset regex state for global flag
-        this.findPkgShareRegex.lastIndex = 0;
-        const pkgShareMatch = this.findPkgShareRegex.exec(filePath);
+        // Create a new RegExp instance to avoid concurrent usage issues
+        const findPkgShareRegex = new RegExp(this.findPkgSharePattern);
+        const pkgShareMatch = findPkgShareRegex.exec(filePath);
         
         if (pkgShareMatch) {
             // Check for cancellation before expensive ROS API call
@@ -101,9 +100,9 @@ export class LaunchLinkProvider implements vscode.DocumentLinkProvider {
                     const pkgPath = await packages[packageName]();
                     
                     // Replace all $(find-pkg-share package_name) occurrences with the actual package path
-                    // Reset regex state before replace
-                    this.findPkgShareRegex.lastIndex = 0;
-                    const relativePath = filePath.replace(this.findPkgShareRegex, pkgPath);
+                    // Create a new RegExp instance for replacement to avoid concurrent usage issues
+                    const replaceRegex = new RegExp(this.findPkgSharePattern);
+                    const relativePath = filePath.replace(replaceRegex, pkgPath);
                     
                     // Check if the resolved file exists
                     if (fs.existsSync(relativePath)) {
