@@ -28,7 +28,9 @@ async function makeColcon(name: string, command: string, verb: string, args: str
         if (nonIgnoredPackages.length > 0) {
             // Insert --packages-select before --cmake-args
             const cmakeArgsIndex = baseArgs.indexOf('--cmake-args');
-            baseArgs.splice(cmakeArgsIndex, 0, '--packages-select', ...nonIgnoredPackages);
+            if (cmakeArgsIndex !== -1) {
+                baseArgs.splice(cmakeArgsIndex, 0, '--packages-select', ...nonIgnoredPackages);
+            }
         }
     }
 
@@ -53,7 +55,7 @@ export class ColconProvider implements vscode.TaskProvider {
         test.group = vscode.TaskGroup.Test;
 
         const testDebug = await makeColcon('Colcon Build Test Debug', 'colcon', 'test', [`-DCMAKE_BUILD_TYPE=Debug`], 'test');
-        test.group = vscode.TaskGroup.Test;
+        testDebug.group = vscode.TaskGroup.Test;
 
         return [make, makeDebug, test, testDebug];
     }
