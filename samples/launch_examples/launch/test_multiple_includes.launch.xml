@@ -1,0 +1,8 @@
+<launch>
+  <!-- Test launch file with multiple includes -->
+  <include file="example_target.launch.xml"/>
+  <include file="demo_links.launch"/>
+  <include file="test_with_includes.launch"/>
+  
+  <arg name="robot_name" default="test_robot"/>
+</launch>

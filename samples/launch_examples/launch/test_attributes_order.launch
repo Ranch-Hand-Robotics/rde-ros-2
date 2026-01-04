@@ -1,0 +1,8 @@
+<launch>
+  <!-- Test launch file with attributes in different orders -->
+  <include ns="namespace1" file="example_target.launch.xml"/>
+  <include file="demo_links.launch" ns="namespace2"/>
+  <include ns="namespace3" file="test_with_includes.launch" launch-prefix="xterm -e"/>
+  
+  <arg name="test" default="value"/>
+</launch>

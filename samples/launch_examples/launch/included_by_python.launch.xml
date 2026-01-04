@@ -1,0 +1,7 @@
+<launch>
+  <!-- Test XML launch file that would be included by Python launch -->
+  <arg name="param1" default="value1"/>
+  <arg name="param2" default="value2"/>
+  
+  <node pkg="test_pkg" exec="test_node" name="test_node_from_xml"/>
+</launch>

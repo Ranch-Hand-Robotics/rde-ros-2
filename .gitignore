@@ -9,6 +9,8 @@ test-results
 .vscode/c_cpp_properties.json
 .vscode/settings.json
 .vscode/**.db*
+test/**/.vscode/**
+test-results/**
 
 vscode.d.ts
 
