@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Test Python launch file with IncludeLaunchDescription"""
+"""Test Python launch file with IncludeLaunchDescription
+This demonstrates real-world ROS 2 launch file patterns including FindPackageShare usage.
+"""
 
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
@@ -23,11 +25,8 @@ def generate_launch_description():
     # List to collect all launch actions
     launch_actions = []
     
-    # Include Python launch files using relative paths
-    # This allows testing of Ctrl+Click navigation to included files
-    # Note: PythonLaunchDescriptionSource is available in all ROS 2 distros
-    
-    # Include a Python launch file
+    # Method 1: Include using relative paths
+    # This is useful for local testing and when files are in the same package
     included_py_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             str(launch_file_dir / 'simple_lifecycle_launch.py')
@@ -35,7 +34,8 @@ def generate_launch_description():
     )
     launch_actions.append(included_py_launch)
     
-    # Include another Python launch file
+    # Method 2: Include using PathJoinSubstitution with absolute paths
+    # This is useful when you know the exact location
     included_py_launch2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             str(launch_file_dir / 'test_launch.py')
@@ -43,7 +43,7 @@ def generate_launch_description():
     )
     launch_actions.append(included_py_launch2)
     
-    # Conditionally include XML launch file if XMLLaunchDescriptionSource is available
+    # Method 3: Include XML launch file (distro-sensitive)
     # This requires the launch_xml package (available in ROS 2 Humble and later)
     if HAS_XML_LAUNCH_SOURCE:
         included_xml_launch = IncludeLaunchDescription(
@@ -53,18 +53,36 @@ def generate_launch_description():
         )
         launch_actions.append(included_xml_launch)
     
-    # Example of how to include using FindPackageShare (similar to find-pkg-share in XML)
-    # This would be used in a real ROS package:
+    # Method 4: Include using FindPackageShare (REAL ROS package pattern)
+    # This is the standard approach for including launch files from other packages
+    # Example: Including a launch file from another ROS package
+    # Uncomment and modify for your specific package:
+    #
     # included_package_launch = IncludeLaunchDescription(
     #     PythonLaunchDescriptionSource([
     #         PathJoinSubstitution([
-    #             FindPackageShare('some_package'),
+    #             FindPackageShare('nav2_bringup'),  # Replace with actual package name
     #             'launch',
-    #             'some_file.launch.py'
+    #             'navigation_launch.py'  # Replace with actual launch file
     #         ])
     #     ])
     # )
+    # launch_actions.append(included_package_launch)
+    #
+    # For XML launch files from packages (requires launch_xml):
+    # if HAS_XML_LAUNCH_SOURCE:
+    #     included_package_xml = IncludeLaunchDescription(
+    #         XMLLaunchDescriptionSource([
+    #             PathJoinSubstitution([
+    #                 FindPackageShare('your_package'),
+    #                 'launch',
+    #                 'your_file.launch.xml'
+    #             ])
+    #         ])
+    #     )
+    #     launch_actions.append(included_package_xml)
     
     return LaunchDescription(launch_actions)
+
 
 
