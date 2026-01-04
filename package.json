@@ -161,8 +161,32 @@
                 "title": "Debug All ROS 2 Tests",
                 "category": "ROS2",
                 "icon": "$(debug-alt)"
+            },
+            {
+                "command": "ROS2.colcon.toggleIgnore",
+                "title": "Toggle Colcon Ignore",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.colcon.buildPackage",
+                "title": "Colcon Build This Package",
+                "category": "ROS2"
             }
         ],
+        "menus": {
+            "explorer/context": [
+                {
+                    "command": "ROS2.colcon.toggleIgnore",
+                    "when": "explorerResourceIsFolder",
+                    "group": "ROS2@1"
+                },
+                {
+                    "command": "ROS2.colcon.buildPackage",
+                    "when": "explorerResourceIsFolder",
+                    "group": "ROS2@2"
+                }
+            ]
+        },
         "mcpServerDefinitionProviders": [
             {
                 "id": "ROS 2",
@@ -200,6 +224,14 @@
                     "type": "string",
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
+                },
+                "ROS2.colconIgnore": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Map of package names to ignore during colcon build. Keys are package names, values are boolean (true to ignore).",
+                    "additionalProperties": {
+                        "type": "boolean"
+                    }
                 }
             }
         },
