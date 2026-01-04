@@ -19,6 +19,7 @@ import { rosApi, selectROSApi } from "./ros/ros";
 import * as lifecycle from "./ros/ros2/lifecycle";
 import { registerRosMessageProviders } from "./ros/ros-msg-providers";
 import { registerLaunchLinkProvider } from "./ros/launch-link-provider";
+import * as install_ros from "./ros/install-ros";
 
 import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
@@ -111,7 +112,8 @@ export enum Commands {
     TopicTreeRefresh = "ROS2.topicTree.refresh",
     TopicTreeStartWatcher = "ROS2.topicTree.startWatcher",
     TopicTreePauseWatcher = "ROS2.topicTree.pauseWatcher",
-    TopicTreePauseAll = "ROS2.topicTree.pauseAll"
+    TopicTreePauseAll = "ROS2.topicTree.pauseAll",
+    InstallRos = "ROS2.installRos"
 }
 
 function syncTopicMonitoringState(): void {
@@ -127,7 +129,6 @@ async function refreshVisibleTopicTree(): Promise<void> {
 
     await sourceRosAndWorkspace(false);
     await topicTreeProvider?.refreshTopics();
-}
 
 /**
  * The walkthrough ID for the getting started guide
@@ -383,6 +384,27 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(Commands.Doctor, () => {
         ensureErrorMessageOnException(() => {
             rosApi.doctor();
+        });
+    });
+
+    // Register Install ROS command
+    vscode.commands.registerCommand(Commands.InstallRos, () => {
+        ensureErrorMessageOnException(() => {
+            return install_ros.installRos();
+        });
+    });
+
+    // Register MCP server commands
+    vscode.commands.registerCommand(Commands.StartMcpServer, () => {
+        ensureErrorMessageOnException(() => {
+            return startMcpServer(context);
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.StopMcpServer, () => {
+        ensureErrorMessageOnException(() => {
+            shutdownMcpServer();
+            vscode.window.showInformationMessage("MCP server stopped");
         });
     });
 
@@ -909,8 +931,9 @@ export async function activateEnvironment(context: vscode.ExtensionContext) {
 
     await sourceRosAndWorkspace();
 
-    if (!env || typeof env.ROS_DISTRO === "undefined") {
-        outputChannel.appendLine("ROS environment not detected. ROS 2 features will be limited. Please install ROS 2 or configure a ROS setup script.");
+    if (typeof env.ROS_DISTRO === "undefined") {
+        // ROS is not detected, check if we should prompt for installation
+        await install_ros.promptInstallRosIfNeeded();
         processingWorkspace = false;
         return;
     }
