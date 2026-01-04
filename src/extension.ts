@@ -80,7 +80,9 @@ export enum Commands {
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
-    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition"
+    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    ColconToggleIgnore = "ROS2.colcon.toggleIgnore",
+    ColconBuildPackage = "ROS2.colcon.buildPackage"
 }
 
 /**
@@ -533,6 +535,73 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+
+    // Register Colcon commands
+    vscode.commands.registerCommand(Commands.ColconToggleIgnore, async (uri: vscode.Uri) => {
+        ensureErrorMessageOnException(async () => {
+            const colconUtils = await import("./build-tool/colcon-utils");
+            
+            if (!uri || !uri.fsPath) {
+                vscode.window.showErrorMessage("Please right-click on a folder to toggle colcon ignore");
+                return;
+            }
+
+            const workspaceRoot = vscode.workspace.rootPath;
+            if (!workspaceRoot) {
+                vscode.window.showErrorMessage("No workspace folder found");
+                return;
+            }
+
+            // Find package for this path
+            const packageName = await colconUtils.findPackageForPath(uri.fsPath, workspaceRoot);
+            if (!packageName) {
+                vscode.window.showWarningMessage("No ROS 2 package found at this location");
+                return;
+            }
+
+            // Get current ignore state
+            const ignoreConfig = colconUtils.getColconIgnoreConfig();
+            const isCurrentlyIgnored = ignoreConfig[packageName] === true;
+
+            // Toggle the ignore state
+            await colconUtils.updateColconIgnoreConfig(packageName, !isCurrentlyIgnored);
+
+            if (isCurrentlyIgnored) {
+                vscode.window.showInformationMessage(`Package '${packageName}' will now be included in colcon builds`);
+            } else {
+                vscode.window.showInformationMessage(`Package '${packageName}' will now be ignored in colcon builds`);
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.ColconBuildPackage, async (uri: vscode.Uri) => {
+        ensureErrorMessageOnException(async () => {
+            const colconUtils = await import("./build-tool/colcon-utils");
+            const colcon = await import("./build-tool/colcon");
+            
+            if (!uri || !uri.fsPath) {
+                vscode.window.showErrorMessage("Please right-click on a folder to build a package");
+                return;
+            }
+
+            const workspaceRoot = vscode.workspace.rootPath;
+            if (!workspaceRoot) {
+                vscode.window.showErrorMessage("No workspace folder found");
+                return;
+            }
+
+            // Find package for this path
+            const packageName = await colconUtils.findPackageForPath(uri.fsPath, workspaceRoot);
+            if (!packageName) {
+                vscode.window.showWarningMessage("No ROS 2 package found at this location");
+                return;
+            }
+
+            // Create and execute the build task
+            const task = await colcon.makeColconPackageTask(packageName);
+            await vscode.tasks.executeTask(task);
+        });
+    });
 
     const reporter = telemetry.getReporter();
     reporter.sendTelemetryActivate();
