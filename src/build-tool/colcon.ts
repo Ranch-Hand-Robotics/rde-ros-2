@@ -34,7 +34,7 @@ async function makeColcon(name: string, command: string, verb: string, args: str
         }
     }
 
-    const task = rosShell.make(name, {type: command, command, args: baseArgs}, category)
+    const task = rosShell.make(name, {type: command, command, args: baseArgs}, category);
     task.problemMatchers = ["$colcon-gcc"];
 
     return task;
