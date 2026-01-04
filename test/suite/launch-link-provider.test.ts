@@ -10,7 +10,7 @@ import * as fs from 'fs';
 describe('Launch Link Provider Test Suite', () => {
     // Use __dirname to construct a more robust path to the test directory
     const workspaceRoot = path.resolve(__dirname, '../../..');
-    const testLaunchDir = path.join(workspaceRoot, 'test', 'launch');
+    const testLaunchDir = path.join(workspaceRoot, 'samples', 'launch_examples', 'launch');
     let hasDocLinkCommand = false;
 
     before(async () => {
