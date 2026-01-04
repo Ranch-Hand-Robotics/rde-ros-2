@@ -17,7 +17,7 @@ const PYTHON_ANALYSIS_PATHS = "python.analysis.extraPaths";
  * If the path is within the workspace, returns a relative path.
  * Otherwise, returns the original absolute path.
  */
-function makeWorkspaceRelative(absolutePath: string, workspaceRoot: string): string {
+export function makeWorkspaceRelative(absolutePath: string, workspaceRoot: string): string {
     if (!absolutePath || !workspaceRoot) {
         return absolutePath;
     }
@@ -93,8 +93,15 @@ async function updateCppPropertiesInternal(): Promise<void> {
         const relativePath = makeWorkspaceRelative(include, workspaceRoot);
         // If the path was converted to relative (i.e., it's within the workspace)
         if (relativePath !== include) {
-            // It's a workspace path, use ${workspaceFolder} variable
-            return "${workspaceFolder}/" + relativePath + "/**";
+            // Handle the workspace root itself specially: path.relative() returns ""
+            if (relativePath === "") {
+                // Use ${workspaceFolder}/** without an extra slash
+                return "${workspaceFolder}/**";
+            }
+            // Normalize to POSIX-style separators for VS Code config paths
+            const vscodeRelativePath = relativePath.split(path.sep).join(path.posix.sep);
+            // It's a workspace subdirectory path, use ${workspaceFolder} variable with POSIX join
+            return path.posix.join("${workspaceFolder}", vscodeRelativePath, "**");
         }
         // Path is outside workspace, keep absolute with **
         return path.join(include, "**");
@@ -171,7 +178,9 @@ function updatePythonAutoCompletePathInternal() {
     const workspaceRoot = vscode.workspace.rootPath;
     
     // Convert absolute paths to relative paths where possible
-    const relativePaths = pythonPaths.map((p: string) => makeWorkspaceRelative(p, workspaceRoot));
+    const relativePaths = pythonPaths
+        .filter((p: string) => p.trim() !== "") // Filter out empty strings
+        .map((p: string) => makeWorkspaceRelative(p, workspaceRoot));
     
     vscode.workspace.getConfiguration().update(PYTHON_AUTOCOMPLETE_PATHS, relativePaths);
 }
@@ -184,7 +193,9 @@ function updatePythonAnalysisPathInternal() {
     const workspaceRoot = vscode.workspace.rootPath;
     
     // Convert absolute paths to relative paths where possible
-    const relativePaths = pythonPaths.map((p: string) => makeWorkspaceRelative(p, workspaceRoot));
+    const relativePaths = pythonPaths
+        .filter((p: string) => p.trim() !== "") // Filter out empty strings
+        .map((p: string) => makeWorkspaceRelative(p, workspaceRoot));
     
     vscode.workspace.getConfiguration().update(PYTHON_ANALYSIS_PATHS, relativePaths);
 }
