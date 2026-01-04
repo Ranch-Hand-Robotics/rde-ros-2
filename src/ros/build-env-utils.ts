@@ -91,11 +91,12 @@ async function updateCppPropertiesInternal(): Promise<void> {
     // Convert paths to workspace-relative where possible
     includes = includes.map((include: string) => {
         const relativePath = makeWorkspaceRelative(include, workspaceRoot);
-        // If it's a relative path, prepend ${workspaceFolder}/
-        if (relativePath !== include && !path.isAbsolute(relativePath)) {
+        // If the path was converted to relative (i.e., it's within the workspace)
+        if (relativePath !== include) {
+            // It's a workspace path, use ${workspaceFolder} variable
             return "${workspaceFolder}/" + relativePath + "/**";
         }
-        // Otherwise append ** to the absolute path
+        // Path is outside workspace, keep absolute with **
         return path.join(include, "**");
     });
 
