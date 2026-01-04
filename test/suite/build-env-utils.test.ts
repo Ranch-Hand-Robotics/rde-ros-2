@@ -51,8 +51,8 @@ describe('Build Environment Utils - Path Conversion', () => {
         it('should handle null/undefined inputs', () => {
             const workspaceRoot = '/home/user/ros2_ws';
             
-            assert.strictEqual(makeWorkspaceRelative(null, workspaceRoot), null);
-            assert.strictEqual(makeWorkspaceRelative(undefined, workspaceRoot), undefined);
+            assert.strictEqual(makeWorkspaceRelative(null, workspaceRoot), "");
+            assert.strictEqual(makeWorkspaceRelative(undefined, workspaceRoot), "");
             assert.strictEqual(makeWorkspaceRelative('/some/path', null), '/some/path');
             assert.strictEqual(makeWorkspaceRelative('/some/path', undefined), '/some/path');
         });
