@@ -5,6 +5,8 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 
 ## Features
 
+* **Automated ROS 2 Installation** with integrated installer for Linux (APT), Windows (Pixi), and macOS (Pixi)
+* AI-powered troubleshooting with GitHub Copilot integration for installation issues
 * Automatic ROS environment configuration.
 * Allows starting, stopping and viewing the ROS core status.
 * Automatically create `colcon` build and test tasks.
@@ -24,6 +26,19 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Support for Visual Studio Code and Cursor
 
 ## Getting Started
+
+### Installing ROS 2
+
+If you don't have ROS 2 installed yet, the extension can help you install it:
+
+1. Open a ROS workspace (containing `package.xml` files)
+2. The extension will automatically prompt you to install ROS 2
+3. Select your preferred ROS 2 distribution (LTS releases are marked)
+4. Follow the installation steps for your platform
+
+For detailed installation instructions, see the [Installation Guide](https://ranchhandrobotics.com/rde-ros-2/installation.html).
+
+### Using the Extension
 
 The VS Code ROS extension will attempt to detect and automatically configure the workspace for the appropriate ROS Distro.
 
