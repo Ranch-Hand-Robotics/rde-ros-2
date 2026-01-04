@@ -67,9 +67,27 @@ describe('Build Environment Utils - Path Conversion', () => {
             const absolutePath = '/home/user/ros2_workspace/build/my_package';
             
             // These should not be considered the same workspace
-            const isInWorkspace = path.normalize(absolutePath).startsWith(path.normalize(workspaceRoot));
+            const workspaceWithSep = workspaceRoot.endsWith(path.sep) 
+                ? workspaceRoot 
+                : workspaceRoot + path.sep;
+            const isInWorkspace = path.normalize(absolutePath).startsWith(workspaceWithSep) 
+                || path.normalize(absolutePath) === path.normalize(workspaceRoot);
             
             assert.strictEqual(isInWorkspace, false);
+        });
+
+        it('should correctly identify workspace root itself', () => {
+            const workspaceRoot = '/home/user/ros2_ws';
+            const absolutePath = '/home/user/ros2_ws';
+            
+            // The workspace root itself should be considered "in workspace"
+            const workspaceWithSep = workspaceRoot.endsWith(path.sep) 
+                ? workspaceRoot 
+                : workspaceRoot + path.sep;
+            const isInWorkspace = path.normalize(absolutePath).startsWith(workspaceWithSep) 
+                || path.normalize(absolutePath) === path.normalize(workspaceRoot);
+            
+            assert.strictEqual(isInWorkspace, true);
         });
     });
 });

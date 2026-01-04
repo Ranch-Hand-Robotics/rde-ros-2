@@ -27,7 +27,12 @@ function makeWorkspaceRelative(absolutePath: string, workspaceRoot: string): str
     const normalizedWorkspace = path.normalize(workspaceRoot);
     
     // Check if the path is within the workspace
-    if (normalizedAbsolute.startsWith(normalizedWorkspace)) {
+    // Add path separator to ensure we're matching the full directory name
+    const workspaceWithSep = normalizedWorkspace.endsWith(path.sep) 
+        ? normalizedWorkspace 
+        : normalizedWorkspace + path.sep;
+    
+    if (normalizedAbsolute.startsWith(workspaceWithSep) || normalizedAbsolute === normalizedWorkspace) {
         const relativePath = path.relative(normalizedWorkspace, normalizedAbsolute);
         return relativePath;
     }
