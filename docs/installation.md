@@ -163,7 +163,7 @@ After successful installation:
 1. **Reload the window**: The extension will prompt you to reload VS Code
 2. **Verify installation**: Open a terminal in VS Code and check:
    - Linux: `ros2 --version`
-   - Windows/macOS with Pixi: Navigate to your Pixi workspace and activate the environment
+   - Windows/macOS with Pixi: Navigate to your Pixi workspace (by default `<ROS2.pixiRoot>/ros2-workspace`, which is `c:\pixi_ws\ros2-workspace` on Windows or `~/pixi_ws/ros2-workspace` on macOS/Linux unless you've changed the `ROS2.pixiRoot` setting) and activate the environment
 3. **Configure the extension**: The extension should automatically detect your ROS 2 installation and configure the environment
 
 ## Related Settings
