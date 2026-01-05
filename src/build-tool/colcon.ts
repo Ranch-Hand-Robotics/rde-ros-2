@@ -34,7 +34,8 @@ async function makeColcon(name: string, command: string, verb: string, args: str
         }
     }
 
-    const task = rosShell.make(name, {type: command, command, args: baseArgs}, category);
+    // The task type must match the provider id ('colcon') so VS Code doesn't warn about undefined providers
+    const task = rosShell.make(name, {type: 'colcon', command: command, args: baseArgs}, category);
     task.problemMatchers = ["$colcon-gcc"];
 
     return task;

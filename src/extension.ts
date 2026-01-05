@@ -25,6 +25,7 @@ import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
+import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
 
 /**
  * The sourced ROS environment.
@@ -82,7 +83,8 @@ export enum Commands {
     LifecycleSetState = "ROS2.lifecycle.setState",
     LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
     ColconToggleIgnore = "ROS2.colcon.toggleIgnore",
-    ColconBuildPackage = "ROS2.colcon.buildPackage"
+    ColconBuildPackageRelease = "ROS2.colcon.buildPackageRelease",
+    ColconBuildPackageDebug = "ROS2.colcon.buildPackageDebug"
 }
 
 /**
@@ -287,6 +289,19 @@ export async function activate(context: vscode.ExtensionContext) {
     // Source the environment, and re-source on config change.
     let config = vscode_utils.getExtensionConfiguration();
 
+    // Conditionally register package decoration provider based on setting
+    let decorationProviderDisposable: vscode.Disposable | undefined;
+    const updateDecorationRegistration = (enabled: boolean): void => {
+        if (enabled && !decorationProviderDisposable) {
+            decorationProviderDisposable = registerPackageDecorationProvider();
+            context.subscriptions.push(decorationProviderDisposable);
+        } else if (!enabled && decorationProviderDisposable) {
+            decorationProviderDisposable.dispose();
+            decorationProviderDisposable = undefined;
+        }
+    };
+    updateDecorationRegistration(config.enableFileDecorations === true);
+
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(() => {
         const updatedConfig = vscode_utils.getExtensionConfiguration();
         const fields = Object.keys(config).filter(k => !(config[k] instanceof Function));
@@ -295,6 +310,8 @@ export async function activate(context: vscode.ExtensionContext) {
         if (changed) {
             sourceRosAndWorkspace();
         }
+
+        updateDecorationRegistration(updatedConfig.enableFileDecorations === true);
 
         config = updatedConfig;
     }));
@@ -540,7 +557,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(Commands.ColconToggleIgnore, async (uri: vscode.Uri) => {
         ensureErrorMessageOnException(async () => {
             const colconUtils = await import("./build-tool/colcon-utils");
-            
+
             if (!uri || !uri.fsPath) {
                 vscode.window.showErrorMessage("Please right-click on a folder to toggle colcon ignore");
                 return;
@@ -559,14 +576,21 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // Get current ignore state
             const ignoreConfig = colconUtils.getColconIgnoreConfig();
-            const isCurrentlyIgnored = ignoreConfig[packageName] === true;
+            const isIgnored = ignoreConfig[packageName] === true;
 
             // Toggle the ignore state
-            await colconUtils.updateColconIgnoreConfig(packageName, !isCurrentlyIgnored);
+            await colconUtils.updateColconIgnoreConfig(packageName, !isIgnored);
 
-            if (isCurrentlyIgnored) {
+            // Update context variable for menu visibility
+            await vscode.commands.executeCommand('setContext', 'ros2.packageIgnored', !isIgnored);
+
+            // Give VS Code a moment to persist the config, then refresh the decoration
+            setTimeout(() => {
+                refreshPackageDecoration(uri);
+            }, 100);
+
+            if (isIgnored) {
                 vscode.window.showInformationMessage(`Package '${packageName}' will now be included in colcon builds`);
             } else {
                 vscode.window.showInformationMessage(`Package '${packageName}' will now be ignored in colcon builds`);
@@ -574,7 +598,32 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
-    vscode.commands.registerCommand(Commands.ColconBuildPackage, async (uri: vscode.Uri) => {
+    // Register a command to update the context when a folder is right-clicked
+    vscode.commands.registerCommand('ROS2.colcon.updateIgnoredContext', async (uri: vscode.Uri) => {
+        if (!uri || !uri.fsPath) {
+            return;
+        }
+
+        const workspaceRoot = vscode.workspace.rootPath;
+        if (!workspaceRoot) {
+            return;
+        }
+
+        try {
+            const colconUtils = await import("./build-tool/colcon-utils");
+            const packageName = await colconUtils.findPackageForPath(uri.fsPath, workspaceRoot);
+            
+            if (packageName) {
+                const ignoreConfig = colconUtils.getColconIgnoreConfig();
+                const isIgnored = ignoreConfig[packageName] === true;
+                await vscode.commands.executeCommand('setContext', 'ros2.packageIgnored', isIgnored);
+            }
+        } catch (error) {
+            // Silently fail - this is just for context update
+        }
+    });
+
+    vscode.commands.registerCommand(Commands.ColconBuildPackageRelease, async (uri: vscode.Uri) => {
         ensureErrorMessageOnException(async () => {
             const colconUtils = await import("./build-tool/colcon-utils");
             const colcon = await import("./build-tool/colcon");
@@ -597,8 +646,37 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // Create and execute the build task
-            const task = await colcon.makeColconPackageTask(packageName);
+            // Create and execute the build task (RelWithDebInfo)
+            const task = await colcon.makeColconPackageTask(packageName, 'RelWithDebInfo');
+            await vscode.tasks.executeTask(task);
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.ColconBuildPackageDebug, async (uri: vscode.Uri) => {
+        ensureErrorMessageOnException(async () => {
+            const colconUtils = await import("./build-tool/colcon-utils");
+            const colcon = await import("./build-tool/colcon");
+            
+            if (!uri || !uri.fsPath) {
+                vscode.window.showErrorMessage("Please right-click on a folder to build a package");
+                return;
+            }
+
+            const workspaceRoot = vscode.workspace.rootPath;
+            if (!workspaceRoot) {
+                vscode.window.showErrorMessage("No workspace folder found");
+                return;
+            }
+
+            // Find package for this path
+            const packageName = await colconUtils.findPackageForPath(uri.fsPath, workspaceRoot);
+            if (!packageName) {
+                vscode.window.showWarningMessage("No ROS 2 package found at this location");
+                return;
+            }
+
+            // Create and execute the build task (Debug)
+            const task = await colcon.makeColconPackageTask(packageName, 'Debug');
             await vscode.tasks.executeTask(task);
         });
     });

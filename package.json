@@ -168,25 +168,45 @@
                 "category": "ROS2"
             },
             {
-                "command": "ROS2.colcon.buildPackage",
-                "title": "Colcon Build This Package",
+                "command": "ROS2.colcon.buildPackageRelease",
+                "title": "Colcon Build (Release)",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.colcon.buildPackageDebug",
+                "title": "Colcon Build (Debug)",
                 "category": "ROS2"
             }
         ],
         "menus": {
             "explorer/context": [
                 {
+                    "submenu": "ROS2.explorer",
+                    "group": "ROS2",
+                    "when": "explorerResourceIsFolder"
+                }
+            ],
+            "ROS2.explorer": [
+                {
                     "command": "ROS2.colcon.toggleIgnore",
-                    "when": "explorerResourceIsFolder",
-                    "group": "ROS2@1"
+                    "group": "1_colcon@1"
                 },
                 {
-                    "command": "ROS2.colcon.buildPackage",
-                    "when": "explorerResourceIsFolder",
-                    "group": "ROS2@2"
+                    "command": "ROS2.colcon.buildPackageRelease",
+                    "group": "1_colcon@2"
+                },
+                {
+                    "command": "ROS2.colcon.buildPackageDebug",
+                    "group": "1_colcon@3"
                 }
             ]
         },
+        "submenus": [
+            {
+                "id": "ROS2.explorer",
+                "label": "ROS 2"
+            }
+        ],
         "mcpServerDefinitionProviders": [
             {
                 "id": "ROS 2",
@@ -214,6 +234,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Automatically show the ROS 2 output channel when there are warnings or errors."
+                },
+                "ROS2.enableFileDecorations": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show Explorer file decorations indicating whether a package is ignored or included in colcon builds."
                 },
                 "ROS2.debugPythonUsingSourceFiles": {
                     "type": "boolean",

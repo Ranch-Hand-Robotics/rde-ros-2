@@ -92,13 +92,16 @@ export async function updateColconIgnoreConfig(packageName: string, ignore: bool
     const config = vscode.workspace.getConfiguration("ROS2");
     const currentIgnore = config.get<{ [key: string]: boolean }>("colconIgnore", {});
     
+    // Create a new object to avoid proxy extensibility issues
+    const updatedIgnore = { ...currentIgnore };
+    
     if (ignore) {
-        currentIgnore[packageName] = true;
+        updatedIgnore[packageName] = true;
     } else {
-        delete currentIgnore[packageName];
+        delete updatedIgnore[packageName];
     }
     
-    await config.update("colconIgnore", currentIgnore, vscode.ConfigurationTarget.Workspace);
+    await config.update("colconIgnore", updatedIgnore, vscode.ConfigurationTarget.Workspace);
 }
 
 /**
