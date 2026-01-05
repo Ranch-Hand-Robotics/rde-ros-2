@@ -7,7 +7,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as child_process from "child_process";
 
-import * as pfs from "../promise-fs";
 import * as vscode_utils from "../vscode-utils";
 import * as extension from "../extension";
 
@@ -68,6 +67,45 @@ export const ROS2_DISTROS: RosDistro[] = [
 const INSTALL_ROS_PREFERENCE_KEY = "neverInstallRos";
 
 /**
+ * Recursively searches for package.xml files in a directory
+ * @param dirPath Directory to search
+ * @param maxDepth Maximum depth to search (default: 3)
+ * @param currentDepth Current depth in recursion
+ */
+async function findPackageXml(dirPath: string, maxDepth: number = 3, currentDepth: number = 0): Promise<boolean> {
+  if (currentDepth >= maxDepth) {
+    return false;
+  }
+
+  try {
+    const packageXmlPath = path.join(dirPath, "package.xml");
+    const exists = await fs.promises.access(packageXmlPath).then(() => true).catch(() => false);
+    if (exists) {
+      return true;
+    }
+
+    // Check subdirectories
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        const found = await findPackageXml(
+          path.join(dirPath, entry.name),
+          maxDepth,
+          currentDepth + 1
+        );
+        if (found) {
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    // Ignore errors (permission denied, etc.)
+  }
+
+  return false;
+}
+
+/**
  * Checks if the current workspace is a ROS workspace by looking for package.xml files
  */
 export async function isRosWorkspace(): Promise<boolean> {
@@ -77,29 +115,19 @@ export async function isRosWorkspace(): Promise<boolean> {
   }
 
   for (const folder of workspaceFolders) {
+    // Check root directory
     const packageXmlPath = path.join(folder.uri.fsPath, "package.xml");
-    if (await pfs.exists(packageXmlPath)) {
+    const exists = await fs.promises.access(packageXmlPath).then(() => true).catch(() => false);
+    if (exists) {
       return true;
     }
 
-    // Also check in common subdirectories
+    // Check src directory recursively (up to 3 levels deep)
     const srcPath = path.join(folder.uri.fsPath, "src");
-    if (await pfs.exists(srcPath)) {
-      try {
-        const entries = await pfs.readdir(srcPath);
-        for (const entry of entries) {
-          const entryPath = path.join(srcPath, entry);
-          // Use fs.promises.stat instead of pfs.stat
-          const stat = await fs.promises.stat(entryPath);
-          if (stat.isDirectory()) {
-            const pkgXml = path.join(entryPath, "package.xml");
-            if (await pfs.exists(pkgXml)) {
-              return true;
-            }
-          }
-        }
-      } catch (err) {
-        // Ignore errors reading directory
+    const srcExists = await fs.promises.access(srcPath).then(() => true).catch(() => false);
+    if (srcExists) {
+      if (await findPackageXml(srcPath, 3, 0)) {
+        return true;
       }
     }
   }
@@ -137,7 +165,7 @@ export async function promptInstallRosIfNeeded(): Promise<void> {
   }
 
   // Check if ROS is already detected
-  if (extension.env && extension.env.ROS_DISTRO) {
+  if (extension.env?.ROS_DISTRO !== undefined) {
     return;
   }
 
@@ -165,6 +193,15 @@ export async function promptInstallRosIfNeeded(): Promise<void> {
 }
 
 /**
+ * Validates that a distro name is safe for use in shell commands
+ * @param distro The distro object to validate
+ * @returns true if the distro name is valid (lowercase letters only)
+ */
+function validateDistroName(distro: RosDistro): boolean {
+  return /^[a-z]+$/.test(distro.name);
+}
+
+/**
  * Main function to install ROS 2
  */
 export async function installRos(): Promise<void> {
@@ -173,6 +210,11 @@ export async function installRos(): Promise<void> {
     const distro = await selectRosDistro();
     if (!distro) {
       return;
+    }
+
+    // Validate distro name for security
+    if (!validateDistroName(distro)) {
+      throw new Error(`Invalid distro name: ${distro.name}`);
     }
 
     extension.outputChannel.appendLine(`User selected ROS 2 distro: ${distro.name}`);
@@ -188,8 +230,9 @@ export async function installRos(): Promise<void> {
       );
     }
   } catch (error) {
-    extension.outputChannel.appendLine(`Error during ROS installation: ${error}`);
-    vscode.window.showErrorMessage(`Failed to install ROS 2: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    extension.outputChannel.appendLine(`Error during ROS installation: ${errorMessage}`);
+    vscode.window.showErrorMessage(`Failed to install ROS 2: ${errorMessage}`);
   }
 }
 
@@ -235,8 +278,10 @@ async function isPixiInstalled(): Promise<boolean> {
  * Installs Pixi on Windows or macOS
  */
 async function installPixi(): Promise<boolean> {
-  const choice = await vscode.window.showInformationMessage(
-    "Pixi package manager is required to install ROS 2 on this platform but is not currently installed. Would you like to install it?",
+  const choice = await vscode.window.showWarningMessage(
+    "Pixi package manager is required to install ROS 2 on this platform but is not currently installed. " +
+    "This will download and execute an installation script from pixi.sh. Would you like to proceed?",
+    { modal: true },
     "Yes",
     "No"
   );
@@ -286,8 +331,9 @@ async function installPixi(): Promise<boolean> {
     );
     return true;
   } catch (error) {
-    extension.outputChannel.appendLine(`Failed to install Pixi: ${error}`);
-    vscode.window.showErrorMessage(`Failed to install Pixi: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    extension.outputChannel.appendLine(`Failed to install Pixi: ${errorMessage}`);
+    vscode.window.showErrorMessage(`Failed to install Pixi: ${errorMessage}`);
     return false;
   }
 }
@@ -306,7 +352,7 @@ async function installRosLinux(distro: RosDistro): Promise<void> {
 
   terminal.show();
 
-  // Send commands to the terminal
+  // Send commands to the terminal one at a time
   // Note: This requires sudo, so the terminal will be focused for the user to enter password
   const commands = [
     "# ROS 2 Installation",
@@ -337,7 +383,10 @@ async function installRosLinux(distro: RosDistro): Promise<void> {
     "echo 'Please reload the window or restart VS Code to detect the new ROS 2 installation.'",
   ];
 
-  terminal.sendText(commands.join("\n"));
+  // Send all commands as a single block for user convenience
+  for (const command of commands) {
+    terminal.sendText(command);
+  }
 
   // Monitor the terminal for completion
   monitorTerminalForErrors(terminal, distro);
@@ -360,15 +409,19 @@ async function installRosPixi(distro: RosDistro): Promise<void> {
   extension.outputChannel.appendLine(`Installing ROS 2 ${distro.name} using Pixi...`);
   extension.outputChannel.show();
 
-  // Get or create pixi workspace directory
+  // Get or create pixi workspace directory with platform-aware default
   const config = vscode_utils.getExtensionConfiguration();
-  const pixiRoot = config.get<string>("pixiRoot", "c:\\pixi_ws");
+  const defaultPixiRoot =
+    process.platform === "win32" ? "c:\\pixi_ws" : path.join(os.homedir(), "pixi_ws");
+  const pixiRoot = config.get<string>("pixiRoot", defaultPixiRoot);
 
-  // Create the directory if it doesn't exist
+  // Create the directory (and any missing parents) if it doesn't exist
   try {
-    await pfs.mkdir(pixiRoot);
+    await fs.promises.mkdir(pixiRoot, { recursive: true });
   } catch (err) {
-    // Directory might already exist
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    extension.outputChannel.appendLine(`Failed to create Pixi root directory "${pixiRoot}": ${errorMessage}`);
+    throw err;
   }
 
   // Create a terminal for the installation
@@ -385,17 +438,20 @@ async function installRosPixi(distro: RosDistro): Promise<void> {
     `# Target directory: ${pixiRoot}`,
     "",
     "# Initialize Pixi project if not already done",
-    "pixi init --channel conda-forge --channel robostack-staging ros2-workspace || true",
+    "pixi init --channel conda-forge --channel robostack-staging ros2-workspace",
     "cd ros2-workspace",
     "",
     "# Add ROS 2 packages",
     `pixi add ros-${distro.name}-desktop`,
     "",
     "echo 'ROS 2 installation complete!'",
-    "echo 'Please configure the ROS2.pixiRoot setting in VS Code to point to this workspace.'",
+    `echo 'Pixi workspace created at: ${path.join(pixiRoot, "ros2-workspace")}'`,
+    "echo 'Please configure the ROS2.pixiRoot setting in VS Code to point to this workspace if needed.'",
   ];
 
-  terminal.sendText(commands.join("\n"));
+  for (const command of commands) {
+    terminal.sendText(command);
+  }
 
   // Monitor for errors
   monitorTerminalForErrors(terminal, distro);
@@ -413,28 +469,32 @@ function monitorTerminalForErrors(terminal: vscode.Terminal, distro: RosDistro):
       // Check if there were errors in the output
       const exitCode = closedTerminal.exitStatus?.code;
 
-      if (exitCode !== undefined && exitCode !== 0) {
-        // Terminal exited with error
+      if (exitCode === 0) {
+        // Terminal exited successfully
         vscode.window
-          .showErrorMessage(
-            `ROS 2 installation may have encountered errors (exit code: ${exitCode}). Would you like help diagnosing the issue?`,
-            "Get Copilot Help",
-            "Dismiss"
+          .showInformationMessage(
+            "ROS 2 installation completed. Please reload the window to detect the new installation.",
+            "Reload Window"
           )
+          .then((choice) => {
+            if (choice === "Reload Window") {
+              vscode.commands.executeCommand("workbench.action.reloadWindow");
+            }
+          });
+      } else {
+        // Terminal did not report a successful exit; installation may have failed or been interrupted
+        const message =
+          exitCode !== undefined
+            ? `ROS 2 installation may have encountered errors (exit code: ${exitCode}). Would you like help diagnosing the issue?`
+            : "ROS 2 installation terminal was closed. The installation may not have completed successfully. Would you like help diagnosing potential issues?";
+
+        vscode.window
+          .showErrorMessage(message, "Get Copilot Help", "Dismiss")
           .then((choice) => {
             if (choice === "Get Copilot Help") {
               offerCopilotHelp(distro);
             }
           });
-      } else {
-        vscode.window.showInformationMessage(
-          "ROS 2 installation completed. Please reload the window to detect the new installation.",
-          "Reload Window"
-        ).then((choice) => {
-          if (choice === "Reload Window") {
-            vscode.commands.executeCommand("workbench.action.reloadWindow");
-          }
-        });
       }
     }
   });
@@ -502,26 +562,30 @@ ${envInfo}
 **Installation Method:**
 ${process.platform === "linux" ? "APT package manager on Linux" : "Pixi package manager"}
 
-**Error Log:**
-Please check the terminal output and VS Code output channel (ROS 2) for detailed error messages.
+**Note:** Terminal output is not automatically captured. Please check the terminal history for error messages.
 
 Can you help diagnose what went wrong and provide steps to fix the installation?`;
 
-    // Try to open Copilot Chat with the context
-    // This uses the VS Code chat API to open the chat panel
     const fullPrompt = systemPrompt
       ? `${systemPrompt}\n\n---\n\n${userPrompt}`
       : userPrompt;
 
-    // Use the chat API to open a new chat with the prompt
-    await vscode.commands.executeCommand("workbench.action.chat.open", {
-      query: fullPrompt,
-    });
+    // Copy the prompt to the clipboard and open Copilot Chat.
+    // VS Code's "workbench.action.chat.open" command does not accept a "query" parameter,
+    // so users need to paste the copied prompt into the chat manually.
+    await vscode.env.clipboard.writeText(fullPrompt);
+    await vscode.commands.executeCommand("workbench.action.chat.open");
+    
+    vscode.window.showInformationMessage(
+      "A ROS 2 installation troubleshooting prompt has been copied to your clipboard. Paste it into Copilot Chat to get help."
+    );
 
     extension.outputChannel.appendLine("Opened Copilot Chat for installation troubleshooting");
+    extension.outputChannel.appendLine("Troubleshooting prompt copied to clipboard");
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     extension.outputChannel.appendLine(
-      `Error opening Copilot help: ${error}`
+      `Error opening Copilot help: ${errorMessage}`
     );
     vscode.window.showErrorMessage(
       "Failed to open Copilot Chat. Please check the output channel for error details."
