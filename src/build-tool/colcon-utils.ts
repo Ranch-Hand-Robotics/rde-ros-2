@@ -51,7 +51,9 @@ export async function getPackages(workspaceRoot: string): Promise<Package[]> {
         return packages;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        extension.outputChannel.appendLine(`Error getting packages: ${errorMessage}`);
+        if (extension.outputChannel) {
+            extension.outputChannel.appendLine(`Error getting packages: ${errorMessage}`);
+        }
         return [];
     }
 }
