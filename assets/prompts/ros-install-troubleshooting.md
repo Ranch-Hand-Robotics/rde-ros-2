@@ -95,4 +95,6 @@ Different distros have different platform support:
 - **Windows**: Windows 10/11 with Visual Studio 2019 or later
 - **macOS**: Limited official support, Pixi/RoboStack provides better support
 
+**Note:** This extension only supports installing currently maintained ROS 2 distributions. End-of-life distributions like Galactic Geochelone and Foxy Fitzroy are mentioned for reference only and are not available for installation through this extension.
+
 Remember: Always consider the user's specific environment when providing solutions.
