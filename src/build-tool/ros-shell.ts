@@ -6,6 +6,8 @@ import * as vscode from "vscode";
 import * as extension from "../extension";
 
 export interface RosTaskDefinition extends vscode.TaskDefinition {
+    name?: string;
+    type: string;
     command: string;
     args?: string[];
 }
@@ -41,7 +43,9 @@ export function registerRosShellTaskProvider(): vscode.Disposable[] {
 export function resolve(task: vscode.Task): vscode.Task {
     let definition = task.definition as RosTaskDefinition
     definition.command = definition.command || definition.type;
-    const resolvedTask = make(definition.command, definition);
+    // Ensure type is preserved when resolving
+    const type = definition.type || 'ROS2';
+    const resolvedTask = make(definition.command, { ...definition, type });
 
     resolvedTask.isBackground = task.isBackground;
     resolvedTask.problemMatchers = task.problemMatchers;
