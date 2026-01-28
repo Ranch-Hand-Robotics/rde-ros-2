@@ -14,6 +14,7 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * [IntelliSense support for ROS message files](intellisense.md) with hover information showing message properties and go-to-definition
 * Automatically add the ROS C++ include and Python import paths.
 * Format C++ using the ROS `clang-format` style.
+* [Discover and run ROS 2 tests](test-explorer.md) with integrated Test Explorer support
 * Debug a single ROS node (C++ or Python) by [attaching to the process](debug-support.md#attach).
 * Debug ROS nodes (C++ or Python) [launched from a `.launch` file](debug-support.md#launch).
 * Configure C++ and Python IntelliSense for ROS development

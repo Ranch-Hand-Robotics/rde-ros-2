@@ -9,6 +9,8 @@
   <depend>rde_lib_without_ament</depend>
   <depend>rclcpp</depend>
 
+  <test_depend>gtest</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

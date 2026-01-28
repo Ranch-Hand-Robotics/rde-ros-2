@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0" disabled="0" errors="0" time="0." timestamp="2026-01-27T20:04:44.334" name="AllTests">
+  <testsuite name="ExampleLibraryTest" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-01-27T20:04:44.334">
+    <testcase name="MultipleCallsWork" file="/home/polyhobbyist/ws/rde-ros-2/samples/lib_without_ament/test/test_example.cpp" line="57" status="run" result="completed" time="0." timestamp="2026-01-27T20:04:44.334" classname="ExampleLibraryTest" />
+  </testsuite>
+</testsuites>

@@ -19,10 +19,23 @@ ament_target_dependencies(rde_lifecycle_cpp
   lifecycle_msgs
 )
 
+# Include directories for the header file
+target_include_directories(rde_lifecycle_cpp
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 # Install the executable
 install(TARGETS
   rde_lifecycle_cpp
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install headers
+install(DIRECTORY
+  include/
+  DESTINATION include
 )
 
 # Install launch files
@@ -31,9 +44,33 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Testing
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
+  
+  find_package(GTest REQUIRED)
+  
+  add_executable(test_lifecycle_node test/test_lifecycle_node.cpp)
+  ament_target_dependencies(test_lifecycle_node
+    rclcpp
+    rclcpp_lifecycle
+    lifecycle_msgs
+  )
+  target_include_directories(test_lifecycle_node
+    PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  target_link_libraries(test_lifecycle_node
+    GTest::GTest
+    GTest::Main
+  )
+  
+  enable_testing()
+  add_test(
+    NAME test_lifecycle_node
+    COMMAND test_lifecycle_node
+  )
 endif()
 
 ament_package()

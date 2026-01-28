@@ -62,6 +62,29 @@ install(
 
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 
-# do nothing but avoid "unused variable" warning 
+enable_testing()
+
+# Testing
 if(BUILD_TESTING)
+  find_package(GTest REQUIRED)
+  
+  add_executable(test_example test/test_example.cpp)
+  target_link_libraries(test_example
+    ${PROJECT_NAME}
+    GTest::GTest
+    GTest::Main
+  )
+  target_include_directories(test_example PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  
+  install(
+    TARGETS test_example
+    DESTINATION lib/${PROJECT_NAME}
+  )
+  
+  add_test(
+    NAME test_example
+    COMMAND test_example
+  )
 endif()

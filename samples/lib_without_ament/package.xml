@@ -5,8 +5,8 @@
   <description>A c++ library that does not depend on ament and ROS.</description>
   <maintainer email="developer@example.com">ROS 2 Developer</maintainer>
   <license>Apache License 2.0</license>
-  <buildtool_depend">cmake</buildtool_depend>
-
+  <buildtool_depend>cmake</buildtool_depend>
+  <test_depend>gtest</test_depend>
   <export>
     <build_type>cmake</build_type>
   </export>
