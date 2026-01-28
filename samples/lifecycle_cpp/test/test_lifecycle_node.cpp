@@ -25,7 +25,7 @@ TEST_F(RdeLifecycleNodeTest, NodeInstantiation) {
   EXPECT_EQ(node->get_name(), std::string("test_node"));
 }
 
-// Test that on_configure reBturns SUCCESS
+// Test that on_configure returns SUCCESS
 TEST_F(RdeLifecycleNodeTest, OnConfigureReturnsSuccess) {
   auto node = std::make_shared<RdeLifecycleNode>("test_node");
   rclcpp_lifecycle::State state;
