@@ -91,8 +91,13 @@ export class RosTestRunner {
 
                     extension.outputChannel.appendLine(`  Python debug session started, waiting for completion...`);
 
+                    // Declare variables that will be used in multiple closures
+                    let debugEndListener: vscode.Disposable;
+                    let timeoutCleanupListener: vscode.Disposable;
+                    let debugTimeout: NodeJS.Timeout;
+
                     // Wait for the debug session to end
-                    const debugEndListener = vscode.debug.onDidTerminateDebugSession((session) => {
+                    debugEndListener = vscode.debug.onDidTerminateDebugSession((session) => {
                         if (session.name === debugConfig.name) {
                             debugEndListener.dispose();
                             timeoutCleanupListener.dispose();
@@ -108,7 +113,7 @@ export class RosTestRunner {
                     });
 
                     // Ensure we clean up after a timeout
-                    const debugTimeout = setTimeout(() => {
+                    debugTimeout = setTimeout(() => {
                         debugEndListener.dispose();
                         timeoutCleanupListener.dispose();
                         extension.outputChannel.appendLine(`  Python debug session timeout`);
@@ -116,7 +121,7 @@ export class RosTestRunner {
                     }, 1800000); // 30 minute debug timeout
 
                     // Clean up timeout when session ends
-                    const timeoutCleanupListener = vscode.debug.onDidTerminateDebugSession((session) => {
+                    timeoutCleanupListener = vscode.debug.onDidTerminateDebugSession((session) => {
                         if (session.name === debugConfig.name) {
                             clearTimeout(debugTimeout);
                         }
@@ -214,8 +219,13 @@ export class RosTestRunner {
 
                     extension.outputChannel.appendLine(`  Debug session started, waiting for completion...`);
 
+                    // Declare variables that will be used in multiple closures
+                    let debugEndListener: vscode.Disposable;
+                    let timeoutCleanupListener: vscode.Disposable;
+                    let debugTimeout: NodeJS.Timeout;
+
                     // Wait for the debug session to end
-                    const debugEndListener = vscode.debug.onDidTerminateDebugSession((session) => {
+                    debugEndListener = vscode.debug.onDidTerminateDebugSession((session) => {
                         // Check if this is our debug session by comparing names
                         if (session.name === debugConfig.name) {
                             debugEndListener.dispose();
@@ -233,7 +243,7 @@ export class RosTestRunner {
                     });
 
                     // Ensure we clean up after a timeout
-                    const debugTimeout = setTimeout(() => {
+                    debugTimeout = setTimeout(() => {
                         debugEndListener.dispose();
                         timeoutCleanupListener.dispose();
                         extension.outputChannel.appendLine(`  Debug session timeout for ${testData.testClass}.${testData.testMethod}`);
@@ -241,7 +251,7 @@ export class RosTestRunner {
                     }, 1800000); // 30 minute debug timeout
 
                     // Clean up timeout when session ends
-                    const timeoutCleanupListener = vscode.debug.onDidTerminateDebugSession((session) => {
+                    timeoutCleanupListener = vscode.debug.onDidTerminateDebugSession((session) => {
                         if (session.name === debugConfig.name) {
                             clearTimeout(debugTimeout);
                         }
