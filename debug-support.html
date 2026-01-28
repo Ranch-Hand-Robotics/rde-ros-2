@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Debug ROS Nodes - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Debug ROS Nodes";
+        var mkdocs_page_input_path = "debug-support.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Debug ROS Nodes</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#attach">Attach</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#attaching-to-a-python-node">Attaching to a Python node</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#attaching-to-a-c-node">Attaching to a C++ node</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#launch">Launch</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#launch-and-debug-python-and-c-nodes">Launch and debug Python and C++ nodes</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#note">Note</a>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Debugging</li>
+      <li class="breadcrumb-item active">Debug ROS Nodes</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/debug-support.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="debug-ros-nodes">Debug ROS Nodes</h1>
+<p>One of the key goals of this extension is to provide a streamlined debugging experience for ROS nodes.
+To achieve this, this extension aims to help developers utilize the debugging capabilities provided by Visual Studio Code.
+This document covers instructions of how to use such functionalities.</p>
+<h2 id="attach">Attach</h2>
+<p>This extension enables a bootstrapped debugging experience for debugging a ROS (Python or C++) node by attaching to the process.</p>
+<p>To get started, create a <code>ros</code>-type debug configuration with an <code>attach</code> request: (use <kbd>Ctrl</kbd>-<kbd>Space</kbd> to bring up the autocomplete dropdown)</p>
+<p><img alt="create attach debug configuration" src="assets/debug-support/create-attach-debug-config.gif" /></p>
+<h3 id="attaching-to-a-python-node">Attaching to a Python node</h3>
+<p><img alt="attach to a python node" src="assets/debug-support/attach-to-python.gif" /></p>
+<h3 id="attaching-to-a-c-node">Attaching to a C++ node</h3>
+<p><img alt="attach to a cpp node" src="assets/debug-support/attach-to-cpp.gif" /></p>
+<h2 id="launch">Launch</h2>
+<p>This extension enables a streamlined debugging experience for debugging a ROS (Python or C++) node in a ROS launch file similar to a native debug flow.</p>
+<p>To get started, create a <code>ros</code>-type debug configuration with a <code>launch</code> request:</p>
+<p><img alt="create launch debug configuration" src="assets/debug-support/create-launch-debug-config.gif" /></p>
+<h3 id="launch-and-debug-python-and-c-nodes">Launch and debug Python and C++ nodes</h3>
+<p><img alt="launch and debug Python and C++ nodes" src="assets/debug-support/launch-and-debug-nodes.gif" /></p>
+<h2 id="note">Note</h2>
+<ol>
+<li>Debugging functionality provided by this extension has dependencies on VS Code’s <a href="https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools">C++</a> and <a href="https://marketplace.visualstudio.com/items?itemName=ms-python.python">Python</a> extensions, and those have dependencies on the version of VS Code. To ensure everything works as expected, please make sure to have everything up-to-date.</li>
+<li>To debug a C++ executable, please make sure the binary is <a href="https://answers.ros.org/question/200155/how-to-debug-executable-built-with-catkin_make-without-roslaunch/">built with debug symbols</a> (e.g. <code>-DCMAKE_BUILD_TYPE=RelWithDebInfo</code>, read more about <a href="https://stackoverflow.com/a/59314670/888545">CMAKE_BUILD_TYPE here</a>).</li>
+<li>To use VS Code's C++ extension with MSVC on Windows, please make sure the VS Code instance is launched from a Visual Studio command prompt.</li>
+</ol>
+<!-- link to files -->
+<!-- external links -->
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="pixi.html" class="btn btn-neutral float-left" title="Pixi for ROS 2"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="launchdebugging.html" class="btn btn-neutral float-right" title="Launchdebugging">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="pixi.html" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="launchdebugging.html" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

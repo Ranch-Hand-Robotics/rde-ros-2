@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>IntelliSense Support - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "IntelliSense Support";
+        var mkdocs_page_input_path = "intellisense.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">IntelliSense Support</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#message-file-intellisense">Message File IntelliSense</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#hover-information">Hover Information</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#hovering-over-message-types">Hovering Over Message Types</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#hovering-over-field-names">Hovering Over Field Names</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#built-in-types">Built-in Types</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#workspace-and-system-packages">Workspace and System Packages</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#go-to-definition">Go to Definition</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#supported-file-types">Supported File Types</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#c-and-python-intellisense">C++ and Python IntelliSense</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#c-intellisense-configuration">C++ IntelliSense Configuration</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#python-intellisense-configuration">Python IntelliSense Configuration</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#tips">Tips</a>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">IntelliSense Support</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/intellisense.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="intellisense-support">IntelliSense Support</h1>
+<p>The Robot Developer Extensions for ROS 2 provides rich IntelliSense support for ROS message files (<code>.msg</code>, <code>.srv</code>, <code>.action</code>), making it easier to work with ROS interfaces.</p>
+<h2 id="message-file-intellisense">Message File IntelliSense</h2>
+<p>When working with ROS message files, the extension provides several IntelliSense features to help you understand message structures.</p>
+<h3 id="hover-information">Hover Information</h3>
+<p>Hovering over message types or field names displays detailed information about the type, including its properties.</p>
+<p><img alt="Message Hover Documentation" src="assets/MSG_Hover_Doc.png" /></p>
+<h4 id="hovering-over-message-types">Hovering Over Message Types</h4>
+<p>When you hover over a message type (such as <code>geometry_msgs/Point</code>, <code>std_msgs/Header</code>, or <code>builtin_interfaces/Duration</code>), the hover tooltip displays:</p>
+<ul>
+<li><strong>Package name</strong>: The ROS package containing the message</li>
+<li><strong>Message type</strong>: The name of the message</li>
+<li><strong>Properties</strong>: A formatted list of all fields in the message, including:</li>
+<li>Field types and names</li>
+<li>Array notation (fixed size <code>[N]</code> or dynamic <code>[]</code>)</li>
+<li>Default values and constants</li>
+<li>Inline comments from the message definition</li>
+</ul>
+<p><strong>Example</strong>: Hovering over <code>geometry_msgs/Vector3</code> shows:
+<div class="highlight"><pre><span></span><code>geometry_msgs/Vector3
+
+Package: Geometric primitive messages for representing common geometric shapes
+Message Type: Vector3
+
+Properties:
+float64 x
+float64 y
+float64 z
+</code></pre></div></p>
+<h4 id="hovering-over-field-names">Hovering Over Field Names</h4>
+<p>Hovering over a field name provides comprehensive information about both the field and its type:</p>
+<ul>
+<li>The field declaration with any default values</li>
+<li>Inline comments associated with the field</li>
+<li>Complete type documentation (same as hovering over the type)</li>
+<li>All properties of the field's message type</li>
+</ul>
+<p><strong>Example</strong>: Hovering over <code>angular_velocity</code> in the line:
+<div class="highlight"><pre><span></span><code>geometry_msgs/Vector3 angular_velocity
+</code></pre></div></p>
+<p>Shows the field declaration, followed by complete documentation about the <code>Vector3</code> type and its properties.</p>
+<h4 id="built-in-types">Built-in Types</h4>
+<p>When hovering over ROS built-in types (such as <code>int32</code>, <code>float64</code>, <code>string</code>, etc.), the extension displays:</p>
+<ul>
+<li>Type name</li>
+<li>Description of the type</li>
+<li>Range information where applicable</li>
+<li>Array information if the field is an array</li>
+</ul>
+<p><strong>Example</strong>: Hovering over <code>float64</code> shows:
+<div class="highlight"><pre><span></span><code>float64
+
+64-bit floating point number (double precision)
+</code></pre></div></p>
+<h3 id="workspace-and-system-packages">Workspace and System Packages</h3>
+<p>The IntelliSense features work seamlessly with both:</p>
+<ul>
+<li><strong>Workspace packages</strong>: Messages defined in your current workspace</li>
+<li><strong>System-installed packages</strong>: Messages from installed ROS packages (e.g., <code>geometry_msgs</code>, <code>sensor_msgs</code>, <code>builtin_interfaces</code>)</li>
+</ul>
+<p>The extension automatically searches for message definitions in:
+1. Your workspace folders
+2. ROS package paths (obtained from the ROS environment)</p>
+<p>This means you get the same rich hover information whether you're working with custom messages or standard ROS messages.</p>
+<h3 id="go-to-definition">Go to Definition</h3>
+<p>Press <strong>F12</strong> or <strong>Ctrl+Click</strong> (Cmd+Click on macOS) on a message type to jump to its definition file. This works for both workspace and system-installed packages.</p>
+<h3 id="supported-file-types">Supported File Types</h3>
+<p>IntelliSense features are available for:</p>
+<ul>
+<li><strong><code>.msg</code> files</strong>: ROS message definitions</li>
+<li><strong><code>.srv</code> files</strong>: ROS service definitions</li>
+<li><strong><code>.action</code> files</strong>: ROS action definitions</li>
+</ul>
+<h2 id="c-and-python-intellisense">C++ and Python IntelliSense</h2>
+<p>For C++ and Python code that uses ROS, you need to configure IntelliSense to include ROS paths:</p>
+<h3 id="c-intellisense-configuration">C++ IntelliSense Configuration</h3>
+<p>Run the command <strong>ROS2: Update C++ Properties</strong> from the command palette to automatically configure C++ IntelliSense with ROS include paths.</p>
+<p>This updates your workspace's <code>c_cpp_properties.json</code> file to include:
+- ROS installation paths
+- Your workspace's package include directories
+- Appropriate compiler settings</p>
+<h3 id="python-intellisense-configuration">Python IntelliSense Configuration</h3>
+<p>Run the command <strong>ROS2: Update Python Path</strong> from the command palette to configure Python IntelliSense with ROS Python paths.</p>
+<p>This updates your workspace settings to include:
+- ROS Python module paths
+- Your workspace's Python packages</p>
+<h2 id="tips">Tips</h2>
+<ul>
+<li><strong>Keep your ROS environment sourced</strong>: Make sure your ROS environment is properly sourced so the extension can find all package definitions</li>
+<li><strong>Reload after installing packages</strong>: If you install new ROS packages, you may need to reload the VS Code window to pick up the new definitions</li>
+<li><strong>Check hover information during development</strong>: Use hover information to quickly verify message structures without switching files</li>
+<li><strong>Combine with Go to Definition</strong>: Use hover to preview, then F12 to dive into the full definition when needed</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="configuration.html" class="btn btn-neutral float-left" title="Configuration"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="openvsx.html" class="btn btn-neutral float-right" title="Available on Open-VSX.org">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="configuration.html" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="openvsx.html" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Model Context Protocol (MCP) Server - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Model Context Protocol (MCP) Server";
+        var mkdocs_page_input_path = "ModelContextProtocol.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Model Context Protocol (MCP) Server</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#features">Features</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#getting-started">Getting Started</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#available-tools">Available Tools</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#example-session-graphical">Example Session (Graphical)</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#example-session-textual">Example Session (Textual)</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Debugging</li>
+      <li class="breadcrumb-item active">Model Context Protocol (MCP) Server</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/ModelContextProtocol.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="model-context-protocol-mcp-server">Model Context Protocol (MCP) Server</h1>
+<p>The Model Context Protocol (MCP) Server is a preview feature of the Robot Developer Extension for ROS 2. It allows Large Language Models (LLMs) to introspect a running ROS 2 system, providing a way to query and interact with the ROS 2 environment programmatically.</p>
+<p>Model Context Protocol (MCP) is a protocol designed by Anthropic to enable LLMs to understand and interact with complex systems. It provides a structured way for LLMs to query system state, access information about components, and perform actions based on the system's context. </p>
+<blockquote>
+<p>NOTE: This feature is in preview and may not be fully stable. It is intended for experimental use and feedback. The extension creates a python virtual environment which resides inside the extension install to run the MCP server, which is separate from the ROS 2 environment. This allows it to run independently of the ROS 2 nodes and provides a clean interface for LLMs to interact with the ROS 2 system. This is experimental code, and may cause issues with your ROS 2 system when launched. Please use with caution and report any issues you encounter.</p>
+</blockquote>
+<h2 id="features">Features</h2>
+<ul>
+<li>Provides a server that can be queried by LLMs to understand the current state of a ROS 2 system.</li>
+<li>Allows LLMs to access information about nodes, topics, services, and parameters in the ROS 2 environment.</li>
+<li>Facilitates the development of intelligent applications that can leverage the capabilities of ROS 2 through natural language queries.</li>
+<li>Enables advanced use cases such as automated debugging, system monitoring, and dynamic configuration of ROS 2 nodes.</li>
+</ul>
+<h2 id="getting-started">Getting Started</h2>
+<p>To use the MCP Server for ROS 2, Start the ROS 2 MCP Server using the command palette (CTRL-SHIFT-P) and selecting <code>ROS2: Start MCP Server</code>. </p>
+<p>The first time you run the MCP Server, the extension will create a Python virtual environment. This process may require a super user password to install the required dependencie. Please open the terminal pane and enter your password in the MCP terminal if prompted.</p>
+<p>This extension will start the server and make it available for LLMs to connect through a configurable endpoint that defaults to <code>http://localhost:3002/sse</code>.</p>
+<h2 id="available-tools">Available Tools</h2>
+<table>
+<thead>
+<tr>
+<th>Tool Name</th>
+<th>Category</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_nodes</code></td>
+<td>Node Management</td>
+<td>Returns a list of running ROS nodes</td>
+</tr>
+<tr>
+<td><code>get_node_info</code></td>
+<td>Node Management</td>
+<td>Returns detailed information about a specific ROS node by name</td>
+</tr>
+<tr>
+<td><code>list_topics</code></td>
+<td>Topic Operations</td>
+<td>Lists available ROS topics with optional type information</td>
+</tr>
+<tr>
+<td><code>get_topic_info</code></td>
+<td>Topic Operations</td>
+<td>Get detailed information about a specific ROS topic</td>
+</tr>
+<tr>
+<td><code>echo_topic</code></td>
+<td>Topic Operations</td>
+<td>Echo messages from a topic for monitoring</td>
+</tr>
+<tr>
+<td><code>publish_to_topic</code></td>
+<td>Topic Operations</td>
+<td>Publish a message to a specific topic</td>
+</tr>
+<tr>
+<td><code>list_services</code></td>
+<td>Service Operations</td>
+<td>Lists available ROS services with optional type information</td>
+</tr>
+<tr>
+<td><code>get_service_type</code></td>
+<td>Service Operations</td>
+<td>Get the type of a specific ROS service</td>
+</tr>
+<tr>
+<td><code>call_service</code></td>
+<td>Service Operations</td>
+<td>Call a ROS service with specified request parameters</td>
+</tr>
+<tr>
+<td><code>list_parameters</code></td>
+<td>Parameter Management</td>
+<td>List all parameters of a specific node</td>
+</tr>
+<tr>
+<td><code>get_parameter</code></td>
+<td>Parameter Management</td>
+<td>Get the value of a specific parameter from a node</td>
+</tr>
+<tr>
+<td><code>set_parameter</code></td>
+<td>Parameter Management</td>
+<td>Set the value of a parameter for a node</td>
+</tr>
+<tr>
+<td><code>list_actions</code></td>
+<td>Action Operations</td>
+<td>Lists available ROS actions with optional type information</td>
+</tr>
+<tr>
+<td><code>get_action_info</code></td>
+<td>Action Operations</td>
+<td>Get detailed information about a specific ROS action</td>
+</tr>
+<tr>
+<td><code>send_action_goal</code></td>
+<td>Action Operations</td>
+<td>Send a goal to an action server</td>
+</tr>
+<tr>
+<td><code>record_bag</code></td>
+<td>Bag Operations</td>
+<td>Record ROS topics to a bag file</td>
+</tr>
+<tr>
+<td><code>play_bag</code></td>
+<td>Bag Operations</td>
+<td>Play back a ROS bag file</td>
+</tr>
+<tr>
+<td><code>get_bag_info</code></td>
+<td>Bag Operations</td>
+<td>Get information about a bag file</td>
+</tr>
+<tr>
+<td><code>list_interfaces</code></td>
+<td>Interface Inspection</td>
+<td>List available ROS interfaces (messages, services, actions)</td>
+</tr>
+<tr>
+<td><code>show_interface</code></td>
+<td>Interface Inspection</td>
+<td>Show the definition of a specific interface</td>
+</tr>
+<tr>
+<td><code>list_packages</code></td>
+<td>Package Management</td>
+<td>List all available ROS packages</td>
+</tr>
+<tr>
+<td><code>package_executables</code></td>
+<td>Package Management</td>
+<td>List executables in a specific ROS package</td>
+</tr>
+<tr>
+<td><code>get_package_manifest</code></td>
+<td>Package Management</td>
+<td>Get package manifest (package.xml) information</td>
+</tr>
+<tr>
+<td><code>list_launch_files</code></td>
+<td>Launch Operations</td>
+<td>List available launch files in a ROS package</td>
+</tr>
+<tr>
+<td><code>launch_file</code></td>
+<td>Launch Operations</td>
+<td>Launch a ROS package with specified launch file</td>
+</tr>
+<tr>
+<td><code>get_launch_parameters</code></td>
+<td>Launch Operations</td>
+<td>Get parameters available in a launch file</td>
+</tr>
+<tr>
+<td><code>run_package_executable</code></td>
+<td>Execution</td>
+<td>Run a ROS package executable with optional arguments</td>
+</tr>
+<tr>
+<td><code>list_lifecycle_nodes</code></td>
+<td>Lifecycle Management</td>
+<td>List nodes with lifecycle support</td>
+</tr>
+<tr>
+<td><code>get_lifecycle_state</code></td>
+<td>Lifecycle Management</td>
+<td>Get the current lifecycle state of a node</td>
+</tr>
+<tr>
+<td><code>set_lifecycle_transition</code></td>
+<td>Lifecycle Management</td>
+<td>Trigger a lifecycle state transition for a node</td>
+</tr>
+<tr>
+<td><code>kill_process</code></td>
+<td>Utility</td>
+<td>Kill a ROS process by process ID</td>
+</tr>
+<tr>
+<td><code>run_doctor</code></td>
+<td>Diagnostics</td>
+<td>Run ROS 2 doctor to check system and ROS 2 setup</td>
+</tr>
+</tbody>
+</table>
+<h2 id="example-session-graphical">Example Session (Graphical)</h2>
+<p><img alt="MCP Session Example 1" src="assets/mcp-session-1.png" /></p>
+<p><img alt="MCP Session Example 2" src="assets/mcp-session-2.png" /></p>
+<h2 id="example-session-textual">Example Session (Textual)</h2>
+<p>This is an example of how the MCP Server can be used to introspect a ROS 2 system:</p>
+<p>I'll help you check the running lifecycle nodes in your ROS 2 system. Let me start by examining what lifecycle nodes are currently running.</p>
+<p><em>ROS 2 (MCP Server)</em>
+Now let me get information about the lifecycle nodes specifically:</p>
+<p><em>ROS 2 (MCP Server)</em>
+Let me get detailed information about the lifecycle node and its current state:</p>
+<p><em>ROS 2 (MCP Server)</em>
+Let me try without the leading slash:</p>
+<p><em>ROS 2 (MCP Server)</em>
+Now let me get the current lifecycle state of the lc_talker node:</p>
+<p><em>ROS 2 (MCP Server)</em>
+Let me also check if there are any other nodes that might be lifecycle nodes by checking the lc_listener:</p>
+<p><em>ROS 2 (MCP Server)</em>
+Let me try to get the lifecycle state of lc_listener as well:</p>
+<p>ROS 2 (MCP Server)
+Let me get more details about the lifecycle services available for the lc_talker:</p>
+<p>ROS 2 (MCP Server)
+ROS 2 (MCP Server)
+Based on my analysis of the running lifecycle nodes in your ROS 2 system, here's what I found:</p>
+<p><strong>Running Lifecycle Nodes</strong>
+lc_talker - Primary Lifecycle Node
+Current State: unconfigured (ID: 1)
+Node Type: This is the LifecycleTalker node from your lifecycle_talker.cpp file
+Purpose: A demonstration lifecycle node that publishes string messages to the /lifecycle_chatter topic</p>
+<p>Available Lifecycle States
+The lc_talker node supports the standard ROS 2 lifecycle states:</p>
+<p>Primary States:</p>
+<ul>
+<li>unknown (0)</li>
+<li>unconfigured (1) ← Current state</li>
+<li>inactive (2)</li>
+<li>active (3)</li>
+<li>
+<p>finalized (4)
+Transition States:</p>
+</li>
+<li>
+<p>configuring (10)</p>
+</li>
+<li>cleaningup (11)</li>
+<li>shuttingdown (12)</li>
+<li>activating (13)</li>
+<li>deactivating (14)</li>
+<li>errorprocessing (15)</li>
+</ul>
+<p>Current Available Transitions
+From the unconfigured state, the node can transition to:</p>
+<ul>
+<li>configure → moves to configuring state (then to inactive)</li>
+<li>shutdown → moves to shuttingdown state (then to finalized)</li>
+</ul>
+<p>Node Features
+The lc_talker node provides these lifecycle-specific services:</p>
+<ul>
+<li>/lc_talker/change_state - Change the lifecycle state</li>
+<li>/lc_talker/get_state - Get current state</li>
+<li>/lc_talker/get_available_states - List all possible states</li>
+<li>/lc_talker/get_available_transitions - Get valid transitions from current state</li>
+</ul>
+<p>Topics
+* Publishers: /lifecycle_chatter (std_msgs/String) - publishes messages when active
+* System Topics: /lc_talker/transition_event - publishes state transition events</p>
+<h1 id="conclusion">Conclusion</h1>
+<p>The included model context protocol server offers a powerful way to introspect and interact with ROS 2 systems. It allows you to query the state of nodes, topics, services, and parameters, enabling advanced use cases such as automated debugging, system monitoring, and dynamic configuration of ROS 2 nodes. We'd love to hear your feedback on this feature and any suggestions for improvements.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="launchdebugging.html" class="btn btn-neutral float-left" title="Launchdebugging"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="troubleshooting.html" class="btn btn-neutral float-right" title="Troubleshooting">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="launchdebugging.html" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="troubleshooting.html" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

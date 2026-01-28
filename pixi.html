@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Pixi for ROS 2 - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Pixi for ROS 2";
+        var mkdocs_page_input_path = "pixi.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Pixi for ROS 2</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#robostack-open-robotics">RoboStack &amp; Open Robotics</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#getting-started-with-pixi-ros-2-and-the-robot-developer-extensions">Getting Started with Pixi, ROS 2, and the Robot Developer Extensions</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#pixi-environment-detection">Pixi Environment Detection</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#platform-specific-behavior">Platform-Specific Behavior</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#troubleshooting">Troubleshooting</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">Pixi for ROS 2</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/pixi.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="pixi-for-ros-2">Pixi for ROS 2</h1>
+<p><a href="https://pixi.sh/latest/">Pixi by prefix.dev</a> is a next generation package manager, which includes support for ROS 2 development environments. It provides a cross-platform way to manage ROS 2 workspaces, dependencies, and tools.</p>
+<p>Open Robotics has standardized on Pixi for Windows development.</p>
+<h2 id="robostack-open-robotics">RoboStack &amp; Open Robotics</h2>
+<p>Open Robotics has partnered with RoboStack to provide a Pixi-based ROS 2 development environment. This environment is designed to work seamlessly with the Robot Developer Extensions for ROS 2, providing a consistent and easy-to-use development experience across platforms.</p>
+<p>Open Robotics provides an official distribution of core ROS Components through Open Robotics build system. This distribution is recommended for production use cases.</p>
+<p>RoboStack provides a community-driven distribution of ROS 2 packages, which includes additional packages not available in the Open Robotics distribution. This distribution is recommended for development and testing purposes.</p>
+<h2 id="getting-started-with-pixi-ros-2-and-the-robot-developer-extensions">Getting Started with Pixi, ROS 2, and the Robot Developer Extensions</h2>
+<ol>
+<li><strong>Install Pixi</strong>: Follow the instructions on the <a href="https://pixi.sh/latest/">Pixi website</a> to install Pixi on your system.</li>
+<li><strong>Install Visual Studio</strong>: Download and install <a href="https://visualstudio.com/">Visual Studio</a>. This is needed for building ROS 2 packages on Windows.</li>
+<li><strong>Install Visual Studio Code</strong>: Download and install <a href="https://code.visualstudio.com/">Visual Studio Code</a>.</li>
+<li><strong>Install ROS 2 through RoboStack or Open Robotics</strong> depending on your use case:</li>
+<li>For Development and Testing, follow the instructions on the <a href="https://robostack.github.io/">RoboStack website</a>.</li>
+<li>For Production Environments, follow the instructions on the <a href="https://docs.ros.org/en/kilted/Installation/Windows-Install-Binary.html">ros.org</a>.</li>
+<li><strong>Install the Robot Developer Extensions (RDE) for ROS 2</strong>: Install the <a href="https://ranchhandrobotics.github.io/rde-ros-2/">Robot Developer Extensions for ROS 2</a> from the <a href="https://marketplace.visualstudio.com/items?itemName=Ranch-Hand-Robotics.rde-ros-2">Visual Studio Code Marketplace</a> or <a href="https://open-vsx.org/extension/Ranch-Hand-Robotics/rde-ros-2">Open-Vsx.org</a>.</li>
+<li><strong>Configure Pixi in RDE</strong><ul>
+<li>Open the Workspace settings.</li>
+<li>Set the <code>ROS2.usePixiOnAllPlatforms</code> setting to <code>true</code> if you want to use Pixi on all platforms. This will allow the extension to automatically configure the ROS 2 environment using Pixi.</li>
+<li>Set the <code>ROS2.pixiRoot</code> setting to specify the root directory where Pixi environments are installed. This defaults to <code>c:\pixi_ws\ros</code> on Windows and not inferred on Mac or Linux.</li>
+<li>The extension will automatically detect and use the appropriate setup script based on your platform and Pixi configuration.</li>
+</ul>
+</li>
+<li><strong>Open a ROS 2 Workspace</strong>: Open a folder containing a ROS 2 workspace. The Robot Developer Extensions will automatically detect the ROS 2 environment and configure the workspace accordingly.</li>
+</ol>
+<h2 id="pixi-environment-detection">Pixi Environment Detection</h2>
+<p>The extension automatically detects Pixi environments by:
+- Checking for the presence of <code>pixi.toml</code> or <code>pixi.lock</code> files in the workspace
+- Looking for Pixi environment directories in the configured <code>pixiRoot</code>
+- Detecting active Pixi environments in the current shell session</p>
+<p>When Pixi is enabled, the extension will:
+- Source the appropriate ROS 2 setup script from the Pixi environment
+- Configure the Python environment to use Pixi-managed packages
+- Set up the build environment for ROS 2 packages using Pixi</p>
+<h2 id="platform-specific-behavior">Platform-Specific Behavior</h2>
+<ul>
+<li><strong>Windows</strong>: Uses <code>local_setup.bat</code> from the Pixi ROS 2 environment</li>
+<li><strong>Linux</strong>: Uses <code>local_setup.bash</code> from the Pixi ROS 2 environment</li>
+<li><strong>macOS</strong>: Uses <code>local_setup.bash</code> from the Pixi ROS 2 environment</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p>If you encounter issues with Pixi or the Robot Developer Extensions, consider the following:</p>
+<ul>
+<li>Ensure that Pixi is installed correctly and the <code>pixi</code> command is available in your terminal.</li>
+<li>Check the <a href="troubleshooting.html">Visual Studio Code output panel</a> for any error messages related to the Robot Developer Extensions.</li>
+<li>If you are using RoboStack, ensure that the ROS 2 packages are installed correctly and the environment is set up properly outside of the extension.</li>
+<li>Verify that the <code>ROS2.pixiRoot</code> setting points to the correct Pixi installation directory.</li>
+<li>For issues related to Pixi, refer to the <a href="https://pixi.sh/latest/docs/">Pixi documentation</a> or the <a href="https://discord.gg/kKV8ZxyzY4">Pixi Discord server</a> for community support.</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="openvsx.html" class="btn btn-neutral float-left" title="Available on Open-VSX.org"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="debug-support.html" class="btn btn-neutral float-right" title="Debug ROS Nodes">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="openvsx.html" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="debug-support.html" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

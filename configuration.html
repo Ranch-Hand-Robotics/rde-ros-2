@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Configuration - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Configuration";
+        var mkdocs_page_input_path = "configuration.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Configuration</a>
+    <ul class="current">
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">Configuration</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/configuration.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h3 id="ros-launch-configuration-options">ROS Launch Configuration options</h3>
+<p>The ROS Launch configuration block supports the following configuration:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td style="text-align: left;">The name which will be displayed in the VS Code UI launch configuration</td>
+</tr>
+<tr>
+<td>request</td>
+<td style="text-align: left;"><code>launch</code> or <code>attach</code> for launching a ROS launch file, or attaching using the attach UI for Pyton or C++</td>
+</tr>
+<tr>
+<td>target</td>
+<td style="text-align: left;">the launch file path</td>
+</tr>
+<tr>
+<td>type</td>
+<td style="text-align: left;">must be <code>ros</code> to indicate to VS Code that this is a ROS launch configuration</td>
+</tr>
+<tr>
+<td>arguments</td>
+<td style="text-align: left;">Arguments passed to roslaunch such as <code>map:=/foo.yaml'</code></td>
+</tr>
+<tr>
+<td>symbolSearchPath</td>
+<td style="text-align: left;">A semicolon delimited search path for Windows symbols, including ROS for Windows symbols downloaded from https://ros-win.visualstudio.com/ros-win/_build</td>
+</tr>
+<tr>
+<td>additionalSOLibSearchPath</td>
+<td style="text-align: left;">A semicolon delimited search path for Linux symbols</td>
+</tr>
+<tr>
+<td>sourceFileMap</td>
+<td style="text-align: left;">A mapping of Source files from where Symbols expect and the location you have on disk.</td>
+</tr>
+<tr>
+<td>launch</td>
+<td style="text-align: left;">If specified, a list of executables to just launch, attaching to everything else. e.g. <code>"launch": ["rviz", "gz"]</code> which prevents attaching a debugger to rviz and gazebo. NOTE: the debugger will ignore file extension: x.py is the same as x.exe.</td>
+</tr>
+<tr>
+<td>attachDebugger</td>
+<td style="text-align: left;">If specified, a list of executables to debug. <code>"attachDebugger": ["my_ros_node"]</code> will only attach to my_ros_node.exe, my_ros_node.py or my_ros_node.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workspace-and-global-settings">Workspace and Global Settings</h3>
+<p>The ROS extension supports the following global settings, which can be overridden in the workspace.</p>
+<table>
+<thead>
+<tr>
+<th>Json Option</th>
+<th style="text-align: left;">Setting Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ros.distro</td>
+<td style="text-align: left;">ROS installation distro to be sourced</td>
+<td>The Distribution to be sourced. On linux, this cause the extension to look for the ROS setup script in <code>/opt/ros/{distro}/setup.bash</code>. On Windows, <code>c:\opt\ros\{distro}\setup.bat</code></td>
+</tr>
+<tr>
+<td>ros.rosSetupScript</td>
+<td style="text-align: left;">ROS workspace setup script. Overrides ros.distro.</td>
+<td>If specified, this will cause the extension to source this script before generating the launch debugging or ROS terminal environment. This overrides the ros.distro, and can be used to specify user scripts or ROS installs in a different location.</td>
+</tr>
+<tr>
+<td>ros.isolateEnvironment</td>
+<td style="text-align: left;">Specify if the extension should not capture the environment VS Code is running in to pass to child processes.</td>
+<td>Off by default, This setting will prevent the ROS extension from capturing it's hosting environment in case this would conflict with the ROS environment.</td>
+</tr>
+</tbody>
+</table>
+<p>Workspace example:</p>
+<div class="highlight"><pre><span></span><code>└──<span class="w"> </span>.vscode
+<span class="w">    </span>├──<span class="w"> </span>launch.json
+<span class="w">    </span>├──<span class="w"> </span>settings.json
+<span class="w">    </span>└──<span class="w"> </span>tasks.json
+</code></pre></div>
+<p><code>settings.json</code>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;ros.distro&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;foxy&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;ros.rosSetupScript&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/opt/ros/foxy/install/setup.bash&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;ros.isolateEnvironment&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;false&quot;</span>
+<span class="p">}</span>
+</code></pre></div></p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="test-explorer.html" class="btn btn-neutral float-left" title="Test Explorer"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="intellisense.html" class="btn btn-neutral float-right" title="IntelliSense Support">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="test-explorer.html" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="intellisense.html" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
