@@ -19,6 +19,7 @@ import * as ros_utils from "./ros/utils";
 import { rosApi, selectROSApi } from "./ros/ros";
 import * as lifecycle from "./ros/ros2/lifecycle";
 import { registerRosMessageProviders } from "./ros/ros-msg-providers";
+import * as install_ros from "./ros/install-ros";
 import { registerLaunchLinkProvider } from "./ros/launch-link-provider";
 
 import * as debug_manager from "./debugger/manager";
@@ -80,7 +81,8 @@ export enum Commands {
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
-    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition"
+    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    InstallRos = "ROS2.installRos"
 }
 
 /**
@@ -373,6 +375,13 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    // Register Install ROS command
+    vscode.commands.registerCommand(Commands.InstallRos, () => {
+        ensureErrorMessageOnException(() => {
+            return install_ros.installRos();
+        });
+    });
+
     // Register MCP server commands
     vscode.commands.registerCommand(Commands.StartMcpServer, () => {
         ensureErrorMessageOnException(() => {
@@ -595,6 +604,8 @@ export async function activateEnvironment(context: vscode.ExtensionContext) {
     await sourceRosAndWorkspace();
 
     if (typeof env.ROS_DISTRO === "undefined") {
+        // ROS is not detected, check if we should prompt for installation
+        await install_ros.promptInstallRosIfNeeded();
         processingWorkspace = false;
         return;
     }
