@@ -25,7 +25,7 @@ The Test Explorer automatically discovers the following test types:
 
 The extension automatically discovers tests by scanning for test files matching these patterns:
 
-* Python: `test_*.py`, `*_test.py`, `*Test.py`
+* Python: `test_*.py`
 * C++: `test_*.cpp`, `*_test.cpp`, `*Test.cpp`
 
 Tests are refreshed automatically when test files are created, modified, or deleted.
