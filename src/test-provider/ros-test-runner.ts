@@ -95,6 +95,8 @@ export class RosTestRunner {
                     const debugEndListener = vscode.debug.onDidTerminateDebugSession((session) => {
                         if (session.name === debugConfig.name) {
                             debugEndListener.dispose();
+                            timeoutCleanupListener.dispose();
+                            clearTimeout(debugTimeout);
                             extension.outputChannel.appendLine(`  Python debug session ended for ${testData.testMethod || path.basename(testData.filePath)}`);
                             
                             if (run && testItem) {
@@ -108,12 +110,13 @@ export class RosTestRunner {
                     // Ensure we clean up after a timeout
                     const debugTimeout = setTimeout(() => {
                         debugEndListener.dispose();
+                        timeoutCleanupListener.dispose();
                         extension.outputChannel.appendLine(`  Python debug session timeout`);
                         resolve();
                     }, 1800000); // 30 minute debug timeout
 
                     // Clean up timeout when session ends
-                    vscode.debug.onDidTerminateDebugSession((session) => {
+                    const timeoutCleanupListener = vscode.debug.onDidTerminateDebugSession((session) => {
                         if (session.name === debugConfig.name) {
                             clearTimeout(debugTimeout);
                         }
@@ -216,6 +219,8 @@ export class RosTestRunner {
                         // Check if this is our debug session by comparing names
                         if (session.name === debugConfig.name) {
                             debugEndListener.dispose();
+                            timeoutCleanupListener.dispose();
+                            clearTimeout(debugTimeout);
                             extension.outputChannel.appendLine(`  Debug session ended for ${testData.testClass}.${testData.testMethod}`);
                             
                             if (run && testItem) {
@@ -230,12 +235,13 @@ export class RosTestRunner {
                     // Ensure we clean up after a timeout
                     const debugTimeout = setTimeout(() => {
                         debugEndListener.dispose();
+                        timeoutCleanupListener.dispose();
                         extension.outputChannel.appendLine(`  Debug session timeout for ${testData.testClass}.${testData.testMethod}`);
                         resolve();
                     }, 1800000); // 30 minute debug timeout
 
                     // Clean up timeout when session ends
-                    vscode.debug.onDidTerminateDebugSession((session) => {
+                    const timeoutCleanupListener = vscode.debug.onDidTerminateDebugSession((session) => {
                         if (session.name === debugConfig.name) {
                             clearTimeout(debugTimeout);
                         }
