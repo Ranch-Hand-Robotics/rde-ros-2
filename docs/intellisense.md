@@ -10,7 +10,7 @@ When working with ROS message files, the extension provides several IntelliSense
 
 Hovering over message types or field names displays detailed information about the type, including its properties.
 
-![Message Hover Documentation](MSG_Hover_Doc.png)
+![Message Hover Documentation](assets/MSG_Hover_Doc.png)
 
 #### Hovering Over Message Types
 

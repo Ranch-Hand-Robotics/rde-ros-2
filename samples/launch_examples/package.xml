@@ -9,6 +9,9 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>launch_testing</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

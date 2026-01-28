@@ -19,7 +19,25 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Testing
 if(BUILD_TESTING)
+  find_package(GTest REQUIRED)
+  
+  add_executable(test_library_integration test/test_library_integration.cpp)
+  ament_target_dependencies(test_library_integration
+    rclcpp
+    rde_lib_without_ament
+  )
+  target_link_libraries(test_library_integration
+    GTest::GTest
+    GTest::Main
+  )
+  
+  enable_testing()
+  add_test(
+    NAME test_library_integration
+    COMMAND test_library_integration
+  )
 endif()
 
 ament_package()

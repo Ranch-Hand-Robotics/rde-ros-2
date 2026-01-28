@@ -377,7 +377,13 @@ export class TestDiscoveryUtils {
      * Extract test command from Python test file
      */
     static getPythonTestCommand(testData: RosTestData): string[] {
-        const args = ['python3', '-m', 'pytest', '-v'];
+        const args = ['python3', '-m', 'pytest', 
+            '-v',           // Verbose
+            '-x',           // Stop on first failure
+            '-p', 'no:cacheprovider',  // Disable cache plugin (can cause hanging)
+            '-p', 'no:nose',           // Disable nose plugin
+            '--tb=short'    // Short traceback format
+        ];
         
         if (testData.testClass && testData.testMethod) {
             args.push(`${testData.filePath}::${testData.testClass}::${testData.testMethod}`);

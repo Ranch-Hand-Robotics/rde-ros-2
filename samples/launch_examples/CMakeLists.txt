@@ -14,4 +14,12 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
+# Testing
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest QUIET)
+  if(ament_cmake_pytest_FOUND)
+    ament_add_pytest_test(test_launch_files test/test_launch_files.py)
+  endif()
+endif()
+
 ament_package()

@@ -282,6 +282,10 @@ export async function activate(context: vscode.ExtensionContext) {
     // Register launch file link provider
     context.subscriptions.push(registerLaunchLinkProvider());
 
+    // Initialize ROS 2 test provider (once during extension activation, not on environment changes)
+    rosTestProvider = new RosTestProvider(context);
+    context.subscriptions.push(rosTestProvider);
+
     // Source the environment, and re-source on config change.
     let config = vscode_utils.getExtensionConfiguration();
 
@@ -624,12 +628,6 @@ export async function activateEnvironment(context: vscode.ExtensionContext) {
     subscriptions.push(...registerRosShellTaskProvider());
 
     debug_manager.registerRosDebugManager(context);
-    
-    // Initialize ROS 2 test provider
-    if (!rosTestProvider) {
-        rosTestProvider = new RosTestProvider(context);
-        subscriptions.push(rosTestProvider);
-    }
 
     // Register commands dependent on a workspace
     if (buildToolDetected) {
