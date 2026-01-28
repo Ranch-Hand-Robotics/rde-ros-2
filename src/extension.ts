@@ -20,6 +20,7 @@ import { rosApi, selectROSApi } from "./ros/ros";
 import * as lifecycle from "./ros/ros2/lifecycle";
 import { registerRosMessageProviders } from "./ros/ros-msg-providers";
 import * as install_ros from "./ros/install-ros";
+import { registerLaunchLinkProvider } from "./ros/launch-link-provider";
 
 import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
@@ -254,12 +255,19 @@ export async function activate(context: vscode.ExtensionContext) {
         throw error;
     }
 
-    // Detect if LLDB extension is installed
+    // Detect C++ debugging capabilities
     const isLldbInstalled = vscode_utils.isLldbExtensionInstalled();
-    if (isLldbInstalled) {
+    const isCppToolsInstalled = vscode_utils.isCppToolsExtensionInstalled();
+    const isCursor = vscode_utils.isCursorEditor();
+    
+    if (isCppToolsInstalled) {
+        outputChannel.appendLine("Microsoft C/C++ extension is installed - C++ debugging via cpptools available");
+    } else if (isLldbInstalled) {
         outputChannel.appendLine("LLDB extension is installed - C++ debugging with LLDB available");
+    } else if (isCursor) {
+        outputChannel.appendLine("No C++ debugger detected - install LLDB extension for C++ debugging");
     } else {
-        outputChannel.appendLine("LLDB extension not installed - C++ debugging with LLDB not available");
+        outputChannel.appendLine("No C++ debugger detected - install Microsoft C/C++ extension (ms-vscode.cpptools) for C++ debugging");
     }
 
     // Activate components when the ROS env is changed.
@@ -272,6 +280,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register ROS message language providers (Definition and Hover)
     context.subscriptions.push(...registerRosMessageProviders(context));
+
+    // Register launch file link provider
+    context.subscriptions.push(registerLaunchLinkProvider());
 
     // Source the environment, and re-source on config change.
     let config = vscode_utils.getExtensionConfiguration();
@@ -573,7 +584,7 @@ async function ensureErrorMessageOnException(callback: (...args: any[]) => any) 
 /**
  * Activates components which require a ROS env.
  */
-async function activateEnvironment(context: vscode.ExtensionContext) {
+export async function activateEnvironment(context: vscode.ExtensionContext) {
 
     if (processingWorkspace) {
         return;

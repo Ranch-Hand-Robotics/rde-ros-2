@@ -658,9 +658,42 @@ export class RosTestRunner {
         // Convert environment to the format expected by C++ debuggers
         const envConfigs = Object.entries(env).map(([name, value]) => ({ name, value }));
 
-        // Check for LLDB extension first (preferred)
+        // Prefer cpptools if available, fall back to LLDB
+        const isCppToolsInstalled = vscode_utils.isCppToolsExtensionInstalled();
         const isLldbInstalled = vscode_utils.isLldbExtensionInstalled();
-        if (isLldbInstalled) {
+        const isCursor = vscode_utils.isCursorEditor();
+
+        if (!isCppToolsInstalled && !isLldbInstalled) {
+            let message: string;
+            if (isCursor) {
+                message = "LLDB is required for C++ test debugging. Install the LLDB extension.";
+            } else {
+                message = "C++ test debugging requires the Microsoft C/C++ extension (ms-vscode.cpptools) or LLDB extension.";
+            }
+            vscode.window.showErrorMessage(message);
+            throw new Error(message);
+        }
+        if (isCppToolsInstalled) {
+            return {
+                name: name,
+                type: process.platform === "win32" ? "cppvsdbg" : "cppdbg",
+                request: "launch",
+                program: program,
+                args: args,
+                cwd: cwd,
+                environment: envConfigs,
+                stopAtEntry: stopAtEntry,
+                ...(process.platform !== "win32" && {
+                    setupCommands: [
+                        {
+                            text: "-enable-pretty-printing",
+                            description: "Enable pretty-printing for gdb",
+                            ignoreFailures: true
+                        }
+                    ]
+                })
+            };
+        } else if (isLldbInstalled) {
             return {
                 name: name,
                 type: "lldb",
@@ -671,37 +704,9 @@ export class RosTestRunner {
                 env: env,
                 stopAtEntry: stopAtEntry
             };
-        } else if (process.platform === "win32") {
-            // Windows: Use Visual Studio debugger
-            return {
-                name: name,
-                type: "cppvsdbg",
-                request: "launch",
-                cwd: cwd,
-                program: program,
-                args: args,
-                environment: envConfigs,
-                stopAtEntry: stopAtEntry
-            };
         } else {
-            // Linux/Unix: Use GDB via cppdbg
-            return {
-                name: name,
-                type: "cppdbg",
-                request: "launch",
-                cwd: cwd,
-                program: program,
-                args: args,
-                environment: envConfigs,
-                stopAtEntry: stopAtEntry,
-                setupCommands: [
-                    {
-                        text: "-enable-pretty-printing",
-                        description: "Enable pretty-printing for gdb",
-                        ignoreFailures: true
-                    }
-                ]
-            };
+            // Should not reach here due to check above, but for safety
+            throw new Error("No C++ debugger available");
         }
     }
 

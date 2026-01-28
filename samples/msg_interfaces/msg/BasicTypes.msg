@@ -2,25 +2,25 @@
 # This message demonstrates all basic ROS2 message types
 
 # Boolean type
-bool is_active true
+bool is_active
 
 # Integer types
-int8 temperature_celsius -25
-uint8 battery_percentage 85
-int16 servo_position 1500
-uint16 sensor_reading 4095
-int32 encoder_count -123456
-uint32 timestamp_ms 4294967295
-int64 large_counter -9223372036854775808
-uint64 system_uptime 18446744073709551615
+int8 temperature_celsius
+uint8 battery_percentage
+int16 servo_position
+uint16 sensor_reading
+int32 encoder_count
+uint32 timestamp_ms
+int64 large_counter
+uint64 system_uptime
 
 # Floating point types
-float32 velocity 3.14159
-float64 precise_position 3.141592653589793
+float32 velocity
+float64 precise_position
 
 # String type
-string robot_name "TestBot-2025"
-string status_message "All systems operational"
+string robot_name
+string status_message
 
 # Byte array (bounded)
 uint8[10] sensor_array

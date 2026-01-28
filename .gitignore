@@ -2,12 +2,15 @@
 out
 dist/**
 node_modules
+test-results
 
 # vscode-test
 .vscode-test
 .vscode/c_cpp_properties.json
 .vscode/settings.json
 .vscode/**.db*
+test/**/.vscode/**
+test-results/**
 
 vscode.d.ts
 

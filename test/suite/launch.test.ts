@@ -15,7 +15,7 @@ describe('Launch Dumper Test', () => {
         // __dirname is out/test/suite, so we need to go up 3 levels to reach workspace root
         const workspaceRoot = path.join(__dirname, '../../../');
         const dumperScript = path.join(workspaceRoot, 'assets', 'scripts', 'ros2_launch_dumper.py');
-        const testLaunchFile = path.join(workspaceRoot, 'test', 'launch', 'test_launch.py');
+        const testLaunchFile = path.join(workspaceRoot, 'samples', 'launch_examples', 'launch','test_launch.py');
 
         // Verify files exist
         assert.ok(fs.existsSync(dumperScript), 'ros2_launch_dumper.py should exist');
@@ -26,8 +26,15 @@ describe('Launch Dumper Test', () => {
         
         // If ROS 2 is not available, skip the test with a warning
         if (result.exitCode !== 0 && result.stderr.includes('ModuleNotFoundError')) {
-            console.warn('ROS 2 environment not available, skipping test');
-            console.warn('stderr:', result.stderr);
+            // Check if it's specifically lark that's missing
+            if (result.stderr.includes("No module named 'lark'")) {
+                console.warn('lark-parser not available in ROS 2 environment. Install with:');
+                console.warn('  sudo apt-get install -y python3-lark-parser');
+                console.warn('  OR: pip install lark-parser');
+            } else {
+                console.warn('ROS 2 environment not available, skipping test');
+                console.warn('stderr:', result.stderr);
+            }
             return; // Skip test instead of failing
         }
         
