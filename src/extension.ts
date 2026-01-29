@@ -3,11 +3,11 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import { promises as fsPromises } from "fs";
 import * as vscode from "vscode";
 import * as child_process from "child_process";
 
 import * as cpp_formatter from "./cpp-formatter";
-import * as pfs from "./promise-fs";
 import * as telemetry from "./telemetry-helper";
 import * as vscode_utils from "./vscode-utils";
 
@@ -25,6 +25,18 @@ import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
+
+/**
+ * Check if a file or directory exists.
+ */
+async function exists(filePath: string): Promise<boolean> {
+    try {
+        await fsPromises.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 /**
  * The sourced ROS environment.
@@ -166,7 +178,7 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
             });
         }
         
-        if (await pfs.exists(serverPath)) {
+        if (await exists(serverPath)) {
             outputChannel.appendLine(`Starting MCP server from ${serverPath} on port ${mcpServerPort}`);
 
             
@@ -686,7 +698,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
         }
 
         // Try to support cases where the setup script doesn't make sense on different environments, such as host vs container.
-        if (await pfs.exists(rosSetupScript)) {
+        if (await exists(rosSetupScript)) {
             try {
                 newEnv = await ros_utils.sourceSetupFile(rosSetupScript, newEnv);
 
@@ -766,7 +778,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
     if (newEnv.ROS_VERSION === "1") {
         outputChannel.appendLine(`this extension does not support ROS 1`);
     } else {    // FUTURE: Revisit if ROS_VERSION changes - not clear it will be called 3
-        if (!await pfs.exists(workspaceOverlayPath)) {
+        if (!await exists(workspaceOverlayPath)) {
             workspaceOverlayPath = path.join(`${vscode.workspace.rootPath}`, "install");
         }
     }
@@ -777,7 +789,7 @@ async function sourceRosAndWorkspace(): Promise<void> {
         ext: ros_utils.getSetupScriptExtension(),
     });
 
-    if (await pfs.exists(wsSetupScript)) {
+    if (await exists(wsSetupScript)) {
         outputChannel.appendLine(`Workspace overlay path: ${wsSetupScript}`);
 
         try {
