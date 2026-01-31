@@ -19,6 +19,7 @@ import * as requests from "../../../requests";
 import * as utils from "../../../utils";
 import { rosApi } from "../../../../ros/ros";
 import * as lifecycle from "../../../../ros/ros2/lifecycle";
+import * as rust_utils from "../../../../ros/rust-utils";
 
 const promisifiedExec = util.promisify(child_process.exec);
 
@@ -202,6 +203,51 @@ function parsePackageXml(packageXmlPath: string): { name: string; packageRoot: s
     }
     
     return null;
+}
+
+/**
+ * Checks if an executable belongs to a Rust ROS 2 package.
+ * 
+ * @param executablePath Path to the executable
+ * @returns true if the executable belongs to a Rust package, false otherwise
+ */
+function isRustExecutable(executablePath: string): boolean {
+    try {
+        // Parse the executable path
+        // Example: /path/to/workspace/install/package_name/lib/package_name/node_name
+        const pathParts = executablePath.split(path.sep);
+        
+        // Find the 'install' directory in the path
+        const installIndex = pathParts.lastIndexOf('install');
+        if (installIndex === -1) {
+            return false;
+        }
+        
+        // Get package name (should be directory after 'install')
+        if (installIndex + 1 >= pathParts.length) {
+            return false;
+        }
+        
+        const packageName = pathParts[installIndex + 1];
+        const workspaceRoot = pathParts.slice(0, installIndex).join(path.sep);
+        
+        // Find package.xml files in workspace
+        const packageXmlFiles = findPackageXmlFiles(workspaceRoot);
+        
+        // Find the package.xml that matches our package name
+        for (const packageXmlPath of packageXmlFiles) {
+            const packageInfo = parsePackageXml(packageXmlPath);
+            if (packageInfo && packageInfo.name === packageName) {
+                // Check if Cargo.toml exists in the package directory
+                return rust_utils.isRustPackage(packageInfo.packageRoot);
+            }
+        }
+        
+        return false;
+    } catch (error) {
+        extension.outputChannel.appendLine(`Error checking if executable is Rust: ${error}`);
+        return false;
+    }
 }
 
 /**
@@ -635,6 +681,31 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         }
     }
 
+    private createRustLaunchConfig(request: ILaunchRequest, stopOnEntry: boolean): ILldbLaunchConfiguration {
+        // Rust debugging uses LLDB (CodeLLDB extension)
+        const isLldbInstalled = vscode_utils.isRustDebuggerExtensionInstalled();
+        
+        if (!isLldbInstalled) {
+            const message = "Rust debugging requires the CodeLLDB extension (vadimcn.vscode-lldb). Please install it from the marketplace.";
+            vscode.window.showErrorMessage(message);
+            throw new Error(message);
+        }
+        
+        const rustLaunchConfig: ILldbLaunchConfiguration = {
+            name: request.nodeName,
+            type: "lldb",
+            request: "launch",
+            program: request.executable,
+            args: request.arguments,
+            cwd: ".",
+            env: request.env,
+            stopAtEntry: stopOnEntry,
+            sourceLanguages: ["rust"]
+        };
+        
+        return rustLaunchConfig;
+    }
+
     private async executeLaunchRequest(request: ILaunchRequest, stopOnEntry: boolean) {
         let debugConfig: ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration | IPythonLaunchConfiguration | ILldbLaunchConfiguration;
 
@@ -661,12 +732,15 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 } catch {
                     // The python file is not available then this must be...
 
-                    // C#? Todo
+                    // Check if it's a Rust executable
+                    if (isRustExecutable(request.executable)) {
+                        debugConfig = this.createRustLaunchConfig(request, stopOnEntry);
+                    } else {
+                        // C#? Todo
 
-                    // Rust? Todo
-
-                    // C++
-                    debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
+                        // Default to C++
+                        debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
+                    }
                 }
             } else if (nodePath.ext.toLowerCase() === ".py") {
                 debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
@@ -703,7 +777,11 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 // look for Python in shebang line
                 if (line.startsWith("#!") && line.toLowerCase().indexOf("python") !== -1) {
                     debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
+                } else if (isRustExecutable(request.executable)) {
+                    // Check if it's a Rust executable
+                    debugConfig = this.createRustLaunchConfig(request, stopOnEntry);
                 } else {
+                    // Default to C++
                     debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
                 }
 

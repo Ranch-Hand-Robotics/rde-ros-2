@@ -40,8 +40,10 @@
         "onLanguage:cpp",
         "onLanguage:python",
         "onLanguage:csharp",
+        "onLanguage:rust",
         "onCommand",
         "workspaceContains:**/package.xml",
+        "workspaceContains:**/Cargo.toml",
         "workspaceContains:**/test_*.py",
         "workspaceContains:**/*_test.py",
         "workspaceContains:**/*Test.cpp",
@@ -161,6 +163,11 @@
                 "title": "Debug All ROS 2 Tests",
                 "category": "ROS2",
                 "icon": "$(debug-alt)"
+            },
+            {
+                "command": "ROS2.initializeRustRos2",
+                "title": "Initialize ROS 2 Rust Workspace",
+                "category": "ROS2"
             }
         ],
         "mcpServerDefinitionProviders": [
@@ -211,7 +218,8 @@
                 "runtime": "node",
                 "languages": [
                     "cpp",
-                    "python"
+                    "python",
+                    "rust"
                 ],
                 "configurationAttributes": {
                     "launch": {

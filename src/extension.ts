@@ -16,6 +16,7 @@ import * as buildtool from "./build-tool/build-tool";
 import * as ros_build_utils from "./ros/build-env-utils";
 import * as ros_cli from "./ros/cli";
 import * as ros_utils from "./ros/utils";
+import * as rust_utils from "./ros/rust-utils";
 import { rosApi, selectROSApi } from "./ros/ros";
 import * as lifecycle from "./ros/ros2/lifecycle";
 import { registerRosMessageProviders } from "./ros/ros-msg-providers";
@@ -80,7 +81,8 @@ export enum Commands {
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
-    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition"
+    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    InitializeRustRos2 = "ROS2.initializeRustRos2"
 }
 
 /**
@@ -534,6 +536,86 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 }
             }
+        });
+    });
+
+    // Register Initialize Rust ROS 2 command
+    vscode.commands.registerCommand(Commands.InitializeRustRos2, async () => {
+        ensureErrorMessageOnException(async () => {
+            // Check if Rust is installed
+            const rustInfo = await rust_utils.checkRustInstallation();
+            
+            if (!rustInfo.installed) {
+                const install = await vscode.window.showWarningMessage(
+                    "Rust is not installed. Rust is required for ROS 2 Rust development. Would you like to install it now?",
+                    "Install Rust",
+                    "Cancel"
+                );
+                
+                if (install === "Install Rust") {
+                    await rust_utils.installRustInTerminal(context);
+                }
+                return;
+            }
+            
+            if (!rustInfo.meetsMinimumVersion) {
+                const update = await vscode.window.showWarningMessage(
+                    `Rust version ${rustInfo.version} is installed, but ROS 2 Rust requires Rust 1.70.0 or higher. Would you like to update Rust now?`,
+                    "Update Rust",
+                    "Continue Anyway",
+                    "Cancel"
+                );
+                
+                if (update === "Update Rust") {
+                    await rust_utils.updateRustInTerminal(context);
+                    return;
+                } else if (update === "Cancel") {
+                    return;
+                }
+            }
+            
+            if (!rustInfo.cargoInstalled) {
+                vscode.window.showErrorMessage("Cargo is not installed. Please install Rust with cargo.");
+                return;
+            }
+            
+            // Get workspace folder
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                vscode.window.showErrorMessage("No workspace folder is open. Please open a workspace folder first.");
+                return;
+            }
+            
+            const workspaceRoot = workspaceFolders[0].uri.fsPath;
+            
+            // Confirm with user
+            const confirm = await vscode.window.showInformationMessage(
+                `This will initialize a ROS 2 Rust workspace in ${workspaceRoot}. The required repositories will be cloned into the 'src' directory. Continue?`,
+                "Yes",
+                "No"
+            );
+            
+            if (confirm !== "Yes") {
+                return;
+            }
+            
+            // Show progress
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Initializing ROS 2 Rust workspace",
+                cancellable: false
+            }, async (progress) => {
+                try {
+                    progress.report({ message: "Cloning required repositories..." });
+                    await rust_utils.initializeRustWorkspace(workspaceRoot);
+                    
+                    vscode.window.showInformationMessage(
+                        "ROS 2 Rust workspace initialized successfully! You can now build the workspace using 'colcon build'."
+                    );
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Failed to initialize Rust workspace: ${error}`);
+                }
+            });
         });
     });
 
