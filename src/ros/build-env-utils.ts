@@ -143,7 +143,7 @@ async function updateCppPropertiesInternal(): Promise<void> {
     const dir = path.join(vscode.workspace.rootPath, ".vscode");
 
     if (!await exists(dir)) {
-        await fsPromises.mkdir(dir, { recursive: true });
+        await fsPromises.mkdir(dir);
     }
 
     await fsPromises.writeFile(filename, JSON.stringify(cppProperties, undefined, 2), 'utf8');
