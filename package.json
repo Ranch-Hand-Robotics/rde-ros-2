@@ -161,8 +161,73 @@
                 "title": "Debug All ROS 2 Tests",
                 "category": "ROS2",
                 "icon": "$(debug-alt)"
+            },
+            {
+                "command": "ROS2.launchTree.refresh",
+                "title": "Refresh Launch Tree",
+                "category": "ROS2",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "ROS2.launchTree.reveal",
+                "title": "Reveal in Launch Tree",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.launchTree.findUsages",
+                "title": "Find Launch File Usages",
+                "category": "ROS2",
+                "icon": "$(search)"
+            },
+            {
+                "command": "ROS2.launchTree.run",
+                "title": "Run Launch File",
+                "category": "ROS2",
+                "icon": "$(play)"
+            },
+            {
+                "command": "ROS2.launchTree.debug",
+                "title": "Debug Launch File",
+                "category": "ROS2",
+                "icon": "$(debug-alt)"
             }
         ],
+        "views": {
+            "explorer": [
+                {
+                    "id": "ros2LaunchTree",
+                    "name": "ROS 2 Launch Files",
+                    "contextualTitle": "ROS 2 Launch Tree",
+                    "visibility": "visible"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "ROS2.launchTree.refresh",
+                    "when": "view == ros2LaunchTree",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "ROS2.launchTree.run",
+                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "group": "1_run@1"
+                },
+                {
+                    "command": "ROS2.launchTree.debug",
+                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "group": "1_run@2"
+                },
+                {
+                    "command": "ROS2.launchTree.findUsages",
+                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "group": "2_navigation@1"
+                }
+            ]
+        },
         "mcpServerDefinitionProviders": [
             {
                 "id": "ROS 2",

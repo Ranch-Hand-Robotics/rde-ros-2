@@ -25,6 +25,7 @@ import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
+import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
 
 /**
  * The sourced ROS environment.
@@ -37,6 +38,7 @@ export let outputChannel: vscode.OutputChannel;
 export let mcpServerTerminal: vscode.Terminal | null = null;
 export let extensionContext: vscode.ExtensionContext | null = null;
 export let rosTestProvider: RosTestProvider | null = null;
+export let launchTreeProvider: LaunchTreeDataProvider | null = null;
 
 let onEnvChanged = new vscode.EventEmitter<void>();
 
@@ -80,7 +82,12 @@ export enum Commands {
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
-    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition"
+    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    LaunchTreeRefresh = "ROS2.launchTree.refresh",
+    LaunchTreeReveal = "ROS2.launchTree.reveal",
+    LaunchTreeFindUsages = "ROS2.launchTree.findUsages",
+    LaunchTreeRun = "ROS2.launchTree.run",
+    LaunchTreeDebug = "ROS2.launchTree.debug"
 }
 
 /**
@@ -285,6 +292,15 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize ROS 2 test provider (once during extension activation, not on environment changes)
     rosTestProvider = new RosTestProvider(context);
     context.subscriptions.push(rosTestProvider);
+
+    // Initialize Launch Tree Provider
+    launchTreeProvider = new LaunchTreeDataProvider(context, outputChannel, extPath);
+    const launchTreeView = vscode.window.createTreeView('ros2LaunchTree', {
+        treeDataProvider: launchTreeProvider,
+        showCollapseAll: true
+    });
+    context.subscriptions.push(launchTreeView);
+    context.subscriptions.push(launchTreeProvider);
 
     // Source the environment, and re-source on config change.
     let config = vscode_utils.getExtensionConfiguration();
@@ -534,6 +550,61 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 }
             }
+        });
+    });
+
+    // Register Launch Tree commands
+    vscode.commands.registerCommand(Commands.LaunchTreeRefresh, () => {
+        ensureErrorMessageOnException(() => {
+            if (launchTreeProvider) {
+                launchTreeProvider.refresh();
+                vscode.window.showInformationMessage("Launch tree refreshed");
+            }
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.LaunchTreeReveal, async (uri: vscode.Uri) => {
+        ensureErrorMessageOnException(async () => {
+            // TODO: Implement reveal logic
+            vscode.window.showInformationMessage(`Reveal ${uri.fsPath} in tree`);
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.LaunchTreeFindUsages, async (item: any) => {
+        ensureErrorMessageOnException(async () => {
+            if (!item || !item.launchFilePath) {
+                return;
+            }
+            const fileName = path.basename(item.launchFilePath);
+            vscode.window.showInformationMessage(`Finding usages of ${fileName}...`);
+            // TODO: Implement find usages
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.LaunchTreeRun, async (item: any) => {
+        ensureErrorMessageOnException(async () => {
+            if (!item || !item.launchFilePath) {
+                return;
+            }
+            // Delegate to existing roslaunch command
+            await vscode.commands.executeCommand(Commands.Roslaunch);
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.LaunchTreeDebug, async (item: any) => {
+        ensureErrorMessageOnException(async () => {
+            if (!item || !item.launchFilePath) {
+                return;
+            }
+            // Create debug configuration
+            const config: vscode.DebugConfiguration = {
+                type: 'ros2',
+                name: `Debug ${path.basename(item.launchFilePath)}`,
+                request: 'launch',
+                target: item.launchFilePath
+            };
+            // Start debugging
+            await vscode.debug.startDebugging(undefined, config);
         });
     });
 
