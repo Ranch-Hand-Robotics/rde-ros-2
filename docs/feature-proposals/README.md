@@ -17,14 +17,32 @@ Extends the RDE MCP server to expose debug session information to AI assistants.
 
 [Read full proposal →](debug-session-context-mcp-tools.md)
 
-### 2. DebugMCP Integration Layer
-**Status**: Requires clarification  
+### 2. DebugMCP Integration Layer - Scenario Implementations
+**Status**: Detailed proposals ready for review  
+**Priority**: Medium-High  
+**Dependencies**: Proposal #1
+
+Three detailed implementation proposals for AI-assisted debugging scenarios:
+- **Scenario 1: Automated Crash Investigation** - Auto-detect crashes, analyze logs, set breakpoints, restart with debugger
+- **Scenario 2: End-to-End Validation** - Validate multi-node pipelines, publish test messages, verify message flow
+- **Scenario 3: Performance Debugging** - Profile pipelines, identify bottlenecks, set conditional breakpoints
+
+Each proposal includes:
+- Detailed MCP tool specifications (TypeScript & Python)
+- Implementation strategy using both built-in TypeScript MCP server (like RDE-URDF) and external Python MCP server
+- Integration points with existing RDE code
+- Context requirements and VS Code API usage
+
+[Read detailed proposals →](scenario-implementations-detailed.md)
+
+### 3. DebugMCP Integration Layer (Original)
+**Status**: Superseded by detailed scenario proposals  
 **Priority**: Medium  
 **Dependencies**: Proposal #1, Access to DebugMCP
 
-Creates a bidirectional integration between RDE and DebugMCP for coordinated multi-node debugging. Requires access to DebugMCP for testing and clarification on integration scope.
+Original high-level proposal for DebugMCP integration. See scenario-implementations-detailed.md for concrete implementation plans.
 
-[Read full proposal →](debugmcp-integration-layer.md)
+[Read original proposal →](debugmcp-integration-layer.md)
 
 ## Background Documentation
 
