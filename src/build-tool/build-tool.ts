@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import * as extension from "../extension";
 import * as telemetry from "../telemetry-helper";
 import * as colcon from "./colcon";
+import * as vscode_utils from "../vscode-utils";
 
 export abstract class BuildTool {
     public static current: BuildTool;
@@ -57,13 +58,13 @@ BuildTool.current = new NotImplementedBuildTool();
  */
 export async function determineBuildTool(dir: string): Promise<boolean> {
     // Verify we're within a workspace folder
-    const workspaceFolder = getWorkspaceFolder(dir);
+    const workspaceFolder = vscode_utils.getWorkspaceFolder(dir);
     if (!workspaceFolder) {
         // Not in a workspace, cannot determine build tool
         return false;
     }
     
-    // Only check the current directory (workspace root), not parent directories
+    // Only check the provided directory without traversing to parent directories
     // This prevents scanning outside the workspace
     if (await ColconBuildTool.isApplicable(dir)) {
         BuildTool.current = new ColconBuildTool();
@@ -71,29 +72,6 @@ export async function determineBuildTool(dir: string): Promise<boolean> {
     }
     
     return false;
-}
-
-/**
- * Gets the workspace folder that contains the given path.
- * Returns the workspace folder path or null if not in a workspace.
- */
-function getWorkspaceFolder(dirPath: string): string | null {
-    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
-        return null;
-    }
-    
-    // Find the workspace folder that contains this path
-    for (const folder of vscode.workspace.workspaceFolders) {
-        const folderPath = folder.uri.fsPath;
-        const normalizedDir = path.normalize(dirPath);
-        const normalizedFolder = path.normalize(folderPath);
-        
-        if (normalizedDir === normalizedFolder || normalizedDir.startsWith(normalizedFolder + path.sep)) {
-            return folderPath;
-        }
-    }
-    
-    return null;
 }
 
 /**
