@@ -278,11 +278,12 @@ export class LaunchTreeDataProvider implements vscode.TreeDataProvider<LaunchTre
 
   /**
    * Setup file watcher for auto-refresh
+   * Watches both Python and XML launch files
    */
   private setupFileWatcher(): void {
-    // Watch for changes to .launch.py files
+    // Watch for changes to both .launch.py and .launch.xml files
     this.fileWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/*.launch.py'
+      '**/*.launch.{py,xml}'
     );
 
     // Debounce refresh to avoid excessive updates

@@ -4,8 +4,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as child_process from 'child_process';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import * as extension from '../../extension';
 import {
   ILaunchFileData,
   IWorkspacePackage,
@@ -14,11 +15,10 @@ import {
   ILaunchArgument
 } from './types';
 
-const execAsync = promisify(exec);
+const execAsync = promisify(child_process.exec);
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 const readFile = promisify(fs.readFile);
-const exists = promisify(fs.exists);
 
 export class LaunchFileParser {
   private dumperScript: string;
@@ -130,6 +130,7 @@ export class LaunchFileParser {
 
   /**
    * Find launch files in package directory
+   * Supports both Python (.launch.py) and XML (.launch.xml) files
    */
   private async findLaunchFilesInPackage(packageDir: string): Promise<string[]> {
     const launchDir = path.join(packageDir, 'launch');
@@ -143,7 +144,8 @@ export class LaunchFileParser {
       const files = await readdir(launchDir);
       
       for (const file of files) {
-        if (file.endsWith('.launch.py')) {
+        // Support both Python and XML launch files
+        if (file.endsWith('.launch.py') || file.endsWith('.launch.xml')) {
           launchFiles.push(path.join(launchDir, file));
         }
       }
@@ -156,6 +158,7 @@ export class LaunchFileParser {
 
   /**
    * Parse a launch file using ros2_launch_dumper.py
+   * Supports both Python (.launch.py) and XML (.launch.xml) launch files
    */
   async parseLaunchFile(filePath: string): Promise<ILaunchFileData> {
     // Check cache first
@@ -165,18 +168,27 @@ export class LaunchFileParser {
     }
 
     try {
-      // Execute ros2_launch_dumper.py
-      // Note: This requires ROS 2 environment to be sourced
+      // Get ROS environment from extension
+      const rosEnv = await extension.resolvedEnv();
+      
+      // Execute ros2_launch_dumper.py with proper ROS environment
+      // Note: The dumper script automatically outputs JSON when USE_JSON_OUTPUT=True
       const { stdout, stderr } = await execAsync(
-        `python3 "${this.dumperScript}" "${filePath}" --json`,
+        `python3 "${this.dumperScript}" "${filePath}"`,
         { 
           timeout: 30000, // 30 second timeout
-          maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+          maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+          env: rosEnv // Use ROS environment from extension
         }
       );
 
       if (stderr) {
-        this.outputChannel.appendLine(`Warning from dumper: ${stderr}`);
+        // Stderr is not necessarily an error - log for debugging
+        this.outputChannel.appendLine(`Launch dumper stderr: ${stderr}`);
+      }
+
+      if (!stdout || stdout.length === 0) {
+        throw new Error('Launch dumper produced no output');
       }
 
       // Parse JSON output
@@ -189,7 +201,7 @@ export class LaunchFileParser {
         throw new Error(`Failed to parse launch file: ${parseError}`);
       }
 
-      // Transform to our interface
+      // Transform to our interface (matching the structure from launch.ts)
       const result: ILaunchFileData = {
         processes: data.processes || [],
         lifecycle_nodes: data.lifecycle_nodes || [],
