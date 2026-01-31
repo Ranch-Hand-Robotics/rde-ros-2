@@ -54,18 +54,43 @@ BuildTool.current = new NotImplementedBuildTool();
 
 /**
  * Determines build system and workspace path in use by checking for unique
- * auto-generated files.
+ * auto-generated files. Only searches within the workspace folder boundaries.
  */
 export async function determineBuildTool(dir: string): Promise<boolean> {
-    while (dir && path.dirname(dir) !== dir) {
-        if (await ColconBuildTool.isApplicable(dir)) {
-            BuildTool.current = new ColconBuildTool();
-            return true;
-        }
-
-        dir = path.dirname(dir);
+    // Get workspace folder to establish boundaries
+    const workspaceFolder = getWorkspaceFolder(dir);
+    
+    // Only check the current directory, not parent directories
+    // This prevents scanning outside the workspace
+    if (await ColconBuildTool.isApplicable(dir)) {
+        BuildTool.current = new ColconBuildTool();
+        return true;
     }
+    
     return false;
+}
+
+/**
+ * Gets the workspace folder that contains the given path.
+ * Returns the workspace folder path or null if not in a workspace.
+ */
+function getWorkspaceFolder(dirPath: string): string | null {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+        return null;
+    }
+    
+    // Find the workspace folder that contains this path
+    for (const folder of vscode.workspace.workspaceFolders) {
+        const folderPath = folder.uri.fsPath;
+        const normalizedDir = path.normalize(dirPath);
+        const normalizedFolder = path.normalize(folderPath);
+        
+        if (normalizedDir === normalizedFolder || normalizedDir.startsWith(normalizedFolder + path.sep)) {
+            return folderPath;
+        }
+    }
+    
+    return null;
 }
 
 /**

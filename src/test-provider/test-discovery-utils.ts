@@ -199,13 +199,15 @@ export class TestDiscoveryUtils {
     }
     
     /**
-     * Find package.xml file in parent directories to determine package name
+     * Find package.xml file in parent directories to determine package name.
+     * Only searches within the workspace folder boundaries.
      */
     static findPackageName(filePath: string): string | undefined {
         let currentPath = path.dirname(filePath);
-        const root = path.parse(currentPath).root;
+        const workspaceRoot = this.getWorkspaceRoot(currentPath);
         
-        while (currentPath && currentPath !== root) {
+        // Search up to workspace root, not filesystem root
+        while (currentPath) {
             const packageXmlPath = path.join(currentPath, 'package.xml');
             if (fs.existsSync(packageXmlPath)) {
                 try {
@@ -221,7 +223,18 @@ export class TestDiscoveryUtils {
                     return path.basename(currentPath);
                 }
             }
-            currentPath = path.dirname(currentPath);
+            
+            // Stop at workspace boundary
+            if (workspaceRoot && currentPath === workspaceRoot) {
+                break;
+            }
+            
+            const parentPath = path.dirname(currentPath);
+            if (parentPath === currentPath) {
+                // Reached filesystem root
+                break;
+            }
+            currentPath = parentPath;
         }
         
         return undefined;
@@ -318,23 +331,59 @@ export class TestDiscoveryUtils {
     }
     
     /**
-     * Find the package directory containing the test file
+     * Find the package directory containing the test file.
+     * Only searches within the workspace folder boundaries.
      */
     private static findPackageDirectory(filePath: string): string | undefined {
         let currentPath = path.dirname(filePath);
-        const root = path.parse(currentPath).root;
+        const workspaceRoot = this.getWorkspaceRoot(currentPath);
         
-        while (currentPath && currentPath !== root) {
+        // Search up to workspace root, not filesystem root
+        while (currentPath) {
             const packageXmlPath = path.join(currentPath, 'package.xml');
             const cmakeListsPath = path.join(currentPath, 'CMakeLists.txt');
             
             if (fs.existsSync(packageXmlPath) && fs.existsSync(cmakeListsPath)) {
                 return currentPath;
             }
-            currentPath = path.dirname(currentPath);
+            
+            // Stop at workspace boundary
+            if (workspaceRoot && currentPath === workspaceRoot) {
+                break;
+            }
+            
+            const parentPath = path.dirname(currentPath);
+            if (parentPath === currentPath) {
+                // Reached filesystem root
+                break;
+            }
+            currentPath = parentPath;
         }
         
         return undefined;
+    }
+    
+    /**
+     * Gets the workspace root folder that contains the given path.
+     * Returns the workspace folder path or null if not in a workspace.
+     */
+    private static getWorkspaceRoot(filePath: string): string | null {
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            return null;
+        }
+        
+        const normalizedPath = path.normalize(filePath);
+        
+        // Find the workspace folder that contains this path
+        for (const folder of vscode.workspace.workspaceFolders) {
+            const folderPath = path.normalize(folder.uri.fsPath);
+            
+            if (normalizedPath === folderPath || normalizedPath.startsWith(folderPath + path.sep)) {
+                return folderPath;
+            }
+        }
+        
+        return null;
     }
     
     /**
