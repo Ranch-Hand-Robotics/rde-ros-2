@@ -80,8 +80,14 @@ export enum Commands {
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
-    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition"
+    LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    ShowWelcome = "ROS2.showWelcome"
 }
+
+/**
+ * The walkthrough ID for the getting started guide
+ */
+const WALKTHROUGH_ID = "Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted";
 
 /**
  * Shuts down the MCP server if it's currently running.
@@ -537,6 +543,13 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    // Register Welcome/Walkthrough command
+    vscode.commands.registerCommand(Commands.ShowWelcome, () => {
+        ensureErrorMessageOnException(() => {
+            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
+        });
+    });
+
 
     const reporter = telemetry.getReporter();
     reporter.sendTelemetryActivate();
@@ -544,10 +557,43 @@ export async function activate(context: vscode.ExtensionContext) {
     // Activate the workspace environment if possible.
     await activateEnvironment(context);
 
+    // Show welcome walkthrough on first install or if ROS is not detected
+    await showWelcomeIfNeeded(context);
+
     return {
         getEnv: () => env,
         onDidChangeEnv: (listener: () => any, thisArg: any) => onDidChangeEnv(listener, thisArg),
     };
+}
+
+/**
+ * Shows the welcome walkthrough if needed based on first install or ROS detection
+ */
+async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<void> {
+    const config = vscode_utils.getExtensionConfiguration();
+    const showWelcomeOnStartup = config.get("showWelcomeOnStartup", true);
+    
+    // Check if user has disabled the welcome screen
+    if (!showWelcomeOnStartup) {
+        return;
+    }
+
+    // Check if this is the first time the extension is being activated
+    const hasShownWelcome = context.globalState.get("hasShownWelcome", false);
+    
+    // Check if ROS is detected (env will be undefined or not have ROS_VERSION if ROS is not found)
+    const isRosDetected = env && (env.ROS_VERSION === "2" || env.ROS_DISTRO);
+    
+    // Show welcome if this is first install OR if ROS is not detected
+    if (!hasShownWelcome || !isRosDetected) {
+        // Mark that we've shown the welcome
+        await context.globalState.update("hasShownWelcome", true);
+        
+        // Show the walkthrough with a slight delay to ensure VS Code is ready
+        setTimeout(() => {
+            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
+        }, 1000);
+    }
 }
 
 export async function deactivate() {
