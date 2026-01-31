@@ -14,6 +14,7 @@
     "aiKey": "",
     "categories": [
         "Debuggers",
+        "Snippets",
         "Other"
     ],
     "capabilities": {
@@ -387,6 +388,24 @@
                 "language": "rosmsg",
                 "scopeName": "source.rosmsg",
                 "path": "./languages/syntaxes/ROS Interface.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "python",
+                "path": "./snippets/python.json"
+            },
+            {
+                "language": "cpp",
+                "path": "./snippets/cpp.json"
+            },
+            {
+                "language": "python",
+                "path": "./snippets/launch-py.json"
+            },
+            {
+                "language": "xml",
+                "path": "./snippets/launch-xml.json"
             }
         ],
         "problemMatchers": [
