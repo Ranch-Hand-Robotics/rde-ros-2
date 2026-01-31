@@ -85,13 +85,7 @@ export function showOutputPanel(outputChannel: vscode.OutputChannel): void {
     showOutputPanelIfConfigured(outputChannel, "ROS2", "autoShowOutputChannel");
 }
 
-/**
- * Checks if the Python environment is externally managed (PEP 668).
- * This is common in Ubuntu 24.04+ and other modern Linux distributions.
- */
-export async function checkExternallyManagedEnvironmentInternal(env: any): Promise<boolean> {
-    return checkExternallyManagedEnvironment(env);
-}
+
 
 /**
  * Check if a file or directory exists.
@@ -117,7 +111,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
     let terminal: vscode.Terminal | undefined = undefined;
 
     // Detect system Python for creating the virtual environment
-    const isExternallyManaged = await checkExternallyManagedEnvironmentInternal(process.env);
+    const isExternallyManaged = await checkExternallyManagedEnvironment(process.env);
     
     if (isExternallyManaged) {
         outputChannel?.appendLine("Creating MCP-specific virtual environment for Ubuntu 24.04+ externally-managed Python.");
