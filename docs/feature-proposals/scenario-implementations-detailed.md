@@ -2,9 +2,15 @@
 
 ## Overview
 
-This document provides three detailed implementation proposals for AI-assisted debugging scenarios in RDE ROS 2. Based on the maintainer's feedback, we're considering both:
-1. **External Python MCP Server** (existing `assets/scripts/server.py`)
-2. **Built-in TypeScript MCP Server** (using VS Code's native MCP exposure, like RDE-URDF)
+This document provides three detailed implementation proposals for AI-assisted debugging scenarios in RDE ROS 2. Following the RDE-URDF pattern, all proposals use a **built-in TypeScript MCP Server** that exposes RDE's internal debugging features directly through VS Code's native MCP capabilities.
+
+The TypeScript MCP server will provide direct access to:
+- Debug session state and management
+- Launch file composition and node mapping
+- Breakpoint control and crash analysis
+- Performance profiling and validation tools
+
+**Note:** The existing Python MCP server (`assets/scripts/server.py`) remains focused on ROS CLI and runtime introspection. This TypeScript server complements it by exposing extension-internal debugging features.
 
 Each proposal outlines the scenario, required MCP tools, implementation approach, and integration strategy.
 
@@ -128,33 +134,65 @@ async get_crash_analysis(node_name: string): Promise<CrashAnalysis>
 async restart_node_with_debugger(node_name: string, breakpoints?: Breakpoint[]): Promise<DebugSessionInfo>
 ```
 
-#### External Python MCP Server Tools
+**Tool 4: `get_launch_composition`**
+```typescript
+@mcp.tool({
+  title: 'Get Launch Composition',
+  description: 'Returns the complete launch file composition including node relationships and topics',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      launch_file: { type: 'string', description: 'Path to the launch file (optional, uses active if not provided)' }
+    }
+  }
+})
+async get_launch_composition(launch_file?: string): Promise<LaunchComposition>
+```
 
-**Tool 4: `get_node_crash_logs`**
-```python
-@mcp.tool()
-async def get_node_crash_logs(node_name: str, lines: int = 100) -> Dict[str, Any]:
-    """Retrieves crash logs for a specific node from ROS log files"""
+**Returns:**
+```json
+{
+  "launch_file": "/workspace/src/webrtc_demo/launch/demo.launch.py",
+  "nodes": [
+    {
+      "node_name": "webrtc_bridge",
+      "package": "webrtc_ros",
+      "executable": "bridge",
+      "source_path": "/workspace/src/webrtc_ros/src/bridge.cpp"
+    }
+  ],
+  "topic_graph": {
+    "/image/raw": {
+      "publishers": ["frame_generator"],
+      "subscribers": ["webrtc_bridge"]
+    }
+  }
+}
 ```
 
 ### Implementation Strategy
 
-#### TypeScript Built-in MCP Server (Recommended)
+#### TypeScript Built-in MCP Server
 Following the RDE-URDF pattern in `src/mcp.ts`:
 
-1. **Create `src/debug-mcp.ts`**:
+1. **Create `src/ros2-ros2-debug-mcp.ts`**:
 ```typescript
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as vscode from 'vscode';
 import * as express from 'express';
+import * as debugManager from './debugger/manager';
+import * as rosUtils from './ros/utils';
 
-export class DebugMcpServer {
+export class Ros2Ros2DebugMcpServer {
   private server: McpServer;
   private app: express.Application;
-  private port: number = 3003; // Different port from Python MCP server
+  private port: number = 3003;
+  private httpServer: any;
+  private transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
-  constructor() {
+  constructor(port: number = 3003) {
+    this.port = port;
     this.app = express();
     this.app.use(express.json());
     
@@ -172,24 +210,86 @@ export class DebugMcpServer {
     );
 
     this.setupRoutes();
-    this.setupTools();
+    this.setupCrashInvestigationTools();
   }
 
-  private setupTools(): void {
-    // Register crash investigation tools
-    this.server.registerTool('get_active_processes', {...}, async (args) => {
-      // Implementation: Query vscode.debug.activeDebugSession
-      // Parse ROS process information from debug manager
+  private setupCrashInvestigationTools(): void {
+    // Tool 1: Get active ROS processes
+    this.server.registerTool('get_active_processes', {
+      title: 'Get Active ROS Processes',
+      description: 'Returns information about all active ROS processes from the current debug session',
+      inputSchema: {}
+    }, async (args) => {
+      // Access debug session state from extension
+      const debugSessions = vscode.debug.activeDebugSession;
+      // Query ROS node process information
+      // Return process status, PIDs, crash states
+      return { content: [{ type: 'text', text: JSON.stringify(processInfo) }] };
     });
 
-    this.server.registerTool('get_crash_analysis', {...}, async (args) => {
-      // Implementation: Parse crash logs and stack traces
-      // Use VS Code's debug adapter to get stack frames
+    // Tool 2: Analyze crash
+    this.server.registerTool('get_crash_analysis', {
+      title: 'Get Crash Analysis',
+      description: 'Analyzes crash logs and core dumps for a crashed node to identify failure location',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          node_name: { type: 'string', description: 'Name of the crashed node' }
+        },
+        required: ['node_name']
+      }
+    }, async (args) => {
+      const nodeName = (args as any).node_name;
+      // Parse ROS log files for crash information
+      // Use VS Code debug adapter to extract stack traces
+      // Analyze and suggest breakpoints
+      return { content: [{ type: 'text', text: JSON.stringify(crashAnalysis) }] };
     });
 
-    this.server.registerTool('restart_node_with_debugger', {...}, async (args) => {
-      // Implementation: Use vscode.debug.startDebugging()
-      // Configure breakpoints via vscode.debug.addBreakpoints()
+    // Tool 3: Restart node with debugger
+    this.server.registerTool('restart_node_with_debugger', {
+      title: 'Restart Node with Debugger',
+      description: 'Restarts a specific node from the launch composition with debugger attached',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          node_name: { type: 'string', description: 'Name of the node to restart' },
+          breakpoints: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                file: { type: 'string' },
+                line: { type: 'number' }
+              }
+            }
+          }
+        },
+        required: ['node_name']
+      }
+    }, async (args) => {
+      const nodeName = (args as any).node_name;
+      const breakpoints = (args as any).breakpoints || [];
+      // Use vscode.debug.startDebugging() to restart with debugger
+      // Pre-configure breakpoints via vscode.debug.addBreakpoints()
+      return { content: [{ type: 'text', text: JSON.stringify(debugSession) }] };
+    });
+
+    // Tool 4: Get launch composition
+    this.server.registerTool('get_launch_composition', {
+      title: 'Get Launch Composition',
+      description: 'Returns the complete launch file composition',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          launch_file: { type: 'string' }
+        }
+      }
+    }, async (args) => {
+      const launchFile = (args as any).launch_file;
+      // Use launch dumper to analyze composition
+      // Return node relationships and topic graph
+      return { content: [{ type: 'text', text: JSON.stringify(composition) }] };
     });
   }
 }
@@ -197,19 +297,19 @@ export class DebugMcpServer {
 
 2. **Integrate in `src/extension.ts`**:
 ```typescript
-import { DebugMcpServer } from './debug-mcp';
+import { Ros2DebugMcpServer } from './ros2-debug-mcp';
 
-let debugMcpServer: DebugMcpServer | null = null;
+let ros2DebugMcpServer: Ros2DebugMcpServer | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
   // ... existing code ...
   
-  // Start built-in debug MCP server
-  debugMcpServer = new DebugMcpServer();
-  await debugMcpServer.start();
+  // Start built-in ROS 2 debug MCP server
+  ros2DebugMcpServer = new Ros2DebugMcpServer();
+  await ros2DebugMcpServer.start();
   
   context.subscriptions.push({
-    dispose: () => debugMcpServer?.stop()
+    dispose: () => ros2DebugMcpServer?.stop()
   });
 }
 ```
@@ -222,7 +322,7 @@ export async function activate(context: vscode.ExtensionContext) {
 - `src/ros/utils.ts` - Add log file parsing utilities
 
 **New Files:**
-- `src/debug-mcp.ts` - Built-in MCP server implementation
+- `src/ros2-debug-mcp.ts` - Built-in MCP server implementation
 - `src/debugger/crash-analyzer.ts` - Crash analysis logic
 - `src/debugger/debug-state-tracker.ts` - Track debug session state
 
@@ -407,44 +507,50 @@ async check_endpoint_availability(
 ): Promise<EndpointCheckResult>
 ```
 
-#### External Python MCP Server Tools
-
-The existing Python MCP server already has tools for:
-- `list_topics()` - List available topics
-- `echo_topic()` - Monitor topic messages
-- `publish_to_topic()` - Publish messages
-- `get_topic_info()` - Get topic metadata
-
-These can be leveraged by the TypeScript server or used directly.
-
 ### Implementation Strategy
 
 #### TypeScript Built-in MCP Server
-Extend `src/debug-mcp.ts`:
+Extend `src/ros2-ros2-debug-mcp.ts`:
 
 ```typescript
 private setupValidationTools(): void {
-  this.server.registerTool('launch_with_debug_profile', {...}, async (args) => {
+  this.server.registerTool('launch_with_debug_profile', {
+    title: 'Launch with Debug Profile',
+    description: 'Launches a ROS composition with selective debugging',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
     // Use existing ROS launch mechanisms from src/ros/cli.ts
     // Selectively attach debuggers based on debug_nodes parameter
-    // Enable validation instrumentation if requested
+    // Track launch session for validation
   });
 
-  this.server.registerTool('validate_message_flow', {...}, async (args) => {
-    // Subscribe to topics in chain
+  this.server.registerTool('validate_message_flow', {
+    title: 'Validate Message Flow',
+    description: 'Validates message flow through topic chains',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
+    // Execute ros2 topic commands to monitor topics
     // Measure message rates and latencies
     // Detect anomalies (drops, delays, etc.)
     // Return comprehensive validation report
   });
 
-  this.server.registerTool('publish_test_message', {...}, async (args) => {
-    // Use ros2 topic pub command or rclpy bindings
+  this.server.registerTool('publish_test_message', {
+    title: 'Publish Test Message',
+    description: 'Publishes test messages to topics',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
+    // Use ros2 topic pub command via vscode.tasks
     // Support standard ROS message types
-    // Handle serialization of message_data
+    // Handle message serialization
   });
 
-  this.server.registerTool('check_endpoint_availability', {...}, async (args) => {
-    // Make HTTP request to URL
+  this.server.registerTool('check_endpoint_availability', {
+    title: 'Check Endpoint Availability',
+    description: 'Checks web endpoint availability',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
+    // Make HTTP request using Node.js http/https
     // Check response status and content
     // Handle timeouts gracefully
   });
@@ -454,28 +560,28 @@ private setupValidationTools(): void {
 #### Integration Points
 
 **Files to Modify:**
+- `src/ros2-ros2-debug-mcp.ts` - Add validation tools
 - `src/ros/cli.ts` - Add selective debug launch capability
 - `src/debugger/configuration/resolvers/ros2/launch.ts` - Support partial debugging
-- Create `src/validation/message-flow-validator.ts` - Message flow validation logic
-- Create `src/validation/test-publisher.ts` - Test message publishing
 
-**Dependencies:**
-- May need `rclpy` or `rclcpp` bindings for efficient message publishing
-- HTTP client for endpoint checking (built-in Node.js `http`/`https`)
+**New Files:**
+- `src/validation/message-flow-validator.ts` - Message flow validation logic
+- `src/validation/endpoint-checker.ts` - Web endpoint checking
 
 ### Context Requirements
 
 **Information Needed:**
-1. Launch file composition and node relationships
-2. Topic publishers and subscribers mapping
-3. Message type schemas for validation
-4. Expected performance metrics (rates, latencies)
-5. Web endpoint URLs from configuration
+1. Launch file composition and node relationships (from launch dumper)
+2. Topic publishers and subscribers mapping (from ROS graph)
+3. Message type schemas (from ROS introspection)
+4. Expected performance metrics (from configuration or user input)
+5. Web endpoint URLs (from launch parameters or configuration)
 
 **VS Code APIs Used:**
 - `vscode.debug.startDebugging()` for selective debug launch
 - `vscode.tasks.executeTask()` for ROS commands
 - `vscode.workspace.fs` for file operations
+- Node.js `http`/`https` for endpoint checking
 
 ---
 
@@ -687,49 +793,55 @@ async get_message_flow_profiling(
 }
 ```
 
-#### External Python MCP Server Tools
-
-Enhance the existing Python MCP server:
-
-```python
-@mcp.tool()
-async def get_node_performance_metrics(node_name: str) -> Dict[str, Any]:
-    """Gets real-time performance metrics for a ROS node using ros2 node info"""
-
-@mcp.tool()
-async def trace_message_latency(topic: str, sample_count: int) -> Dict[str, Any]:
-    """Traces message latency through a topic using timestamp analysis"""
-```
-
 ### Implementation Strategy
 
 #### TypeScript Built-in MCP Server
-Extend `src/debug-mcp.ts`:
+Extend `src/ros2-ros2-debug-mcp.ts`:
 
 ```typescript
 private setupPerformanceTools(): void {
-  this.server.registerTool('start_performance_profiling', {...}, async (args) => {
-    // Start collecting metrics from ROS nodes
-    // Use ros2 node info for CPU/memory
-    // Hook into callback timing for duration measurements
-    // Store profiling session data
+  this.server.registerTool('start_performance_profiling', {
+    title: 'Start Performance Profiling',
+    description: 'Starts performance profiling for ROS nodes',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
+    // Execute ros2 node info commands for CPU/memory metrics
+    // Monitor callback durations via debug instrumentation
+    // Store profiling session data in extension state
+    // Return session ID for later retrieval
   });
 
-  this.server.registerTool('get_performance_report', {...}, async (args) => {
-    // Retrieve profiling session data
-    // Analyze for bottlenecks
-    // Generate recommendations
+  this.server.registerTool('get_performance_report', {
+    title: 'Get Performance Report',
+    description: 'Retrieves performance profiling results',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
+    // Retrieve profiling session data from extension state
+    // Analyze collected metrics for bottlenecks
+    // Generate recommendations based on thresholds
+    // Return comprehensive performance report
   });
 
-  this.server.registerTool('set_conditional_breakpoint', {...}, async (args) => {
-    // Use VS Code debug API to create conditional breakpoint
-    // Support performance-based conditions
+  this.server.registerTool('set_conditional_breakpoint', {
+    title: 'Set Conditional Breakpoint',
+    description: 'Sets performance-based conditional breakpoints',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
+    // Use vscode.debug API to create conditional breakpoint
+    // Support expressions like "processing_time > 100"
+    // Handle hit count conditions
+    // Return breakpoint info
   });
 
-  this.server.registerTool('get_message_flow_profiling', {...}, async (args) => {
-    // Subscribe to topic chain
-    // Measure inter-topic latencies
+  this.server.registerTool('get_message_flow_profiling', {
+    title: 'Get Message Flow Profiling',
+    description: 'Profiles message latency through topic chains',
+    inputSchema: { /* as shown above */ }
+  }, async (args) => {
+    // Execute ros2 topic echo commands to monitor topics
+    // Measure inter-topic latencies using timestamps
     // Identify slowest processing stages
+    // Return detailed flow profile
   });
 }
 ```
@@ -737,10 +849,13 @@ private setupPerformanceTools(): void {
 #### Integration Points
 
 **Files to Modify:**
-- Create `src/performance/profiler.ts` - Performance profiling engine
-- Create `src/performance/metrics-collector.ts` - Collect ROS metrics
-- Create `src/performance/bottleneck-analyzer.ts` - Analyze bottlenecks
+- `src/ros2-ros2-debug-mcp.ts` - Add performance profiling tools
 - `src/debugger/configuration/resolvers/ros2/launch.ts` - Support profiling mode
+
+**New Files:**
+- `src/performance/profiler.ts` - Performance profiling engine
+- `src/performance/metrics-collector.ts` - Collect ROS node metrics
+- `src/performance/bottleneck-analyzer.ts` - Analyze bottlenecks and generate recommendations
 
 **Dependencies:**
 - `perf` or similar profiling tools for CPU profiling
@@ -765,31 +880,30 @@ private setupPerformanceTools(): void {
 
 ## Implementation Recommendations
 
-### Recommended Approach: Hybrid Strategy
+### Recommended Approach: TypeScript Built-in MCP Server
 
-Use **both** TypeScript built-in MCP server and Python external server:
+Following the RDE-URDF pattern, implement a **TypeScript built-in MCP server** that exposes RDE's internal debugging features:
 
-1. **TypeScript Built-in MCP Server** (Port 3003):
-   - Debug session management
-   - Breakpoint control
-   - VS Code integration
-   - Performance profiling coordination
-   - **Advantages**: Direct access to VS Code APIs, type safety, integrated lifecycle
+**TypeScript Built-in MCP Server** (Port 3003):
+- Debug session management and state tracking
+- Breakpoint control and crash analysis
+- Direct VS Code API integration
+- Performance profiling coordination
+- Launch composition analysis
+- **Advantages**: 
+  - Direct access to extension internals
+  - Type-safe implementation
+  - Integrated with extension lifecycle
+  - No external process dependencies for debug features
+  - Real-time access to debug session state
 
-2. **Python External MCP Server** (Port 3002):
-   - ROS introspection (existing 34 tools)
-   - Topic monitoring and publishing
-   - Node metrics collection
-   - Log file analysis
-   - **Advantages**: Better ROS 2 integration, existing tooling, Python ROS libraries
-
-3. **Coordination**: AI assistants can call both servers as needed, with TypeScript server handling VS Code-specific operations and Python server handling ROS-specific operations.
+**Note on Python MCP Server**: The existing Python MCP server (Port 3002) in `assets/scripts/server.py` continues to handle ROS CLI commands and runtime introspection (topics, services, parameters, etc.). The TypeScript server complements it by exposing extension-internal features that cannot be accessed from Python.
 
 ### Priority Implementation Order
 
-1. **Start with Scenario 1 (Crash Investigation)** - Most immediate value
-2. **Then Scenario 2 (End-to-End Validation)** - Building on crash tools
-3. **Finally Scenario 3 (Performance Profiling)** - Most complex, requires infrastructure
+1. **Start with Scenario 1 (Crash Investigation)** - Most immediate value, foundational for other scenarios
+2. **Then Scenario 2 (End-to-End Validation)** - Builds on crash investigation tools
+3. **Finally Scenario 3 (Performance Profiling)** - Most complex, requires additional infrastructure
 
 ### Package Dependencies
 
@@ -803,10 +917,7 @@ Use **both** TypeScript built-in MCP server and Python external server:
 }
 ```
 
-**For Python External Server (additions):**
-```txt
-psutil>=5.9.0  # For process monitoring
-```
+These are the same dependencies used in RDE-URDF, ensuring consistency across extensions.
 
 ---
 
@@ -814,9 +925,11 @@ psutil>=5.9.0  # For process monitoring
 
 1. **Review and Approve** these proposals
 2. **Clarify priorities** - which scenario to implement first?
-3. **Set up development environment** - Install MCP SDK dependencies
-4. **Create feature issues** for each approved scenario
-5. **Begin implementation** starting with highest priority scenario
+3. **Install MCP SDK dependencies** - Add packages to `package.json`
+4. **Create `src/ros2-ros2-debug-mcp.ts`** - Following RDE-URDF pattern
+5. **Integrate with extension activation** - Start MCP server in `src/extension.ts`
+6. **Implement tools incrementally** - Start with Scenario 1 tools
+7. **Test with AI assistants** - Validate tools work with Copilot/Cursor
 
 ---
 
@@ -827,10 +940,10 @@ psutil>=5.9.0  # For process monitoring
    - [ ] Scenario 2: End-to-End Validation
    - [ ] Scenario 3: Performance Profiling
 
-2. **Implementation Approach**: Do you prefer:
-   - [ ] TypeScript built-in server only (simpler, VS Code-native)
-   - [ ] Hybrid approach (TypeScript + Python)
-   - [ ] Python server only (leverage existing infrastructure)
+2. **Port Configuration**: Is port 3003 acceptable for the TypeScript MCP server?
+   - Python MCP server uses 3002
+   - RDE-URDF uses 3005
+   - Suggested: 3003 for ROS 2 Debug MCP
 
 3. **Performance Profiling**: Do you have existing performance analysis tools or preferences?
    - What metrics are most important? (CPU, memory, latency, throughput)
