@@ -181,8 +181,8 @@ The MCP tools need to access debug session state. Recommended approach:
 **High** - This is a foundational feature that provides immediate value and enables future DebugMCP integration work.
 
 ### Related Documentation
-- [DebugMCP Integration Investigation](docs/DebugMCP-Integration-Investigation.md)
-- [Feature Proposal](docs/feature-proposals/debug-session-context-mcp-tools.md)
+- [DebugMCP Integration Investigation](specs/DebugMCP-Integration-Investigation.md)
+- [Feature Proposal](specs/feature-proposals/debug-session-context-mcp-tools.md)
 - [Current MCP Server Documentation](docs/ModelContextProtocol.md)
 
 ### Notes

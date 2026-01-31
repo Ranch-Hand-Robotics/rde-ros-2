@@ -32,7 +32,7 @@ DebugMCP is a VS Code extension from Microsoft that exposes debugging capabiliti
 - Provide launch file composition analysis
 - No external dependencies
 - Estimated: 1-2 days
-- [Full proposal](docs/feature-proposals/debug-session-context-mcp-tools.md)
+- [Full proposal](specs/feature-proposals/debug-session-context-mcp-tools.md)
 
 ### ⏸️ Requires Clarification
 **Feature #2: DebugMCP Integration Layer**
@@ -40,7 +40,7 @@ DebugMCP is a VS Code extension from Microsoft that exposes debugging capabiliti
 - Coordinated multi-node debugging
 - Needs: Access to DebugMCP for testing, integration scope definition
 - Estimated: 1-2 weeks
-- [Full proposal](docs/feature-proposals/debugmcp-integration-layer.md)
+- [Full proposal](specs/feature-proposals/debugmcp-integration-layer.md)
 
 ## Questions for Maintainers
 
@@ -89,8 +89,8 @@ Based on your feedback, I can:
 
 ## Documentation Provided
 
-- [Complete Investigation Report](docs/DebugMCP-Integration-Investigation.md) - 13KB detailed analysis
-- [Feature Proposals Directory](docs/feature-proposals/) - Individual feature specifications
+- [Complete Investigation Report](specs/DebugMCP-Integration-Investigation.md) - 13KB detailed analysis
+- [Feature Proposals Directory](specs/feature-proposals/) - Individual feature specifications
 - All work is in this PR for review
 
 ## References

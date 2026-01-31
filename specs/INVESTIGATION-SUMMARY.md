@@ -32,13 +32,13 @@ This investigation explored integrating Microsoft's DebugMCP (Model Context Prot
 
 ## Documentation Delivered
 
-1. **`docs/DebugMCP-Integration-Investigation.md`** (13KB)
+1. **`specs/DebugMCP-Integration-Investigation.md`** (13KB)
    - Complete technical analysis
    - Integration architecture proposals
    - Open questions and considerations
    - References and background
 
-2. **`docs/feature-proposals/`** directory
+2. **`specs/feature-proposals/`** directory
    - Detailed feature specifications
    - Implementation guidance
    - Dependency mapping
@@ -107,6 +107,6 @@ If Feature #2 is implemented later:
 ## Questions?
 
 For complete details, see:
-- Investigation: `docs/DebugMCP-Integration-Investigation.md`
-- Feature specs: `docs/feature-proposals/`
+- Investigation: `specs/DebugMCP-Integration-Investigation.md`
+- Feature specs: `specs/feature-proposals/`
 - Feedback template: `PR-COMMENT-REQUEST-FOR-DIRECTION.md`
