@@ -558,9 +558,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
             
-            if (!rustInfo.meetsMinimumVersion) {
+            if (rustInfo.installed && !rustInfo.meetsMinimumVersion) {
                 const update = await vscode.window.showWarningMessage(
-                    `Rust version ${rustInfo.version} is installed, but ROS 2 Rust requires Rust 1.70.0 or higher. Would you like to update Rust now?`,
+                    `Rust is installed (${rustInfo.version}), but ROS 2 Rust requires Rust 1.70.0 or higher. Would you like to update Rust now?`,
                     "Update Rust",
                     "Continue Anyway",
                     "Cancel"
@@ -599,23 +599,16 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
             
-            // Show progress
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Initializing ROS 2 Rust workspace",
-                cancellable: false
-            }, async (progress) => {
-                try {
-                    progress.report({ message: "Cloning required repositories..." });
-                    await rust_utils.initializeRustWorkspace(workspaceRoot);
-                    
-                    vscode.window.showInformationMessage(
-                        "ROS 2 Rust workspace initialized successfully! You can now build the workspace using 'colcon build'."
-                    );
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Failed to initialize Rust workspace: ${error}`);
-                }
-            });
+            // Initialize workspace - this will send commands to terminal
+            try {
+                await rust_utils.initializeRustWorkspace(workspaceRoot, context);
+                
+                vscode.window.showInformationMessage(
+                    "ROS 2 Rust workspace initialization commands sent to terminal. Check the terminal for progress."
+                );
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to initialize Rust workspace: ${error}`);
+            }
         });
     });
 

@@ -13,7 +13,7 @@ The Robot Developer Extensions for ROS 2 provides comprehensive support for deve
 
 ### Required Software
 
-1. **ROS 2** (Humble, Jazzy, Kilted, or Rolling)
+1. **ROS 2** (Humble, Jazzy, Kilted, Lyrical, or Rolling)
 2. **Rust** (version 1.70.0 or higher)
    - Install from [https://rustup.rs/](https://rustup.rs/)
 3. **colcon Cargo Plugins**
@@ -29,6 +29,26 @@ The Robot Developer Extensions for ROS 2 provides comprehensive support for deve
 Optionally, you can also install:
 - **rust-analyzer** (`rust-lang.rust-analyzer`) - Provides IDE features for Rust
 
+## Configuration
+
+### Custom Rust Paths
+
+If you have Rust installed in a non-standard location, you can configure the paths to `rustc` and `cargo`:
+
+1. Open VS Code Settings (`Ctrl+,` or `Cmd+,`)
+2. Search for "ROS2 Rust"
+3. Set the following options:
+   - **ROS2: Rustc Path** - Path to the `rustc` executable (default: `rustc`)
+   - **ROS2: Cargo Path** - Path to the `cargo` executable (default: `cargo`)
+
+Example configuration in `settings.json`:
+```json
+{
+  "ROS2.rustcPath": "/usr/local/rust/bin/rustc",
+  "ROS2.cargoPath": "/usr/local/rust/bin/cargo"
+}
+```
+
 ## Getting Started
 
 ### 1. Initialize ROS 2 Rust Workspace
@@ -39,11 +59,14 @@ The extension provides a command to set up your workspace with all necessary ROS
 2. Run: `ROS2: Initialize ROS 2 Rust Workspace`
 
 This command will:
-- Check if Rust is installed and meets minimum version requirements
-- Prompt you to install/update Rust if needed
-- Clone required repositories based on your ROS distribution:
-  - For **Rolling/Kilted**: `rosidl_rust` and `examples`
-  - For **Jazzy/Humble**: Common interface packages + `rosidl_rust` and `examples`
+- Check if Rust is installed and meets minimum version requirements (1.70.0+)
+- Distinguish between Rust not being installed vs. installed but wrong version
+- Prompt you to install/update Rust if needed via a ROS terminal
+- Clone required repositories based on your ROS distribution into the `src` directory:
+  - For **Rolling/Kilted/Lyrical**: `rosidl_rust`
+  - For **Jazzy/Humble**: Common interface packages + `rosidl_rust`
+
+**Note**: Repository cloning is done through a ROS 2 terminal to handle any sudo requirements or permissions issues.
 
 ### 2. Create a Rust ROS 2 Package
 
