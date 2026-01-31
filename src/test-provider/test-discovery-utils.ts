@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { TestType, RosTestData } from "./ros-test-provider";
+import * as vscode_utils from "../vscode-utils";
 
 /**
  * Utilities for discovering and parsing ROS 2 test files
@@ -204,7 +205,7 @@ export class TestDiscoveryUtils {
      */
     static findPackageName(filePath: string): string | undefined {
         let currentPath = path.dirname(filePath);
-        const workspaceRoot = this.getWorkspaceRoot(currentPath);
+        const workspaceRoot = vscode_utils.getWorkspaceFolder(currentPath);
         
         // Search up to workspace root, not filesystem root
         while (currentPath) {
@@ -336,7 +337,7 @@ export class TestDiscoveryUtils {
      */
     private static findPackageDirectory(filePath: string): string | undefined {
         let currentPath = path.dirname(filePath);
-        const workspaceRoot = this.getWorkspaceRoot(currentPath);
+        const workspaceRoot = vscode_utils.getWorkspaceFolder(currentPath);
         
         // Search up to workspace root, not filesystem root
         while (currentPath) {
@@ -361,29 +362,6 @@ export class TestDiscoveryUtils {
         }
         
         return undefined;
-    }
-    
-    /**
-     * Gets the workspace root folder that contains the given path.
-     * Returns the workspace folder path or null if not in a workspace.
-     */
-    private static getWorkspaceRoot(filePath: string): string | null {
-        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
-            return null;
-        }
-        
-        const normalizedPath = path.normalize(filePath);
-        
-        // Find the workspace folder that contains this path
-        for (const folder of vscode.workspace.workspaceFolders) {
-            const folderPath = path.normalize(folder.uri.fsPath);
-            
-            if (normalizedPath === folderPath || normalizedPath.startsWith(folderPath + path.sep)) {
-                return folderPath;
-            }
-        }
-        
-        return null;
     }
     
     /**

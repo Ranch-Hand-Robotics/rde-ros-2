@@ -35,6 +35,30 @@ export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
 }
 
 /**
+ * Gets the workspace folder that contains the given path.
+ * Returns the workspace folder path or null if not in a workspace.
+ * This function ensures workspace boundary enforcement across the extension.
+ */
+export function getWorkspaceFolder(dirPath: string): string | null {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+        return null;
+    }
+    
+    const normalizedPath = path.normalize(dirPath);
+    
+    // Find the workspace folder that contains this path
+    for (const folder of vscode.workspace.workspaceFolders) {
+        const folderPath = path.normalize(folder.uri.fsPath);
+        
+        if (normalizedPath === folderPath || normalizedPath.startsWith(folderPath + path.sep)) {
+            return folderPath;
+        }
+    }
+    
+    return null;
+}
+
+/**
  * Gets the ROS setup script path from user settings with Windows default for Pixi.
  * Returns the full path to the setup script that should be sourced.
  */
