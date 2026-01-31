@@ -22,7 +22,7 @@ import {
     IPackageInfo as CommonIPackageInfo
 } from "@ranchhandrobotics/rde-common";
 
-export interface IPackageInfo extends CommonIPackageInfo {}
+export type IPackageInfo = CommonIPackageInfo;
 
 export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
     const rosConfigurationName: string = "ROS2";
