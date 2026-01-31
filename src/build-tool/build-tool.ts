@@ -55,21 +55,35 @@ BuildTool.current = new NotImplementedBuildTool();
 
 /**
  * Determines build system and workspace path in use by checking for unique
- * auto-generated files. Only searches within the workspace folder boundaries.
+ * auto-generated files. Searches parent directories but stops at workspace boundaries.
  */
 export async function determineBuildTool(dir: string): Promise<boolean> {
-    // Verify we're within a workspace folder
+    // Get the workspace folder to establish boundaries
     const workspaceFolder = vscode_utils.getWorkspaceFolder(dir);
     if (!workspaceFolder) {
         // Not in a workspace, cannot determine build tool
         return false;
     }
     
-    // Only check the provided directory without traversing to parent directories
-    // This prevents scanning outside the workspace
-    if (await ColconBuildTool.isApplicable(dir)) {
-        BuildTool.current = new ColconBuildTool();
-        return true;
+    // Search parent directories up to the workspace boundary
+    let currentDir = dir;
+    while (currentDir) {
+        if (await ColconBuildTool.isApplicable(currentDir)) {
+            BuildTool.current = new ColconBuildTool();
+            return true;
+        }
+        
+        // Stop at workspace boundary
+        if (currentDir === workspaceFolder) {
+            break;
+        }
+        
+        const parentDir = path.dirname(currentDir);
+        if (parentDir === currentDir) {
+            // Reached filesystem root (shouldn't happen if workspace boundary is enforced)
+            break;
+        }
+        currentDir = parentDir;
     }
     
     return false;

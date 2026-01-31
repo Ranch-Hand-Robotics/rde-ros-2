@@ -207,7 +207,9 @@ export class TestDiscoveryUtils {
         let currentPath = path.dirname(filePath);
         const workspaceRoot = vscode_utils.getWorkspaceFolder(currentPath);
         
-        // Search up to workspace root, not filesystem root
+        // If not in a workspace, still search up to filesystem root for compatibility
+        const searchBoundary = workspaceRoot || path.parse(currentPath).root;
+        
         while (currentPath) {
             const packageXmlPath = path.join(currentPath, 'package.xml');
             if (fs.existsSync(packageXmlPath)) {
@@ -225,8 +227,8 @@ export class TestDiscoveryUtils {
                 }
             }
             
-            // Stop at workspace boundary
-            if (workspaceRoot && currentPath === workspaceRoot) {
+            // Stop at workspace boundary (or filesystem root if no workspace)
+            if (currentPath === searchBoundary) {
                 break;
             }
             
@@ -339,7 +341,9 @@ export class TestDiscoveryUtils {
         let currentPath = path.dirname(filePath);
         const workspaceRoot = vscode_utils.getWorkspaceFolder(currentPath);
         
-        // Search up to workspace root, not filesystem root
+        // If not in a workspace, still search up to filesystem root for compatibility
+        const searchBoundary = workspaceRoot || path.parse(currentPath).root;
+        
         while (currentPath) {
             const packageXmlPath = path.join(currentPath, 'package.xml');
             const cmakeListsPath = path.join(currentPath, 'CMakeLists.txt');
@@ -348,8 +352,8 @@ export class TestDiscoveryUtils {
                 return currentPath;
             }
             
-            // Stop at workspace boundary
-            if (workspaceRoot && currentPath === workspaceRoot) {
+            // Stop at workspace boundary (or filesystem root if no workspace)
+            if (currentPath === searchBoundary) {
                 break;
             }
             
