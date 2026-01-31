@@ -485,7 +485,7 @@
                     {
                         "id": "ros2.welcome",
                         "title": "Welcome to ROS 2 Development",
-                        "description": "Learn about the powerful features available in the Robot Developer Extensions for ROS 2.\n[Read More](command:markdown.showPreview?${workspaceFolder}/media/walkthroughs/getting-started.md)",
+                        "description": "Learn about the powerful features available in the Robot Developer Extensions for ROS 2.",
                         "media": {
                             "markdown": "media/walkthroughs/getting-started.md"
                         }
@@ -493,7 +493,7 @@
                     {
                         "id": "ros2.installLinux",
                         "title": "Install ROS 2 on Linux",
-                        "description": "Follow this guide if you're on Linux and need to install ROS 2 using apt.\n[Open Guide](command:markdown.showPreview?${workspaceFolder}/media/walkthroughs/install-ros-linux.md)",
+                        "description": "Follow this guide if you're on Linux and need to install ROS 2 using apt.",
                         "media": {
                             "markdown": "media/walkthroughs/install-ros-linux.md"
                         },
@@ -502,7 +502,7 @@
                     {
                         "id": "ros2.installPixi",
                         "title": "Install ROS 2 with Pixi",
-                        "description": "Learn how to install ROS 2 using Pixi on Windows or macOS.\n[Open Guide](command:markdown.showPreview?${workspaceFolder}/media/walkthroughs/install-ros-pixi.md)",
+                        "description": "Learn how to install ROS 2 using Pixi on Windows or macOS.",
                         "media": {
                             "markdown": "media/walkthroughs/install-ros-pixi.md"
                         },
@@ -519,7 +519,7 @@
                     {
                         "id": "ros2.learnFeatures",
                         "title": "Explore Extension Features",
-                        "description": "Discover the commands and features available for ROS 2 development.\n[Learn More](command:markdown.showPreview?${workspaceFolder}/media/walkthroughs/commands-and-features.md)",
+                        "description": "Discover the commands and features available for ROS 2 development.",
                         "media": {
                             "markdown": "media/walkthroughs/commands-and-features.md"
                         }

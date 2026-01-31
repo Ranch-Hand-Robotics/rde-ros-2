@@ -85,6 +85,11 @@ export enum Commands {
 }
 
 /**
+ * The walkthrough ID for the getting started guide
+ */
+const WALKTHROUGH_ID = "Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted";
+
+/**
  * Shuts down the MCP server if it's currently running.
  */
 function shutdownMcpServer(): void {
@@ -541,7 +546,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Register Welcome/Walkthrough command
     vscode.commands.registerCommand(Commands.ShowWelcome, () => {
         ensureErrorMessageOnException(() => {
-            vscode.commands.executeCommand('workbench.action.openWalkthrough', 'Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted');
+            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
         });
     });
 
@@ -586,7 +591,7 @@ async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<vo
         
         // Show the walkthrough with a slight delay to ensure VS Code is ready
         setTimeout(() => {
-            vscode.commands.executeCommand('workbench.action.openWalkthrough', 'Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted');
+            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
         }, 1000);
     }
 }
