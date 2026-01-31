@@ -1,0 +1,15 @@
+[package]
+name = "rde_rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rclrs = "0.7"
+
+[[bin]]
+name = "minimal_publisher"
+path = "src/minimal_publisher.rs"
+
+[[bin]]
+name = "minimal_subscriber"
+path = "src/minimal_subscriber.rs"
