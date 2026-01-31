@@ -74,15 +74,6 @@ describe('Workspace Boundary Tests', () => {
             assert.strictEqual(packageName, 'my_package', 
                 'Should find the package.xml in the package directory');
         });
-
-        it('should not find package.xml outside workspace boundaries', () => {
-            // This test would need workspace folder mocking to work properly
-            // For now, we just verify it doesn't crash
-            const packageName = TestDiscoveryUtils.findPackageName(testFile);
-            assert.ok(packageName !== undefined, 'Should find a package name');
-            assert.strictEqual(packageName, 'my_package', 
-                'Should find my_package, not parent_package');
-        });
     });
 
     describe('isTestFile', () => {

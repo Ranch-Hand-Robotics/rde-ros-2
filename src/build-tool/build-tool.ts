@@ -57,10 +57,14 @@ BuildTool.current = new NotImplementedBuildTool();
  * auto-generated files. Only searches within the workspace folder boundaries.
  */
 export async function determineBuildTool(dir: string): Promise<boolean> {
-    // Get workspace folder to establish boundaries
+    // Verify we're within a workspace folder
     const workspaceFolder = getWorkspaceFolder(dir);
+    if (!workspaceFolder) {
+        // Not in a workspace, cannot determine build tool
+        return false;
+    }
     
-    // Only check the current directory, not parent directories
+    // Only check the current directory (workspace root), not parent directories
     // This prevents scanning outside the workspace
     if (await ColconBuildTool.isApplicable(dir)) {
         BuildTool.current = new ColconBuildTool();
