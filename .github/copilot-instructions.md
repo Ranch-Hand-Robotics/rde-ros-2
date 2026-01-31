@@ -46,8 +46,29 @@ This is the **Robot Developer Extensions for ROS 2** - a Visual Studio Code exte
 ├── scripts/          # Build and maintenance scripts
 ├── samples/          # Sample ROS 2 workspaces for testing
 ├── dist/             # Compiled output (do not commit)
-└── docs/             # Documentation source files
+├── docs/             # User-facing documentation (builds public docs)
+└── spec/             # Technical specifications and design proposals
 ```
+
+# Documentation Guidelines
+
+## User Documentation (`/docs`)
+The `/docs` directory contains user-facing documentation that is built into public documentation:
+* **User guides** - How to use features (tutorials, quick starts)
+* **Configuration** - Setup and configuration instructions
+* **Troubleshooting** - Common issues and solutions
+* **Usage examples** - Code samples and walkthroughs
+
+**Do not place** technical specifications or design proposals in `/docs`.
+
+## Technical Specifications (`/spec`)
+The `/spec` directory contains technical specifications and design documents:
+* **Feature proposals** - Design documents for new features
+* **Technical specifications** - Detailed technical designs and architecture
+* **API specifications** - Interface and protocol definitions
+* **Design mockups** - UI/UX designs and wireframes
+
+Each feature should have its own subdirectory in `/spec` containing all related specification documents.
 
 # Code Style and Conventions
 

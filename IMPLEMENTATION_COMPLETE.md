@@ -258,6 +258,11 @@ Modified:
 - ROS 2 Launch Documentation: https://docs.ros.org/en/rolling/Tutorials/Intermediate/Launch/
 - rqt_launchtree: https://github.com/pschillinger/rqt_launchtree
 
+**Technical Specifications:**
+- Full proposal and design documents: `spec/launch-tree-viewer/`
+- User documentation: `docs/QUICK_START_LAUNCH_TREE.md`, `docs/IMPLEMENTATION_SCREENSHOT.md`
+- Module documentation: `src/ros/launch-tree/README.md`
+
 ---
 
 ## ✅ Acceptance Criteria Met

@@ -1,11 +1,26 @@
 # Launch File Tree Viewer - Implementation Summary
 
-This directory contains the complete proposal and design documentation for the **Launch File Tree Viewer** feature for the VS Code ROS 2 extension.
+This document provides an overview of the **Launch File Tree Viewer** feature implementation for the VS Code ROS 2 extension.
 
-## 📄 Documentation Files
+## 📄 Documentation Structure
 
-### 1. **LAUNCH_TREE_VIEWER_PROPOSAL.md** (Main Proposal)
-The primary design document covering:
+### Technical Specifications
+Full technical specifications and design documents are located in:
+- **`spec/launch-tree-viewer/`** - Complete proposal, architecture, mockups, and technical guides
+
+### User Documentation
+User-facing documentation is located in:
+- **`docs/QUICK_START_LAUNCH_TREE.md`** - Quick start guide for end users
+- **`docs/IMPLEMENTATION_SCREENSHOT.md`** - Visual mockup and feature breakdown
+- **`src/ros/launch-tree/README.md`** - Module documentation for developers
+
+### Implementation Summary
+- **`IMPLEMENTATION_COMPLETE.md`** - Final implementation summary and status
+
+## 📋 Specification Overview
+
+### Main Proposal
+The primary design document (`spec/launch-tree-viewer/LAUNCH_TREE_VIEWER_PROPOSAL.md`) covers:
 - Problem statement and user needs
 - Proposed solution architecture
 - Tree structure and hierarchy
@@ -23,8 +38,8 @@ The primary design document covering:
 - Separate Activity Bar icon (Phase 2)
 - Three-phase rollout (MVP → Navigation → Advanced)
 
-### 2. **docs/launch-tree-mockups.md** (UI Mockups)
-ASCII art mockups showing:
+### UI Mockups
+ASCII art mockups (`spec/launch-tree-viewer/launch-tree-mockups.md`) showing:
 - Tree view in File Explorer
 - Expanded node details
 - Context menu actions
@@ -36,8 +51,8 @@ ASCII art mockups showing:
 
 **Purpose:** Visual reference for UI implementation
 
-### 3. **docs/launch-tree-comparison.md** (Feature Comparison)
-Detailed comparison with `rqt_launchtree`:
+### Feature Comparison
+Detailed comparison with `rqt_launchtree` (`spec/launch-tree-viewer/launch-tree-comparison.md`):
 - Feature-by-feature matrix
 - Key advantages of VS Code integration
 - Use case comparisons
@@ -47,7 +62,8 @@ Detailed comparison with `rqt_launchtree`:
 
 **Key Finding:** VS Code tree provides superset of rqt_launchtree features with better IDE integration
 
-### 4. **docs/launch-tree-technical-guide.md** (Implementation Guide)
+### Technical Implementation Guide
+Complete TypeScript implementation (`spec/launch-tree-viewer/launch-tree-technical-guide.md`):
 Complete technical specification:
 - Architecture diagram
 - File structure (new files to create, files to modify)
