@@ -11,7 +11,7 @@ fn main() -> Result<(), RclrsError> {
     let publisher = Arc::new(Mutex::new(publisher));
     
     let mut count = 0u32;
-    let mut timer = node.create_wall_timer(Duration::from_millis(500), move || {
+    let _timer = node.create_wall_timer(Duration::from_millis(500), move || {
         let msg = StringMsg {
             data: format!("Hello from Rust! count: {}", count),
         };
