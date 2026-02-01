@@ -482,6 +482,7 @@
         "test-compile": "tsc -p ./"
     },
     "dependencies": {
+        "@ranchhandrobotics/rde-common": "^1.0.0",
         "@vscode/debugadapter": "^1.68.0",
         "@vscode/extension-telemetry": "^1.2.0",
         "@vscode/vsce": "^3.7.0",

@@ -2,313 +2,44 @@
 // Licensed under the MIT License.
 
 import * as child_process from "child_process";
-import * as os from "os";
 import * as path from "path";
+import { promises as fsPromises } from "fs";
 import * as vscode from "vscode";
-import * as fs from "fs";
 
 import * as extension from "../extension";
-import * as pfs from "../promise-fs";
 import * as telemetry from "../telemetry-helper";
-import * as ros_utils from "./utils";
 import * as vscode_utils from "../vscode-utils";
 
-/**
- * Detected shell information
- */
-export interface ShellInfo {
-    name: string;
-    executable: string;
-    scriptExtension: string;
-    sourceCommand: string;
-}
+// Re-export common shell utilities
+export { 
+    detectUserShell, 
+    getSetupScriptExtension, 
+    ShellInfo 
+} from "@ranchhandrobotics/rde-common";
 
-/**
- * Detects the user's shell on Linux/macOS systems
- */
-export function detectUserShell(): ShellInfo {
-    if (process.platform === "win32") {
-        return {
-            name: "cmd",
-            executable: "cmd",
-            scriptExtension: ".bat",
-            sourceCommand: "call"
-        };
-    }
-
-    // Get shell from environment or fallback to bash
-    let shellPath = process.env.SHELL || "/bin/bash";
-    
-    // Extract shell name from path
-    const shellName = shellPath.split("/").pop() || "bash";
-    
-    // Map shell to appropriate configuration
-    switch (shellName) {
-        case "zsh":
-            return {
-                name: "zsh",
-                executable: shellPath,
-                scriptExtension: ".zsh",
-                sourceCommand: "source"
-            };
-        case "fish":
-            return {
-                name: "fish",
-                executable: shellPath,
-                scriptExtension: ".fish",
-                sourceCommand: "source"
-            };
-        case "dash":
-        case "sh":
-            return {
-                name: "sh",
-                executable: shellPath,
-                scriptExtension: ".sh",
-                sourceCommand: "."
-            };
-        case "tcsh":
-        case "csh":
-            return {
-                name: "csh",
-                executable: shellPath,
-                scriptExtension: ".csh",
-                sourceCommand: "source"
-            };
-        case "bash":
-        default:
-            // Default to bash for unknown shells or bash itself
-            return {
-                name: "bash",
-                executable: shellPath,
-                scriptExtension: ".bash",
-                sourceCommand: "source"
-            };
-    }
-}
-
-/**
- * Finds Visual Studio installations by reading from the Windows registry
- */
-function findVisualStudioInstallations(): string[] {
-    if (process.platform !== "win32") {
-        return [];
-    }
-
-    const installations: string[] = [];
-    const child_process = require("child_process");
-
-    try {
-        const vswhereCmd = '"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe" -all -property installationPath';
-        const vswhereResult = child_process.execSync(vswhereCmd, { 
-            encoding: 'utf8', 
-            timeout: 5000,
-            windowsHide: true 
-        });
-        
-        const installPaths = vswhereResult.trim().split('\n').filter(path => path.trim());
-        for (const installPath of installPaths) {
-            const vcvarsPath = `${installPath.trim()}\\VC\\Auxiliary\\Build\\vcvarsall.bat`;
-            const fs = require("fs");
-            if (fs.existsSync(vcvarsPath)) {
-                installations.push(vcvarsPath);
-                extension.outputChannel.appendLine(`Found VS installation via vswhere: ${vcvarsPath}`);
-            }
-        }
-    } catch (vswhereError) {
-        extension.outputChannel.appendLine(`vswhere.exe not available: ${vswhereError.message}`);
-    }
-
-    // Remove duplicates and return
-    return [...new Set(installations)];
-}
-
-/**
- * Gets the appropriate setup script extension for the detected shell
- */
-export function getSetupScriptExtension(): string {
-    return detectUserShell().scriptExtension;
-}
+import {
+    detectUserShell,
+    sourceSetupFile as commonSourceSetupFile,
+    SourceSetupOptions
+} from "@ranchhandrobotics/rde-common";
 
 /**
  * Executes a setup file and returns the resulting env.
+ * This wraps the common sourceSetupFile with ROS-specific logging.
  */
 export function sourceSetupFile(filename: string, env?: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-        let exportEnvCommand: string;
-        
-        if (process.platform === "win32") {
-            // On Windows, create a composite environment by sourcing multiple setup scripts
-            // Use a temporary batch file to avoid command line length limitations
-            const tempDir = os.tmpdir();
-            const timestamp = Date.now();
-            const tempBatchFile = path.join(tempDir, `ros_env_setup_${timestamp}.bat`);
-            
-            const setupCommands: string[] = [
-                "@echo off",
-                "REM Composite ROS 2 environment setup script"
-            ];
-            
-            // 1. Visual Studio console environment (vcvarsall.bat)
-            const vsInstallations = findVisualStudioInstallations();
-            
-            // Add VS environment setup if available (only call the first one found)
-            for (const vsPath of vsInstallations) {
-                setupCommands.push(`if exist "${vsPath}" (`);
-                setupCommands.push(`    call "${vsPath}" x64`);
-                setupCommands.push(`    goto :vs_done`);
-                setupCommands.push(`)`);
-            }
-            setupCommands.push(":vs_done");
-            
-            // 2. Pixi shell hook (if available)
-            const config = vscode_utils.getExtensionConfiguration();
-            const pixiRoot = config.get("pixiRoot", "c:\\pixi_ws");
-            setupCommands.push("REM Setup Pixi environment");
-            setupCommands.push(`if exist "${pixiRoot}" (`);
-            setupCommands.push(`    cd /d "${pixiRoot}"`);
-            setupCommands.push("    where pixi >nul 2>nul");
-            setupCommands.push("    if %errorlevel% equ 0 (");
-            setupCommands.push("        echo Setting up Pixi environment from " + pixiRoot);
-            setupCommands.push(`        set "PIXI_TEMP_BAT=%TEMP%\\pixi_env_${timestamp}.bat"`);
-            setupCommands.push("        pixi shell-hook > \"%PIXI_TEMP_BAT%\" 2>nul");
-            setupCommands.push("        if exist \"%PIXI_TEMP_BAT%\" (");
-            setupCommands.push("            call \"%PIXI_TEMP_BAT%\"");
-            setupCommands.push("            del \"%PIXI_TEMP_BAT%\" >nul 2>nul");
-            setupCommands.push("        ) else (");
-            setupCommands.push("            echo Pixi shell-hook failed to generate environment file");
-            setupCommands.push("        )");
-            setupCommands.push("    ) else (");
-            setupCommands.push("        echo Pixi command not found in PATH");
-            setupCommands.push("    )");
-            setupCommands.push(") else (");
-            setupCommands.push(`    echo Pixi root directory does not exist: ${pixiRoot}`);
-            setupCommands.push(")");
-            
-            // 3. Source the requested setup file
-            setupCommands.push(`call "${filename}"`);
-            
-            // 4. Output environment variables
-            setupCommands.push("set");
-            
-            // Write the batch file
-            const batchContent = setupCommands.join("\r\n");
-            
-            try {
-                fs.writeFileSync(tempBatchFile, batchContent);
-                exportEnvCommand = `cmd /c "${tempBatchFile}"`;
-                
-                extension.outputChannel.appendLine(`Created temporary batch file: ${tempBatchFile}`);
-                extension.outputChannel.appendLine(`Batch content:\n${batchContent}`);
-            } catch (writeError) {
-                extension.outputChannel.appendLine(`Failed to create temporary batch file: ${writeError}`);
-                // Fallback to simple approach
-                exportEnvCommand = `cmd /c "call "${filename}" && set"`;
-            }
-        } else {
-            const shellInfo = detectUserShell();
-            
-            // Special handling for different shells
-            switch (shellInfo.name) {
-                case "fish":
-                    // Fish shell has different syntax
-                    exportEnvCommand = `${shellInfo.executable} -c "${shellInfo.sourceCommand} '${filename}'; and env"`;
-                    break;
-                case "csh":
-                case "tcsh":
-                    // C shell family
-                    exportEnvCommand = `${shellInfo.executable} -c "${shellInfo.sourceCommand} '${filename}' && env"`;
-                    break;
-                default:
-                    // Bash, zsh, sh, and other POSIX-compatible shells
-                    // Force login shell for ROS compatibility in containers
-                    exportEnvCommand = `${shellInfo.executable} --login -c "${shellInfo.sourceCommand} '${filename}' && env"`;
-                    break;
-            }
-            
-            extension.outputChannel.appendLine(`Sourcing Environment using ${shellInfo.name}: ${exportEnvCommand}`);
+    const config = vscode_utils.getExtensionConfiguration();
+    const pixiRoot = config.get("pixiRoot", "c:\\pixi_ws");
+    
+    const options: SourceSetupOptions = {
+        cwd: vscode.workspace.rootPath,
+        pixiRoot,
+        onOutput: (message: string) => {
+            extension.outputChannel.appendLine(message);
         }
-
-        const processOptions: child_process.ExecOptions = {
-            cwd: vscode.workspace.rootPath,
-            env: env,
-            // Increase timeout for complex Windows setup chains
-            timeout: 60000,
-            // Set max buffer size to handle large environment outputs
-            maxBuffer: 1024 * 1024, // 1MB
-        };
-        
-        child_process.exec(exportEnvCommand, processOptions, (error, stdout, stderr) => {
-            // Clean up temporary batch files on Windows
-            if (process.platform === "win32" && exportEnvCommand.includes("ros_env_setup_")) {
-                const fs = require("fs");
-                try {
-                    const tempFile = exportEnvCommand.match(/"([^"]*ros_env_setup_[^"]*\.bat)"/)?.[1];
-                    if (tempFile) {
-                        fs.unlinkSync(tempFile);
-                        extension.outputChannel.appendLine(`Cleaned up temporary batch file: ${tempFile}`);
-                        
-                        // Also try to clean up the pixi temp file if it exists
-                        const pixiTempFile = tempFile.replace("ros_env_setup_", "pixi_env_");
-                        if (fs.existsSync(pixiTempFile)) {
-                            fs.unlinkSync(pixiTempFile);
-                            extension.outputChannel.appendLine(`Cleaned up pixi temporary batch file: ${pixiTempFile}`);
-                        }
-                    }
-                } catch (cleanupError) {
-                    extension.outputChannel.appendLine(`Failed to cleanup temporary files: ${cleanupError}`);
-                }
-            }
-            
-            if (error) {
-                extension.outputChannel.appendLine(`Shell sourcing error: ${error.message}`);
-                if (stderr) {
-                    extension.outputChannel.appendLine(`Shell stderr: ${stderr}`);
-                }
-                reject(error);
-                return;
-            }
-
-            if (stderr) {
-                extension.outputChannel.appendLine(`Shell stderr: ${stderr}`);
-            }
-
-            if (stdout) {
-                extension.outputChannel.appendLine(`Shell stdout: ${stdout}`);
-            }                
-
-            try {
-                // Parse environment variables with better error handling
-                const parsedEnv = stdout
-                    .split(os.EOL)
-                    .filter(line => line.trim().length > 0) // Filter empty lines
-                    .reduce((envObj: Record<string, string>, line: string) => {
-                        const equalIndex = line.indexOf("=");
-                        
-                        // Skip lines that don't contain environment variables
-                        if (equalIndex === -1 || equalIndex === 0) {
-                            return envObj;
-                        }
-                        
-                        const key = line.substring(0, equalIndex).trim();
-                        const value = line.substring(equalIndex + 1);
-                        
-                        // Skip empty keys or keys with spaces (invalid env vars)
-                        if (key && !key.includes(" ")) {
-                            envObj[key] = value;
-                        }
-                        
-                        return envObj;
-                    }, {});
-                
-                extension.outputChannel.appendLine(`Successfully parsed ${Object.keys(parsedEnv).length} environment variables`);
-                resolve(parsedEnv);
-                
-            } catch (parseError) {
-                extension.outputChannel.appendLine(`Failed to parse environment variables: ${parseError}`);
-                reject(parseError);
-            }
-        });
-    });
+    };
+    
+    return commonSourceSetupFile(filename, env, options);
 }
 
 export function xacro(filename: string): Promise<any> {
@@ -342,7 +73,7 @@ export function xacro(filename: string): Promise<any> {
  */
 export function getDistros(): Promise<string[]> {
     try {
-        return pfs.readdir("/opt/ros");
+        return fsPromises.readdir("/opt/ros");
     } catch (error) {
         return Promise.resolve([]);
     }

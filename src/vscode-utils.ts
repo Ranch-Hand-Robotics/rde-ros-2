@@ -3,31 +3,26 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import { promises as fsPromises } from "fs";
 import * as child_process from "child_process";
 import * as vscode from "vscode";
 
-import * as pfs from "./promise-fs";
 import * as ros_utils from "./ros/utils";
 import * as extension from "./extension";
 
-export interface IPackageInfo {
-    name: string;
-    version: string;
-    aiKey: string;
-}
+import { 
+    checkExternallyManagedEnvironment,
+    getPackageInfo as commonGetPackageInfo,
+    isLldbExtensionInstalled as commonIsLldbInstalled,
+    isCppToolsExtensionInstalled as commonIsCppToolsInstalled,
+    isPythonExtensionInstalled as commonIsPythonInstalled,
+    isCursorEditor as commonIsCursorEditor,
+    createOutputChannel as commonCreateOutputChannel,
+    showOutputPanelIfConfigured,
+    IPackageInfo as CommonIPackageInfo
+} from "@ranchhandrobotics/rde-common";
 
-export function getPackageInfo(extensionId: string): IPackageInfo {
-    const extension = vscode.extensions.getExtension(extensionId);
-    const metadata = extension.packageJSON;
-    if (metadata && ("name" in metadata) && ("version" in metadata) && ("aiKey" in metadata)) {
-        return {
-            name: metadata.name,
-            version: metadata.version,
-            aiKey: metadata.aiKey,
-        };
-    }
-    return undefined;
-}
+export type IPackageInfo = CommonIPackageInfo;
 
 export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
     const rosConfigurationName: string = "ROS2";
@@ -79,7 +74,7 @@ export function getRosSetupScript(): string {
 }
 
 export function createOutputChannel(): vscode.OutputChannel {
-    return vscode.window.createOutputChannel("ROS 2");
+    return commonCreateOutputChannel("ROS 2");
 }
 
 /**
@@ -87,48 +82,25 @@ export function createOutputChannel(): vscode.OutputChannel {
  * @param outputChannel The output channel to show
  */
 export function showOutputPanel(outputChannel: vscode.OutputChannel): void {
-    if (getExtensionConfiguration().get<boolean>("autoShowOutputChannel", true)) {
-        outputChannel.show();
-    }
+    showOutputPanelIfConfigured(outputChannel, "ROS2", "autoShowOutputChannel");
 }
 
 /**
  * Checks if the Python environment is externally managed (PEP 668).
  * This is common in Ubuntu 24.04+ and other modern Linux distributions.
  */
-async function checkExternallyManagedEnvironment(env: any): Promise<boolean> {
+export async function checkExternallyManagedEnvironmentInternal(env: any): Promise<boolean> {
+    return checkExternallyManagedEnvironment(env);
+}
+
+/**
+ * Check if a file or directory exists.
+ */
+async function exists(filePath: string): Promise<boolean> {
     try {
-        // Get the Python installation directory (where stdlib is located)
-        const result = await new Promise<string>((resolve, reject) => {
-            child_process.exec(`python3 -c "import sysconfig; print(sysconfig.get_path('stdlib'))"`, { env }, (err, stdout, stderr) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(stdout.trim());
-                }
-            });
-        });
-        
-        const stdlibPath = result.trim();
-        if (stdlibPath) {
-            // On Ubuntu 24.04, EXTERNALLY-MANAGED is in the Python installation directory
-            // e.g., /usr/lib/python3.12/EXTERNALLY-MANAGED
-            const externallyManagedPath = path.join(stdlibPath, 'EXTERNALLY-MANAGED');
-            const exists = await pfs.exists(externallyManagedPath);
-            
-            // Also check the parent directory as a fallback
-            // e.g., /usr/lib/python3.12/../EXTERNALLY-MANAGED
-            if (!exists) {
-                const altPath = path.join(path.dirname(stdlibPath), 'EXTERNALLY-MANAGED');
-                return await pfs.exists(altPath);
-            }
-            
-            return exists;
-        }
-        
-        return false;
-    } catch (err) {
-        // If we can't check, assume it's not externally managed
+        await fsPromises.access(filePath);
+        return true;
+    } catch {
         return false;
     }
 }
@@ -145,7 +117,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
     let terminal: vscode.Terminal | undefined = undefined;
 
     // Detect system Python for creating the virtual environment
-    const isExternallyManaged = await checkExternallyManagedEnvironment(process.env);
+    const isExternallyManaged = await checkExternallyManagedEnvironmentInternal(process.env);
     
     if (isExternallyManaged) {
         outputChannel?.appendLine("Creating MCP-specific virtual environment for Ubuntu 24.04+ externally-managed Python.");
@@ -206,7 +178,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                 // Install requirements.txt from extension assets if it exists
                 const requirementsPath = path.join(extensionPath, 'assets', 'scripts', 'requirements.txt');
-                if (await pfs.exists(requirementsPath)) {
+                if (await exists(requirementsPath)) {
                     outputChannel?.appendLine(`Installing MCP requirements from extension assets`);
                     
                     const venvPip = path.join(venvPath, 'bin', 'pip3');
@@ -233,12 +205,18 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 }
 
 /**
+ * Extracts package metadata from an extension's package.json
+ */
+export function getPackageInfo(extensionId: string): IPackageInfo | undefined {
+    return commonGetPackageInfo(extensionId);
+}
+
+/**
  * Detects if the vadimcn.vscode-lldb extension is installed
  * @returns true if the LLDB extension is installed, false otherwise
  */
 export function isLldbExtensionInstalled(): boolean {
-    const lldbExtension = vscode.extensions.getExtension('vadimcn.vscode-lldb');
-    return lldbExtension !== undefined;
+    return commonIsLldbInstalled();
 }
 
 /**
@@ -246,8 +224,7 @@ export function isLldbExtensionInstalled(): boolean {
  * @returns true if the C/C++ extension is installed, false otherwise
  */
 export function isCppToolsExtensionInstalled(): boolean {
-    const cppToolsExtension = vscode.extensions.getExtension('ms-vscode.cpptools');
-    return cppToolsExtension !== undefined;
+    return commonIsCppToolsInstalled();
 }
 
 /**
@@ -255,8 +232,7 @@ export function isCppToolsExtensionInstalled(): boolean {
  * @returns true if the Python extension is installed, false otherwise
  */
 export function isPythonExtensionInstalled(): boolean {
-    const pythonExtension = vscode.extensions.getExtension('ms-python.python');
-    return pythonExtension !== undefined;
+    return commonIsPythonInstalled();
 }
 
 /**
@@ -264,5 +240,5 @@ export function isPythonExtensionInstalled(): boolean {
  * @returns true if running in Cursor, false otherwise
  */
 export function isCursorEditor(): boolean {
-    return vscode.env.appName.includes('Cursor');
+    return commonIsCursorEditor();
 }
