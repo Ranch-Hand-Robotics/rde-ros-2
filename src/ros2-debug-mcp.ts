@@ -16,6 +16,7 @@ import * as child_process from 'child_process';
 import * as util from 'util';
 import * as express from 'express';
 import { randomUUID } from 'node:crypto';
+import * as portfinder from 'portfinder';
 import { debugStateTracker } from './debugger/debug-state-tracker';
 import * as extension from './extension';
 
@@ -32,11 +33,12 @@ export class Ros2DebugMcpServer {
   private app: express.Application;
   private transports: { [sessionId: string]: SSEServerTransport } = {};
   private isRunning = false;
-  private port: number;
+  private requestedPort: number;
+  private actualPort: number | null = null;
   private httpServer: any;
 
   constructor(port: number = 3003) {
-    this.port = port;
+    this.requestedPort = port;
     this.app = express();
     this.app.use(express.json());
     
@@ -474,11 +476,27 @@ export class Ros2DebugMcpServer {
       return;
     }
 
+    // Find an available port starting from the requested port
+    try {
+      const availablePort = await portfinder.getPortPromise({
+        port: this.requestedPort,
+        stopPort: this.requestedPort + 100 // Try up to 100 ports higher
+      });
+      
+      this.actualPort = availablePort;
+      
+      if (availablePort !== this.requestedPort) {
+        extension.outputChannel?.appendLine(`Requested port ${this.requestedPort} was in use, using port ${availablePort} instead`);
+      }
+    } catch (error) {
+      throw new Error(`Could not find available port starting from ${this.requestedPort}: ${error}`);
+    }
+
     return new Promise((resolve, reject) => {
-      this.httpServer = this.app.listen(this.port, () => {
+      this.httpServer = this.app.listen(this.actualPort, () => {
         this.isRunning = true;
-        extension.outputChannel?.appendLine(`MCP Debug Server started on port ${this.port}`);
-        extension.outputChannel?.appendLine(`SSE endpoint: http://localhost:${this.port}/sse`);
+        extension.outputChannel?.appendLine(`MCP Debug Server started on port ${this.actualPort}`);
+        extension.outputChannel?.appendLine(`SSE endpoint: http://localhost:${this.actualPort}/sse`);
         resolve();
       });
 
@@ -519,5 +537,12 @@ export class Ros2DebugMcpServer {
    */
   public get running(): boolean {
     return this.isRunning;
+  }
+
+  /**
+   * Returns the actual port the server is running on
+   */
+  public get port(): number | null {
+    return this.actualPort;
   }
 }

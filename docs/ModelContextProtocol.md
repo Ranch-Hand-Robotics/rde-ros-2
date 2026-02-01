@@ -57,13 +57,13 @@ This extension will start the server and make it available for LLMs to connect t
 
 ## Debug MCP Server (Preview)
 
-In addition to the ROS 2 system introspection MCP server, RDE also provides a **Debug MCP Server** that exposes debug session context. This server runs on a separate port (default: 3003) and provides AI assistants with information about active debug sessions.
+In addition to the ROS 2 system introspection MCP server, RDE also provides a **Debug MCP Server** that exposes debug session context. This server runs on a separate port (default: 3003, automatically finds an available port if busy) and provides AI assistants with information about active debug sessions.
 
 ### Starting the Debug MCP Server
 
 Start the Debug MCP Server using the command palette (CTRL-SHIFT-P) and selecting `ROS2: Start Debug MCP Server`.
 
-The server will be available at `http://localhost:3003/sse` (configurable via `ROS2.debugMcpServerPort` setting).
+The server will automatically find an available port starting from the configured port (default 3003). If the configured port is in use, it will try up to 100 ports higher. The actual port used will be shown in the notification message and output channel.
 
 ### Debug MCP Tools
 

@@ -267,7 +267,7 @@ async function startDebugMcpServer(context: vscode.ExtensionContext): Promise<vo
         
         if (debugMcpServer && debugMcpServer.running) {
             outputChannel.appendLine("Debug MCP server is already running");
-            vscode.window.showInformationMessage("Debug MCP server is already running");
+            vscode.window.showInformationMessage(`Debug MCP server is already running on port ${debugMcpServer.port}`);
             return;
         }
         
@@ -278,7 +278,8 @@ async function startDebugMcpServer(context: vscode.ExtensionContext): Promise<vo
         debugMcpServer = new Ros2DebugMcpServer(debugMcpServerPort);
         await debugMcpServer.start();
         
-        vscode.window.showInformationMessage(`Debug MCP Server started on port ${debugMcpServerPort}. Connect at http://localhost:${debugMcpServerPort}/sse`);
+        const actualPort = debugMcpServer.port;
+        vscode.window.showInformationMessage(`Debug MCP Server started on port ${actualPort}. Connect at http://localhost:${actualPort}/sse`);
         
         // Add to subscriptions to ensure cleanup on deactivation
         context.subscriptions.push({
