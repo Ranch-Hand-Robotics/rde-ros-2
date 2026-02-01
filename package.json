@@ -161,6 +161,50 @@
                 "title": "Debug All ROS 2 Tests",
                 "category": "ROS2",
                 "icon": "$(debug-alt)"
+            },
+            {
+                "command": "ROS2.colcon.toggleIgnore",
+                "title": "Toggle Colcon Ignore",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.colcon.buildPackageRelease",
+                "title": "Colcon Build (Release)",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.colcon.buildPackageDebug",
+                "title": "Colcon Build (Debug)",
+                "category": "ROS2"
+            }
+        ],
+        "menus": {
+            "explorer/context": [
+                {
+                    "submenu": "ROS2.explorer",
+                    "group": "ROS2",
+                    "when": "explorerResourceIsFolder"
+                }
+            ],
+            "ROS2.explorer": [
+                {
+                    "command": "ROS2.colcon.toggleIgnore",
+                    "group": "1_colcon@1"
+                },
+                {
+                    "command": "ROS2.colcon.buildPackageRelease",
+                    "group": "1_colcon@2"
+                },
+                {
+                    "command": "ROS2.colcon.buildPackageDebug",
+                    "group": "1_colcon@3"
+                }
+            ]
+        },
+        "submenus": [
+            {
+                "id": "ROS2.explorer",
+                "label": "ROS 2"
             }
         ],
         "mcpServerDefinitionProviders": [
@@ -191,6 +235,11 @@
                     "default": true,
                     "description": "Automatically show the ROS 2 output channel when there are warnings or errors."
                 },
+                "ROS2.enableFileDecorations": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show Explorer file decorations indicating whether a package is ignored or included in colcon builds."
+                },
                 "ROS2.debugPythonUsingSourceFiles": {
                     "type": "boolean",
                     "default": false,
@@ -200,6 +249,14 @@
                     "type": "string",
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
+                },
+                "ROS2.colconIgnore": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Map of package names to ignore during colcon build. Keys are package names, values are boolean (true to ignore).",
+                    "additionalProperties": {
+                        "type": "boolean"
+                    }
                 }
             }
         },
