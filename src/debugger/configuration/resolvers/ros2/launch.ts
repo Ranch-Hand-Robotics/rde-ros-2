@@ -19,6 +19,7 @@ import * as requests from "../../../requests";
 import * as utils from "../../../utils";
 import { rosApi } from "../../../../ros/ros";
 import * as lifecycle from "../../../../ros/ros2/lifecycle";
+import { debugStateTracker, DebuggedNode } from "../../../debug-state-tracker";
 
 const promisifiedExec = util.promisify(child_process.exec);
 
@@ -718,6 +719,33 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         }
     }
 
+    private detectRuntimeType(executable: string): "C++" | "Python" | "Rust" | ".NET" | "Unknown" {
+        const ext = path.extname(executable).toLowerCase();
+        
+        if (ext === '.py') {
+            return 'Python';
+        }
+        
+        // Check shebang for scripts without extension
+        if (fs.existsSync(executable)) {
+            try {
+                const content = fs.readFileSync(executable, 'utf8');
+                const firstLine = content.split('\n')[0];
+                
+                if (firstLine.startsWith('#!')) {
+                    if (firstLine.includes('python')) {
+                        return 'Python';
+                    }
+                }
+            } catch (error) {
+                // Ignore read errors
+            }
+        }
+        
+        // Assume C++ for compiled executables
+        return 'C++';
+    }
+
     private async processJsonLaunchData(launchData: IJsonLaunchData, config: requests.ILaunchRequest, rosExecOptions: child_process.ExecOptions): Promise<void> {
         const launchPromises: Promise<void>[] = [];
 
@@ -746,6 +774,9 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             vscode_utils.showOutputPanel(extension.outputChannel);
         }
 
+        // Collect all nodes for debug state tracking
+        const debuggedNodes: DebuggedNode[] = [];
+
         // Process regular processes
         for (const process of launchData.processes) {
             const launchRequest = this.generateLaunchRequest(
@@ -755,6 +786,16 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             );
 
             if (launchRequest) {
+                // Add to debug tracking
+                debuggedNodes.push({
+                    node_name: launchRequest.nodeName,
+                    executable: launchRequest.executable,
+                    source_file: undefined,
+                    process_id: undefined,
+                    runtime: this.detectRuntimeType(launchRequest.executable),
+                    debug_status: "running"
+                });
+                
                 launchPromises.push(this.executeLaunchRequest(launchRequest, config.stopOnEntry || false));
             }
         }
@@ -771,9 +812,30 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 if (lifecycleNode.namespace) {
                     launchRequest.env.ROS_NAMESPACE = lifecycleNode.namespace;
                 }
+                
+                // Add to debug tracking
+                debuggedNodes.push({
+                    node_name: launchRequest.nodeName,
+                    executable: launchRequest.executable,
+                    source_file: undefined,
+                    process_id: undefined,
+                    runtime: this.detectRuntimeType(launchRequest.executable),
+                    debug_status: "running"
+                });
+                
                 launchPromises.push(this.executeLaunchRequest(launchRequest, config.stopOnEntry || false));
             }
         }
+
+        // Register debug session with state tracker
+        const sessionId = `debug-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        debugStateTracker.registerSession(
+            sessionId,
+            "ros2",
+            config.request || "launch",
+            config.target,
+            debuggedNodes
+        );
 
         // Wait for all debuggers to start
         await Promise.all(launchPromises);

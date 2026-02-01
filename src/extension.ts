@@ -50,6 +50,7 @@ export let outputChannel: vscode.OutputChannel;
 export let mcpServerTerminal: vscode.Terminal | null = null;
 export let extensionContext: vscode.ExtensionContext | null = null;
 export let rosTestProvider: RosTestProvider | null = null;
+export let debugMcpServer: any | null = null; // Ros2DebugMcpServer instance
 
 let onEnvChanged = new vscode.EventEmitter<void>();
 
@@ -90,6 +91,8 @@ export enum Commands {
     StartMcpServer = "ROS2.startMcpServer",
     StopMcpServer = "ROS2.stopMcpServer",
     ShowMcpTerminal = "ROS2.showMcpTerminal",
+    StartDebugMcpServer = "ROS2.startDebugMcpServer",
+    StopDebugMcpServer = "ROS2.stopDebugMcpServer",
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
@@ -251,6 +254,56 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
     }
 
     
+}
+
+/**
+ * Starts the Debug MCP server (TypeScript-based) for debug session context
+ * @param context The VS Code extension context
+ */
+async function startDebugMcpServer(context: vscode.ExtensionContext): Promise<void> {
+    try {
+        // Lazy import to avoid loading unless needed
+        const { Ros2DebugMcpServer } = await import('./ros2-debug-mcp');
+        
+        if (debugMcpServer && debugMcpServer.running) {
+            outputChannel.appendLine("Debug MCP server is already running");
+            vscode.window.showInformationMessage(`Debug MCP server is already running on port ${debugMcpServer.port}`);
+            return;
+        }
+        
+        const debugMcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("debugMcpServerPort", 3003);
+        
+        outputChannel.appendLine(`Starting Debug MCP server on port ${debugMcpServerPort}`);
+        
+        debugMcpServer = new Ros2DebugMcpServer(debugMcpServerPort);
+        await debugMcpServer.start();
+        
+        const actualPort = debugMcpServer.port;
+        vscode.window.showInformationMessage(`Debug MCP Server started on port ${actualPort}. Connect at http://localhost:${actualPort}/sse`);
+        
+        // Add to subscriptions to ensure cleanup on deactivation
+        context.subscriptions.push({
+            dispose: async () => {
+                await shutdownDebugMcpServer();
+            }
+        });
+        
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        outputChannel.appendLine(`Failed to start Debug MCP server: ${errorMessage}`);
+        vscode.window.showErrorMessage(`Failed to start Debug MCP server: ${errorMessage}`);
+    }
+}
+
+/**
+ * Shuts down the Debug MCP server if it's currently running.
+ */
+async function shutdownDebugMcpServer(): Promise<void> {
+    if (debugMcpServer) {
+        outputChannel.appendLine("Shutting down Debug MCP server");
+        await debugMcpServer.stop();
+        debugMcpServer = null;
+    }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -415,6 +468,20 @@ export async function activate(context: vscode.ExtensionContext) {
         ensureErrorMessageOnException(() => {
             shutdownMcpServer();
             vscode.window.showInformationMessage("MCP server stopped");
+        });
+    });
+
+    // Register Debug MCP server commands
+    vscode.commands.registerCommand(Commands.StartDebugMcpServer, () => {
+        ensureErrorMessageOnException(async () => {
+            return await startDebugMcpServer(context);
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.StopDebugMcpServer, () => {
+        ensureErrorMessageOnException(async () => {
+            await shutdownDebugMcpServer();
+            vscode.window.showInformationMessage("Debug MCP server stopped");
         });
     });
 
