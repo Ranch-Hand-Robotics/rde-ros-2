@@ -206,51 +206,6 @@ function parsePackageXml(packageXmlPath: string): { name: string; packageRoot: s
 }
 
 /**
- * Checks if an executable belongs to a Rust ROS 2 package.
- * 
- * @param executablePath Path to the executable
- * @returns true if the executable belongs to a Rust package, false otherwise
- */
-function isRustExecutable(executablePath: string): boolean {
-    try {
-        // Parse the executable path
-        // Example: /path/to/workspace/install/package_name/lib/package_name/node_name
-        const pathParts = executablePath.split(path.sep);
-        
-        // Find the 'install' directory in the path
-        const installIndex = pathParts.lastIndexOf('install');
-        if (installIndex === -1) {
-            return false;
-        }
-        
-        // Get package name (should be directory after 'install')
-        if (installIndex + 1 >= pathParts.length) {
-            return false;
-        }
-        
-        const packageName = pathParts[installIndex + 1];
-        const workspaceRoot = pathParts.slice(0, installIndex).join(path.sep);
-        
-        // Find package.xml files in workspace
-        const packageXmlFiles = findPackageXmlFiles(workspaceRoot);
-        
-        // Find the package.xml that matches our package name
-        for (const packageXmlPath of packageXmlFiles) {
-            const packageInfo = parsePackageXml(packageXmlPath);
-            if (packageInfo && packageInfo.name === packageName) {
-                // Check if Cargo.toml exists in the package directory
-                return rust_utils.isRustPackage(packageInfo.packageRoot);
-            }
-        }
-        
-        return false;
-    } catch (error) {
-        extension.outputChannel.appendLine(`Error checking if executable is Rust: ${error}`);
-        return false;
-    }
-}
-
-/**
  * Recursively searches for Python files in a directory.
  * 
  * @param dirPath Directory to search
@@ -733,7 +688,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                     // The python file is not available then this must be...
 
                     // Check if it's a Rust executable
-                    if (isRustExecutable(request.executable)) {
+                    if (rust_utils.isRustExecutable(request.executable)) {
                         debugConfig = this.createRustLaunchConfig(request, stopOnEntry);
                     } else {
                         // C#? Todo
@@ -777,7 +732,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 // look for Python in shebang line
                 if (line.startsWith("#!") && line.toLowerCase().indexOf("python") !== -1) {
                     debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
-                } else if (isRustExecutable(request.executable)) {
+                } else if (rust_utils.isRustExecutable(request.executable)) {
                     // Check if it's a Rust executable
                     debugConfig = this.createRustLaunchConfig(request, stopOnEntry);
                 } else {

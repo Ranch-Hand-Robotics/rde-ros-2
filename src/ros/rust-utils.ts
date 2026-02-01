@@ -79,6 +79,112 @@ export function isRustPackage(packagePath: string): boolean {
 }
 
 /**
+ * Finds all package.xml files in a workspace recursively.
+ * 
+ * @param workspaceRoot Root directory of the workspace
+ * @returns Array of package.xml file paths
+ */
+function findPackageXmlFiles(workspaceRoot: string): string[] {
+    const packageXmlFiles: string[] = [];
+    
+    function searchDirectory(dirPath: string) {
+        try {
+            const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+            
+            for (const entry of entries) {
+                const fullPath = path.join(dirPath, entry.name);
+                
+                if (entry.isDirectory()) {
+                    // Skip common directories that won't contain packages
+                    if (['build', 'install', 'log', '.git', 'node_modules', '__pycache__'].includes(entry.name)) {
+                        continue;
+                    }
+                    searchDirectory(fullPath);
+                } else if (entry.isFile() && entry.name === 'package.xml') {
+                    packageXmlFiles.push(fullPath);
+                }
+            }
+        } catch (error) {
+            // Ignore directories we can't read
+        }
+    }
+    
+    searchDirectory(workspaceRoot);
+    return packageXmlFiles;
+}
+
+/**
+ * Parses a package.xml file to extract package information.
+ * 
+ * @param packageXmlPath Path to the package.xml file
+ * @returns Package information or null if parsing fails
+ */
+function parsePackageXml(packageXmlPath: string): { name: string; packageRoot: string } | null {
+    try {
+        const xmlContent = fs.readFileSync(packageXmlPath, 'utf8');
+        const packageRoot = path.dirname(packageXmlPath);
+        
+        // Simple XML parsing to extract package name
+        const nameMatch = xmlContent.match(/<name>\s*([^<]+)\s*<\/name>/);
+        if (nameMatch && nameMatch[1]) {
+            return {
+                name: nameMatch[1].trim(),
+                packageRoot: packageRoot
+            };
+        }
+    } catch (error) {
+        extension.outputChannel.appendLine(`Error parsing package.xml at ${packageXmlPath}: ${String(error)}`);
+    }
+    
+    return null;
+}
+
+/**
+ * Checks if an executable belongs to a Rust ROS 2 package.
+ * 
+ * @param executablePath Path to the executable
+ * @returns true if the executable belongs to a Rust package, false otherwise
+ */
+export function isRustExecutable(executablePath: string): boolean {
+    try {
+        // Parse the executable path
+        // Example: /path/to/workspace/install/package_name/lib/package_name/node_name
+        const pathParts = executablePath.split(path.sep);
+        
+        // Find the 'install' directory in the path
+        const installIndex = pathParts.lastIndexOf('install');
+        if (installIndex === -1) {
+            return false;
+        }
+        
+        // Get package name (should be directory after 'install')
+        if (installIndex + 1 >= pathParts.length) {
+            return false;
+        }
+        
+        const packageName = pathParts[installIndex + 1];
+        const workspaceRoot = pathParts.slice(0, installIndex).join(path.sep);
+        
+        // Find package.xml files in workspace
+        const packageXmlFiles = findPackageXmlFiles(workspaceRoot);
+        
+        // Find the package.xml that matches our package name
+        for (const packageXmlPath of packageXmlFiles) {
+            const packageInfo = parsePackageXml(packageXmlPath);
+            if (packageInfo && packageInfo.name === packageName) {
+                // Check if Cargo.toml exists in the package directory
+                return isRustPackage(packageInfo.packageRoot);
+            }
+        }
+        
+        return false;
+    } catch (error) {
+        extension.outputChannel.appendLine(`Error checking if executable is Rust: ${error}`);
+        return false;
+    }
+}
+
+/**
  * Initializes a ROS 2 Rust workspace by cloning required repositories
  * @param workspaceRoot The workspace root directory
  * @param context VS Code extension context
