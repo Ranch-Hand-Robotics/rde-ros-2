@@ -2,15 +2,15 @@
 
 ## Overview
 
-This document provides three detailed implementation proposals for AI-assisted debugging scenarios in RDE ROS 2. Following the RDE-URDF pattern, all proposals use a **built-in TypeScript MCP Server** that exposes RDE's internal debugging features directly through VS Code's native MCP capabilities.
+This document provides three detailed implementation proposals for AI-assisted debugging scenarios in RDE ROS 2. **All proposals use a TypeScript-only MCP server implementation** following the exact pattern from [RDE-URDF's mcp.ts](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts).
 
-The TypeScript MCP server will provide direct access to:
+The TypeScript MCP server (`src/ros2-debug-mcp.ts`) will provide direct access to:
 - Debug session state and management
 - Launch file composition and node mapping
 - Breakpoint control and crash analysis
 - Performance profiling and validation tools
 
-**Note:** The existing Python MCP server (`assets/scripts/server.py`) remains focused on ROS CLI and runtime introspection. This TypeScript server complements it by exposing extension-internal debugging features.
+**Important:** This TypeScript MCP server is the ONLY way to expose extension-internal debugging features. The existing Python MCP server (`assets/scripts/server.py`) is separate and handles only ROS CLI commands - it is NOT used for any debugging features described in this document.
 
 Each proposal outlines the scenario, required MCP tools, implementation approach, and integration strategy.
 
@@ -880,24 +880,25 @@ private setupPerformanceTools(): void {
 
 ## Implementation Recommendations
 
-### Recommended Approach: TypeScript Built-in MCP Server
+### Recommended Approach: TypeScript MCP Server Only
 
-Following the RDE-URDF pattern, implement a **TypeScript built-in MCP server** that exposes RDE's internal debugging features:
+**All features must be implemented using a TypeScript MCP server** following the exact pattern from [RDE-URDF's mcp.ts](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts):
 
-**TypeScript Built-in MCP Server** (Port 3003):
+**TypeScript MCP Server** (`src/ros2-debug-mcp.ts`, Port 3003):
 - Debug session management and state tracking
 - Breakpoint control and crash analysis
 - Direct VS Code API integration
 - Performance profiling coordination
 - Launch composition analysis
+- **Implementation Pattern**: https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts
 - **Advantages**: 
-  - Direct access to extension internals
-  - Type-safe implementation
+  - Direct access to extension internals and VS Code debugging APIs
+  - Type-safe TypeScript implementation
   - Integrated with extension lifecycle
   - No external process dependencies for debug features
   - Real-time access to debug session state
 
-**Note on Python MCP Server**: The existing Python MCP server (Port 3002) in `assets/scripts/server.py` continues to handle ROS CLI commands and runtime introspection (topics, services, parameters, etc.). The TypeScript server complements it by exposing extension-internal features that cannot be accessed from Python.
+**Critical Note**: The existing Python MCP server (`assets/scripts/server.py`, Port 3002) is for ROS CLI commands ONLY. **DO NOT modify or reference the Python server** for debugging features. All debugging tools described in this document go in `src/ros2-debug-mcp.ts`.
 
 ### Priority Implementation Order
 
@@ -907,7 +908,7 @@ Following the RDE-URDF pattern, implement a **TypeScript built-in MCP server** t
 
 ### Package Dependencies
 
-**For TypeScript Built-in Server:**
+**TypeScript MCP Server** (same as RDE-URDF):
 ```json
 {
   "dependencies": {
@@ -917,19 +918,17 @@ Following the RDE-URDF pattern, implement a **TypeScript built-in MCP server** t
 }
 ```
 
-These are the same dependencies used in RDE-URDF, ensuring consistency across extensions.
-
 ---
 
-## Next Steps
+## Implementation Steps
 
 1. **Review and Approve** these proposals
 2. **Clarify priorities** - which scenario to implement first?
-3. **Install MCP SDK dependencies** - Add packages to `package.json`
-4. **Create `src/ros2-ros2-debug-mcp.ts`** - Following RDE-URDF pattern
-5. **Integrate with extension activation** - Start MCP server in `src/extension.ts`
-6. **Implement tools incrementally** - Start with Scenario 1 tools
-7. **Test with AI assistants** - Validate tools work with Copilot/Cursor
+3. **Install MCP SDK dependencies** - Add to `package.json`
+4. **Create `src/ros2-debug-mcp.ts`** - Copy structure from [RDE-URDF mcp.ts](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts)
+5. **Integrate with `src/extension.ts`** - Start MCP server on activation
+6. **Implement tools incrementally** - Begin with Scenario 1
+7. **Test with AI assistants** - Validate with Copilot/Cursor
 
 ---
 
@@ -941,13 +940,10 @@ These are the same dependencies used in RDE-URDF, ensuring consistency across ex
    - [ ] Scenario 3: Performance Profiling
 
 2. **Port Configuration**: Is port 3003 acceptable for the TypeScript MCP server?
-   - Python MCP server uses 3002
    - RDE-URDF uses 3005
    - Suggested: 3003 for ROS 2 Debug MCP
 
 3. **Performance Profiling**: Do you have existing performance analysis tools or preferences?
-   - What metrics are most important? (CPU, memory, latency, throughput)
-   - Any existing profiling infrastructure to integrate with?
 
 4. **Testing**: What test environments are available?
    - Sample launch files with 6+ nodes?

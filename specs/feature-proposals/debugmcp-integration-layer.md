@@ -24,13 +24,14 @@ Create a bidirectional integration between RDE MCP server and DebugMCP:
 
 ## Implementation Details
 
+**All implementation must be in TypeScript** following [RDE-URDF mcp.ts](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts):
+
 **New Files:**
-- `assets/scripts/debugmcp_client.py`: MCP client for communicating with DebugMCP
-- `assets/scripts/debug_orchestrator.py`: Orchestration logic for multi-node debugging
+- `src/ros2-debug-mcp.ts`: TypeScript MCP server for debug integration
 
 **Files to Modify:**
-- `assets/scripts/server.py`: Add integration layer and new MCP tools
-- `src/extension.ts`: Add configuration for DebugMCP integration
+- `src/extension.ts`: Start TypeScript MCP server on activation
+- `src/debugger/manager.ts`: Add debug state tracking
 
 ## Dependencies
 - Feature: Debug Session Context MCP Tools (provides foundation)

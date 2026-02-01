@@ -30,10 +30,25 @@ Currently, the RDE MCP server provides excellent ROS 2 system introspection (34 
 
 ### Proposed Implementation
 
-Add three new MCP tools to `assets/scripts/server.py`:
+**IMPORTANT**: All MCP tools must be implemented in TypeScript following the [RDE-URDF mcp.ts pattern](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts). Create a new file `src/ros2-debug-mcp.ts` for these tools.
+
+Add three new MCP tools to `src/ros2-debug-mcp.ts`:
 
 #### 1. `get_active_debug_sessions()`
 Returns information about all currently active debug sessions managed by RDE.
+
+**TypeScript Implementation:**
+```typescript
+this.server.registerTool('get_active_debug_sessions', {
+  title: 'Get Active Debug Sessions',
+  description: 'Returns information about all active ROS debug sessions',
+  inputSchema: {}
+}, async (args) => {
+  // Access vscode.debug.activeDebugSession
+  // Return debug session information
+  return { content: [{ type: 'text', text: JSON.stringify(sessions) }] };
+});
+```
 
 **Returns:**
 ```json
@@ -61,8 +76,24 @@ Returns information about all currently active debug sessions managed by RDE.
 #### 2. `get_node_debug_info(node_name: str)`
 Returns debugging-specific information for a given node.
 
-**Parameters:**
-- `node_name` (str): Name of the ROS node
+**TypeScript Implementation:**
+```typescript
+this.server.registerTool('get_node_debug_info', {
+  title: 'Get Node Debug Info',
+  description: 'Returns debugging information for a specific ROS node',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      node_name: { type: 'string', description: 'Name of the ROS node' }
+    },
+    required: ['node_name']
+  }
+}, async (args) => {
+  const nodeName = (args as any).node_name;
+  // Query debug manager for node info
+  return { content: [{ type: 'text', text: JSON.stringify(nodeInfo) }] };
+});
+```
 
 **Returns:**
 ```json
@@ -80,8 +111,24 @@ Returns debugging-specific information for a given node.
 #### 3. `get_launch_file_debug_info(launch_file: str)`
 Analyzes a launch file and returns debugging-relevant information.
 
-**Parameters:**
-- `launch_file` (str): Path to the launch file
+**TypeScript Implementation:**
+```typescript
+this.server.registerTool('get_launch_file_debug_info', {
+  title: 'Get Launch File Debug Info',
+  description: 'Analyzes a launch file for debugging information',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      launch_file: { type: 'string', description: 'Path to launch file' }
+    },
+    required: ['launch_file']
+  }
+}, async (args) => {
+  const launchFile = (args as any).launch_file;
+  // Use launch dumper to analyze
+  return { content: [{ type: 'text', text: JSON.stringify(launchInfo) }] };
+});
+```
 
 **Returns:**
 ```json
@@ -111,85 +158,91 @@ Analyzes a launch file and returns debugging-relevant information.
 
 ### Implementation Guidance
 
-#### Files to Modify
-1. **`assets/scripts/server.py`**: Add the three new MCP tool functions
-2. **`src/debugger/manager.ts`**: Add debug state export functionality
-3. **`assets/scripts/ros2_launch_dumper.py`**: Enhance with additional metadata (source paths, runtime detection)
+#### Files to Create/Modify
+1. **`src/ros2-debug-mcp.ts`** (NEW): TypeScript MCP server following [RDE-URDF pattern](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts)
+2. **`src/extension.ts`**: Import and start the MCP server
+3. **`src/debugger/manager.ts`**: Add debug state tracking
+4. **`assets/scripts/ros2_launch_dumper.py`**: Enhance with additional metadata (if needed)
 
 #### Technical Approach
 
-**Integration with Debug Manager:**
-The MCP tools need to access debug session state. Recommended approach:
-- Export debug session state to a JSON file in a known location (e.g., `<extension_dir>/.debug-state.json`)
-- Have `src/debugger/manager.ts` write session state when sessions start/stop
-- MCP tools read from this file
+**TypeScript MCP Server Implementation:**
+Following the [RDE-URDF mcp.ts pattern](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts):
+- Create `src/ros2-debug-mcp.ts` with `Ros2DebugMcpServer` class
+- Use `@modelcontextprotocol/sdk` for MCP server infrastructure
+- Register tools using `this.server.registerTool()` method
+- Access VS Code debugging APIs directly via `vscode.debug.*`
+- Integrate into extension lifecycle in `src/extension.ts`
+
+**Debug State Access:**
+- Query `vscode.debug.activeDebugSession` for current sessions
+- Use `vscode.debug.breakpoints` for breakpoint information
+- Access debug manager state from `src/debugger/manager.ts`
+- Track session lifecycle via `vscode.debug.onDidStartDebugSession` and `vscode.debug.onDidTerminateDebugSession`
 
 **Launch File Analysis:**
-- Leverage existing `ros2_launch_dumper.py` functionality
-- Enhance dumper to include:
-  - Source package paths for each node
-  - Runtime type detection (C++/Python/Rust/.NET)
-  - Topic/service relationship mapping
+- Use existing `ros2_launch_dumper.py` via child_process
+- Parse dumper output for node composition
+- Enhance dumper if needed for:
+  - Source package paths
+  - Runtime type detection
+  - Topic/service relationships
 
-**State Management:**
-- Monitor debug session lifecycle events
-- Maintain session state file with current sessions
-- Clean up state when sessions end
-
-#### Error Handling
+**Error Handling:**
 - Return empty array `[]` if no active debug sessions
-- Return error if node not found or not being debugged
-- Return error if launch file cannot be parsed
-- Handle cases where debug manager state is unavailable gracefully
+- Return error messages in MCP format for invalid inputs
+- Handle cases where debug state is unavailable
+- Graceful degradation when tools cannot access data
 
 ### Testing Requirements
 
 #### Unit Tests
-- Test each MCP tool in isolation
-- Mock debug session state
-- Verify correct JSON response format
+- Test each MCP tool registration and response format
+- Mock VS Code debug APIs
+- Verify JSON schema compliance
 - Test error conditions
 
 #### Integration Tests
-- Start a debug session via RDE
-- Call `get_active_debug_sessions()` and verify response
-- Verify node debug info for debugged nodes
-- Test launch file analysis on Python and XML launch files
+- Start TypeScript MCP server (port 3003)
+- Launch ROS debug session via RDE
+- Call tools via MCP and verify responses
+- Test with Python and XML launch files
 
 #### Manual Testing
-1. Start MCP server: `ROS2: Start MCP Server` command
+1. Start extension with MCP server enabled
 2. Launch a ROS composition with debugger
-3. Query debug state via Copilot/Cursor using MCP
-4. Verify information accuracy
+3. Use Copilot/Cursor to query debug state
+4. Verify accuracy of returned information
 
 ### Success Criteria
+- [ ] TypeScript MCP server (`src/ros2-debug-mcp.ts`) created following RDE-URDF pattern
 - [ ] All three MCP tools implemented and functional
-- [ ] Tools return accurate information about debug sessions
-- [ ] Launch file analysis works for Python and XML launch files
-- [ ] No performance degradation when tools are called frequently
-- [ ] Documentation updated in `docs/ModelContextProtocol.md` with new tool descriptions
-- [ ] Unit tests pass for all scenarios
-- [ ] Manual testing completed successfully
+- [ ] Tools return accurate debug session information
+- [ ] Launch file analysis works for Python and XML files
+- [ ] No performance degradation
+- [ ] Documentation updated
+- [ ] Tests pass
 
 ### Dependencies
-- None (can be implemented independently)
+- `@modelcontextprotocol/sdk`: ^0.5.0 (same as RDE-URDF)
+- `express`: ^4.18.2 (same as RDE-URDF)
 
 ### Estimated Effort
 **1-2 days** for a developer familiar with the codebase
 
 ### Priority
-**High** - This is a foundational feature that provides immediate value and enables future DebugMCP integration work.
+**High** - Foundational feature for AI-assisted debugging
 
 ### Related Documentation
-- [DebugMCP Integration Investigation](specs/DebugMCP-Integration-Investigation.md)
-- [Feature Proposal](specs/feature-proposals/debug-session-context-mcp-tools.md)
-- [Current MCP Server Documentation](docs/ModelContextProtocol.md)
+- [RDE-URDF MCP Implementation](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts) - **Use this as the template**
+- [DebugMCP Integration Investigation](DebugMCP-Integration-Investigation.md)
+- [Feature Proposal](feature-proposals/debug-session-context-mcp-tools.md)
 
 ### Notes
-- This feature does not require DebugMCP to be installed
-- Can be tested immediately without external dependencies
-- Provides value even without full DebugMCP integration
-- Foundation for Feature #2 (DebugMCP Integration Layer) if implemented later
+- **TypeScript implementation only** - do NOT modify Python MCP server
+- Follow RDE-URDF pattern exactly for consistency
+- Python server (`assets/scripts/server.py`) is separate and handles ROS CLI only
+- This provides value independently without DebugMCP
 
 ### Example Use Cases
 
@@ -220,25 +273,30 @@ AI uses `get_node_debug_info("talker")` to show process ID, source file, and deb
 3. Add hooks to clean up state when sessions end
 4. Export state to `<extension_dir>/.debug-state.json`
 
-### Step 3: Enhance Launch Dumper
-1. Edit `assets/scripts/ros2_launch_dumper.py`
+### Step 3: Create TypeScript MCP Server
+1. Create `src/ros2-debug-mcp.ts` following [RDE-URDF pattern](https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts)
+2. Set up MCP server infrastructure with express
+3. Configure server on port 3003
+
+### Step 4: Implement MCP Tools
+1. In `src/ros2-debug-mcp.ts`, register tool `get_active_debug_sessions()`
+2. Register tool `get_node_debug_info(node_name: str)`
+3. Register tool `get_launch_file_debug_info(launch_file: str)`
+4. Implement each tool using VS Code debug APIs
+5. Add error handling for all tools
+
+### Step 5: Integrate with Extension
+1. Edit `src/extension.ts` to import and start MCP server
+2. Add server to extension subscriptions for cleanup
+3. Configure server startup in activation
+
+### Step 6: Enhance Launch Dumper (if needed)
+1. Edit `assets/scripts/ros2_launch_dumper.py` if additional metadata needed
 2. Add source package path detection
 3. Add runtime type detection logic
 4. Add topic/service relationship mapping
 
-### Step 4: Implement MCP Tools
-1. Edit `assets/scripts/server.py`
-2. Add `@mcp.tool()` decorated function for `get_active_debug_sessions()`
-3. Add `@mcp.tool()` decorated function for `get_node_debug_info(node_name: str)`
-4. Add `@mcp.tool()` decorated function for `get_launch_file_debug_info(launch_file: str)`
-5. Implement error handling for each tool
-
-### Step 5: Update Documentation
-1. Edit `docs/ModelContextProtocol.md`
-2. Add tool descriptions to the Available Tools table
-3. Add example usage for new tools
-
-### Step 6: Testing
+### Step 7: Testing
 1. Create unit tests in appropriate test directory
 2. Test each tool independently
 3. Test error conditions

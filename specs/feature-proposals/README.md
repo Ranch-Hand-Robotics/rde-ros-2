@@ -28,10 +28,12 @@ Three detailed implementation proposals for AI-assisted debugging scenarios:
 - **Scenario 3: Performance Debugging** - Profile pipelines, identify bottlenecks, set conditional breakpoints
 
 Each proposal includes:
-- Detailed MCP tool specifications (TypeScript & Python)
-- Implementation strategy using both built-in TypeScript MCP server (like RDE-URDF) and external Python MCP server
+- Complete TypeScript MCP tool specifications
+- Implementation using TypeScript MCP server (following RDE-URDF pattern)
 - Integration points with existing RDE code
-- Context requirements and VS Code API usage
+- VS Code API usage
+
+**Pattern Reference**: https://github.com/Ranch-Hand-Robotics/rde-urdf/blob/main/src/mcp.ts
 
 [Read detailed proposals →](scenario-implementations-detailed.md)
 
