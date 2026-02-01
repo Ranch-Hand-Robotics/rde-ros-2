@@ -19,6 +19,7 @@ import * as requests from "../../../requests";
 import * as utils from "../../../utils";
 import { rosApi } from "../../../../ros/ros";
 import * as lifecycle from "../../../../ros/ros2/lifecycle";
+import * as rust_utils from "../../../../ros/rust-utils";
 
 const promisifiedExec = util.promisify(child_process.exec);
 
@@ -635,6 +636,31 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         }
     }
 
+    private createRustLaunchConfig(request: ILaunchRequest, stopOnEntry: boolean): ILldbLaunchConfiguration {
+        // Rust debugging uses LLDB (CodeLLDB extension)
+        const isLldbInstalled = vscode_utils.isRustDebuggerExtensionInstalled();
+        
+        if (!isLldbInstalled) {
+            const message = "Rust debugging requires the CodeLLDB extension (vadimcn.vscode-lldb). Please install it from the marketplace.";
+            vscode.window.showErrorMessage(message);
+            throw new Error(message);
+        }
+        
+        const rustLaunchConfig: ILldbLaunchConfiguration = {
+            name: request.nodeName,
+            type: "lldb",
+            request: "launch",
+            program: request.executable,
+            args: request.arguments,
+            cwd: ".",
+            env: request.env,
+            stopAtEntry: stopOnEntry,
+            sourceLanguages: ["rust"]
+        };
+        
+        return rustLaunchConfig;
+    }
+
     private async executeLaunchRequest(request: ILaunchRequest, stopOnEntry: boolean) {
         let debugConfig: ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration | IPythonLaunchConfiguration | ILldbLaunchConfiguration;
 
@@ -661,12 +687,15 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 } catch {
                     // The python file is not available then this must be...
 
-                    // C#? Todo
+                    // Check if it's a Rust executable
+                    if (rust_utils.isRustExecutable(request.executable)) {
+                        debugConfig = this.createRustLaunchConfig(request, stopOnEntry);
+                    } else {
+                        // C#? Todo
 
-                    // Rust? Todo
-
-                    // C++
-                    debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
+                        // Default to C++
+                        debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
+                    }
                 }
             } else if (nodePath.ext.toLowerCase() === ".py") {
                 debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
@@ -703,7 +732,11 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 // look for Python in shebang line
                 if (line.startsWith("#!") && line.toLowerCase().indexOf("python") !== -1) {
                     debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
+                } else if (rust_utils.isRustExecutable(request.executable)) {
+                    // Check if it's a Rust executable
+                    debugConfig = this.createRustLaunchConfig(request, stopOnEntry);
                 } else {
+                    // Default to C++
                     debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
                 }
 

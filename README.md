@@ -14,13 +14,14 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * IntelliSense support for ROS message files (`.msg`) including hover information with nested message properties and go-to-definition.
 * Automatically add the ROS C++ include and Python import paths.
 * Format C++ using the ROS `clang-format` style.
-* Debug a single ROS node (C++ or Python) by [attaching to the process](https://ranchhandrobotics.com/rde-ros-2/debug-support.html#attach).
-* Debug ROS nodes (C++ or Python) [launched from a `.launch.py` file](https://ranchhandrobotics.com/rde-ros-2/debug-support.html#launch).
+* Debug a single ROS node (C++, Python, or Rust) by [attaching to the process](https://ranchhandrobotics.com/rde-ros-2/debug-support.html#attach).
+* Debug ROS nodes (C++, Python, or Rust) [launched from a `.launch.py` file](https://ranchhandrobotics.com/rde-ros-2/debug-support.html#launch).
 * Configure Intellisense
 * Support for alternative shells (e.g. `fish`, `zsh`, etc.) for ROS 2.
 * (Preview) [Model Context Protocol (MCP) Server](https://ranchhandrobotics.com/rde-ros-2/ModelContextProtocol.html), allowing LLMs to introspect a running ROS 2 system.
 * Support for [Pixi Package Manager for ROS 2](https://ranchhandrobotics.com/rde-ros-2/pixi.html), a cross-platform ROS 2 development environment.
 * (Preview) Lifecycle Node Support, allowing you to manage the lifecycle of ROS 2 nodes through the Dashboard.
+* (Preview) **Rust ROS 2 Support**, enabling development and debugging of ROS 2 nodes written in Rust.
 * Support for Visual Studio Code and Cursor
 
 ## Getting Started

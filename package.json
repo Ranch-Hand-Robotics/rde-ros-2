@@ -40,8 +40,10 @@
         "onLanguage:cpp",
         "onLanguage:python",
         "onLanguage:csharp",
+        "onLanguage:rust",
         "onCommand",
         "workspaceContains:**/package.xml",
+        "workspaceContains:**/Cargo.toml",
         "workspaceContains:**/test_*.py",
         "workspaceContains:**/*_test.py",
         "workspaceContains:**/*Test.cpp",
@@ -161,6 +163,11 @@
                 "title": "Debug All ROS 2 Tests",
                 "category": "ROS2",
                 "icon": "$(debug-alt)"
+            },
+            {
+                "command": "ROS2.initializeRustRos2",
+                "title": "Initialize ROS 2 Rust Workspace",
+                "category": "ROS2"
             }
         ],
         "mcpServerDefinitionProviders": [
@@ -200,6 +207,16 @@
                     "type": "string",
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
+                },
+                "ROS2.rustcPath": {
+                    "type": "string",
+                    "default": "rustc",
+                    "description": "Path to the rustc executable. Defaults to 'rustc' (uses system PATH). Override this if you have Rust installed in a non-standard location."
+                },
+                "ROS2.cargoPath": {
+                    "type": "string",
+                    "default": "cargo",
+                    "description": "Path to the cargo executable. Defaults to 'cargo' (uses system PATH). Override this if you have Cargo installed in a non-standard location."
                 }
             }
         },
@@ -211,7 +228,8 @@
                 "runtime": "node",
                 "languages": [
                     "cpp",
-                    "python"
+                    "python",
+                    "rust"
                 ],
                 "configurationAttributes": {
                     "launch": {

@@ -260,6 +260,19 @@ export function isPythonExtensionInstalled(): boolean {
 }
 
 /**
+ * Detects if a Rust debugger extension is installed (CodeLLDB or rust-analyzer)
+ * @returns true if a Rust debugger extension is installed, false otherwise
+ */
+export function isRustDebuggerExtensionInstalled(): boolean {
+    // CodeLLDB is the most common Rust debugger extension
+    const codeLldbExtension = vscode.extensions.getExtension('vadimcn.vscode-lldb');
+    // rust-analyzer also provides debugging support
+    const rustAnalyzerExtension = vscode.extensions.getExtension('rust-lang.rust-analyzer');
+    
+    return codeLldbExtension !== undefined || rustAnalyzerExtension !== undefined;
+}
+
+/**
  * Detects if running in Cursor editor
  * @returns true if running in Cursor, false otherwise
  */
