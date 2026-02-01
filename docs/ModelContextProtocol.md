@@ -55,6 +55,56 @@ This extension will start the server and make it available for LLMs to connect t
 | `kill_process` | Utility | Kill a ROS process by process ID |
 | `run_doctor` | Diagnostics | Run ROS 2 doctor to check system and ROS 2 setup |
 
+## Debug MCP Server (Preview)
+
+In addition to the ROS 2 system introspection MCP server, RDE also provides a **Debug MCP Server** that exposes debug session context. This server runs on a separate port (default: 3003) and provides AI assistants with information about active debug sessions.
+
+### Starting the Debug MCP Server
+
+Start the Debug MCP Server using the command palette (CTRL-SHIFT-P) and selecting `ROS2: Start Debug MCP Server`.
+
+The server will be available at `http://localhost:3003/sse` (configurable via `ROS2.debugMcpServerPort` setting).
+
+### Debug MCP Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `get_active_debug_sessions` | Returns information about all active ROS 2 debug sessions, including session IDs, target launch files, and debugged nodes |
+| `get_node_debug_info` | Returns debugging information for a specific ROS node by name, including executable path, runtime type, and debug status |
+| `get_launch_file_debug_info` | Analyzes a launch file and returns debugging-relevant information including nodes, runtime types, and lifecycle nodes |
+
+### Use Cases
+
+- **Debug Planning**: AI can analyze launch files to suggest which nodes to debug
+- **Session Awareness**: AI knows what's currently being debugged and can provide context-aware suggestions
+- **Breakpoint Suggestions**: Based on message flow and node relationships, AI can suggest relevant breakpoints
+
+### Example
+
+```typescript
+// Get all active debug sessions
+await mcp.tools.call({
+  name: "get_active_debug_sessions"
+});
+// Returns: List of sessions with debugged nodes, their runtime types, and status
+
+// Get info about a specific node
+await mcp.tools.call({
+  name: "get_node_debug_info",
+  arguments: { node_name: "talker" }
+});
+// Returns: Node executable, source file, runtime (C++/Python), debug status
+
+// Analyze a launch file for debugging
+await mcp.tools.call({
+  name: "get_launch_file_debug_info",
+  arguments: { launch_file: "/path/to/launch.py" }
+});
+// Returns: List of debuggable nodes, their packages, runtime types, and lifecycle info
+```
+
+## Available Tools
+
 ## Example Session (Graphical)
 ![MCP Session Example 1](assets/mcp-session-1.png)
 
