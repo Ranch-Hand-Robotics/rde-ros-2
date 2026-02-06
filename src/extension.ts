@@ -27,6 +27,8 @@ import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
 import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
 import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
+import { TopicTreeDataProvider } from "./ros/topic-tree/topic-tree-provider";
+import { TopicWebviewManager } from "./ros/ros2/topic-webview";
 
 /**
  * Check if a file or directory exists.
@@ -52,6 +54,8 @@ export let mcpServerTerminal: vscode.Terminal | null = null;
 export let extensionContext: vscode.ExtensionContext | null = null;
 export let rosTestProvider: RosTestProvider | null = null;
 export let launchTreeProvider: LaunchTreeDataProvider | null = null;
+export let topicTreeProvider: TopicTreeDataProvider | null = null;
+export let topicWebviewManager: TopicWebviewManager | null = null;
 
 let onEnvChanged = new vscode.EventEmitter<void>();
 
@@ -103,7 +107,9 @@ export enum Commands {
     LaunchTreeDebug = "ROS2.launchTree.debug",
     ColconToggleIgnore = "ROS2.colcon.toggleIgnore",
     ColconBuildPackageRelease = "ROS2.colcon.buildPackageRelease",
-    ColconBuildPackageDebug = "ROS2.colcon.buildPackageDebug"
+    ColconBuildPackageDebug = "ROS2.colcon.buildPackageDebug",
+    TopicTreeRefresh = "ROS2.topicTree.refresh",
+    TopicTreePauseAll = "ROS2.topicTree.pauseAll"
 }
 
 /**
@@ -317,6 +323,43 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(launchTreeView);
     context.subscriptions.push(launchTreeProvider);
+
+    // Initialize Topic Webview Manager
+    topicWebviewManager = new TopicWebviewManager(context);
+    context.subscriptions.push(topicWebviewManager);
+
+    // Initialize Topic Tree Provider
+    topicTreeProvider = new TopicTreeDataProvider(
+        context,
+        outputChannel,
+        (topicName: string, subscribe: boolean) => {
+            if (subscribe && topicWebviewManager) {
+                // Find topic info to get the type
+                (async () => {
+                    const topics = await import("./ros/ros2/topic-monitor");
+                    const topicList = await topics.listTopics();
+                    const topicInfo = topicList.find(t => t.name === topicName);
+                    if (topicInfo && topicWebviewManager) {
+                        topicWebviewManager.openTopicMonitor(topicName, topicInfo.type);
+                    }
+                })();
+            } else if (!subscribe && topicWebviewManager) {
+                topicWebviewManager.closeTopicMonitor(topicName);
+            }
+        }
+    );
+    const topicTreeView = vscode.window.createTreeView('ros2TopicTree', {
+        treeDataProvider: topicTreeProvider,
+        showCollapseAll: true
+    });
+    
+    // Handle checkbox changes
+    topicTreeView.onDidChangeCheckboxState((event) => {
+        topicTreeProvider?.handleCheckboxChange(event.items);
+    });
+    
+    context.subscriptions.push(topicTreeView);
+    context.subscriptions.push(topicTreeProvider);
 
     // Source the environment, and re-source on config change.
     let config = vscode_utils.getExtensionConfiguration();
@@ -591,6 +634,20 @@ export async function activate(context: vscode.ExtensionContext) {
                 launchTreeProvider.refresh();
                 vscode.window.showInformationMessage("Launch tree refreshed");
             }
+        });
+    });
+
+    // Register Topic Tree commands
+    vscode.commands.registerCommand(Commands.TopicTreeRefresh, () => {
+        ensureErrorMessageOnException(() => {
+            topicTreeProvider?.refresh();
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.TopicTreePauseAll, () => {
+        ensureErrorMessageOnException(() => {
+            topicTreeProvider?.unsubscribeAll();
+            vscode.window.showInformationMessage("All topic monitors stopped");
         });
     });
 

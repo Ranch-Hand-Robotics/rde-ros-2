@@ -205,6 +205,18 @@
                 "command": "ROS2.colcon.buildPackageDebug",
                 "title": "Colcon Build (Debug)",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.topicTree.refresh",
+                "title": "Refresh Topic List",
+                "category": "ROS2",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "ROS2.topicTree.pauseAll",
+                "title": "Stop All Topic Monitors",
+                "category": "ROS2",
+                "icon": "$(debug-pause)"
             }
         ],
         "menus": {
@@ -243,6 +255,12 @@
                     "name": "ROS 2 Launch Files",
                     "contextualTitle": "ROS 2 Launch Tree",
                     "visibility": "visible"
+                },
+                {
+                    "id": "ros2TopicTree",
+                    "name": "ROS 2 Topics",
+                    "contextualTitle": "ROS 2 Topic Monitor",
+                    "visibility": "visible"
                 }
             ]
         },
@@ -252,6 +270,16 @@
                     "command": "ROS2.launchTree.refresh",
                     "when": "view == ros2LaunchTree",
                     "group": "navigation"
+                },
+                {
+                    "command": "ROS2.topicTree.refresh",
+                    "when": "view == ros2TopicTree",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "ROS2.topicTree.pauseAll",
+                    "when": "view == ros2TopicTree",
+                    "group": "navigation@2"
                 }
             ],
             "view/item/context": [
