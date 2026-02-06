@@ -36,6 +36,13 @@ Hover over any topic in the tree to see:
 - Publishing frequency (Hz)
 - Number of publishers
 - Number of subscribers
+- **QoS (Quality of Service) settings:**
+  - Reliability (RELIABLE, BEST_EFFORT)
+  - Durability (VOLATILE, TRANSIENT_LOCAL)
+  - Deadline (time constraint)
+  - Lifespan (message validity duration)
+  - Liveliness (node liveness policy)
+  - Liveliness Lease Duration (timeout for liveliness)
 
 ### Controlling Topic Monitoring
 
@@ -109,7 +116,6 @@ If clicking a topic checkbox doesn't open a webview:
 ## Known Limitations
 
 - Image topic rendering is not yet implemented (shows as JSON currently)
-- QoS information is not yet displayed in tooltips (planned)
 - Cannot adjust message buffer size (fixed at 100 messages)
 - Cannot filter or search within messages
 
