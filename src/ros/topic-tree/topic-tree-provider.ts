@@ -102,31 +102,29 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   /**
    * Handle checkbox state changes
    */
-  async handleCheckboxChange(items: readonly vscode.TreeCheckboxChangeEvent<TopicTreeItem>[]): Promise<void> {
-    for (const item of items) {
-      if (item.items.length === 0) continue;
-      
-      const treeItem = item.items[0][0];
-      if (treeItem.type !== TopicTreeItemType.Topic || !treeItem.topicInfo) {
-        continue;
+  async handleCheckboxChange(events: readonly vscode.TreeCheckboxChangeEvent<TopicTreeItem>[]): Promise<void> {
+    for (const event of events) {
+      for (const [treeItem, newState] of event.items) {
+        if (treeItem.type !== TopicTreeItemType.Topic || !treeItem.topicInfo) {
+          continue;
+        }
+
+        const topicName = treeItem.topicInfo.name;
+        const isChecked = newState === vscode.TreeItemCheckboxState.Checked;
+
+        if (isChecked) {
+          this.subscribedTopics.add(topicName);
+          this.onTopicSubscriptionChanged(topicName, true);
+        } else {
+          this.subscribedTopics.delete(topicName);
+          this.onTopicSubscriptionChanged(topicName, false);
+        }
+
+        // Update the tree item
+        treeItem.isSubscribed = isChecked;
+        treeItem.checkboxState = newState;
+        treeItem.contextValue = isChecked ? 'topicSubscribed' : 'topicUnsubscribed';
       }
-
-      const topicName = treeItem.topicInfo.name;
-      const newState = item.items[0][1];
-      const isChecked = newState === vscode.TreeItemCheckboxState.Checked;
-
-      if (isChecked) {
-        this.subscribedTopics.add(topicName);
-        this.onTopicSubscriptionChanged(topicName, true);
-      } else {
-        this.subscribedTopics.delete(topicName);
-        this.onTopicSubscriptionChanged(topicName, false);
-      }
-
-      // Update the tree item
-      treeItem.isSubscribed = isChecked;
-      treeItem.checkboxState = newState;
-      treeItem.contextValue = isChecked ? 'topicSubscribed' : 'topicUnsubscribed';
     }
 
     this.refresh();

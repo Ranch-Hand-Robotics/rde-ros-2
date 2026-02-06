@@ -70,7 +70,7 @@ export async function getTopicInfo(topicName: string): Promise<TopicInfo | null>
       } else if (line.includes('Publisher count:')) {
         info.publisherCount = parseInt(line.split(':')[1].trim());
       } else if (line.includes('Subscription count:')) {
-        info.subscriberCount = parseInt(line.split(':')[1].trim();
+        info.subscriberCount = parseInt(line.split(':')[1].trim());
       }
     }
     
@@ -138,7 +138,7 @@ export class TopicEchoManager {
     this.stopEcho(topicName);
 
     const command = `ros2 topic echo ${topicName} --no-arr --no-str-len`;
-    const process = child_process.spawn(
+    const childProcess = child_process.spawn(
       process.platform === 'win32' ? 'cmd' : 'sh',
       process.platform === 'win32' ? ['/c', command] : ['-c', command],
       {
@@ -148,11 +148,11 @@ export class TopicEchoManager {
     );
 
     this.messageHandlers.set(topicName, onMessage);
-    this.activeProcesses.set(topicName, process);
+    this.activeProcesses.set(topicName, childProcess);
 
     let buffer = '';
 
-    process.stdout?.on('data', (data: Buffer) => {
+    childProcess.stdout?.on('data', (data: Buffer) => {
       buffer += data.toString();
       
       // Split by YAML document separator (---)
@@ -181,11 +181,11 @@ export class TopicEchoManager {
       }
     });
 
-    process.stderr?.on('data', (data: Buffer) => {
+    childProcess.stderr?.on('data', (data: Buffer) => {
       extension.outputChannel.appendLine(`Error from topic echo ${topicName}: ${data.toString()}`);
     });
 
-    process.on('exit', (code) => {
+    childProcess.on('exit', (code) => {
       extension.outputChannel.appendLine(`Topic echo process for ${topicName} exited with code ${code}`);
       this.activeProcesses.delete(topicName);
       this.messageHandlers.delete(topicName);

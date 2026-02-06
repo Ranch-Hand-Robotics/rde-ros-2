@@ -355,7 +355,7 @@ export async function activate(context: vscode.ExtensionContext) {
     
     // Handle checkbox changes
     topicTreeView.onDidChangeCheckboxState((event) => {
-        topicTreeProvider?.handleCheckboxChange(event.items);
+        topicTreeProvider?.handleCheckboxChange([event]);
     });
     
     context.subscriptions.push(topicTreeView);
