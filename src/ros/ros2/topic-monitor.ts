@@ -63,16 +63,46 @@ export async function getTopicInfo(topicName: string): Promise<TopicInfo | null>
       subscriberCount: 0
     };
     
+    const qos: TopicQoS = {
+      reliability: '',
+      durability: '',
+      deadline: '',
+      lifespan: '',
+      liveliness: '',
+      livelinessLeaseDuration: ''
+    };
+    
     // Parse the verbose output
     const lines = stdout.split(os.EOL);
     for (const line of lines) {
-      if (line.includes('Type:')) {
-        info.type = line.split(':')[1].trim();
-      } else if (line.includes('Publisher count:')) {
-        info.publisherCount = parseInt(line.split(':')[1].trim());
-      } else if (line.includes('Subscription count:')) {
-        info.subscriberCount = parseInt(line.split(':')[1].trim());
+      const trimmedLine = line.trim();
+      
+      if (trimmedLine.includes('Type:')) {
+        info.type = trimmedLine.split(':')[1].trim();
+      } else if (trimmedLine.includes('Publisher count:')) {
+        info.publisherCount = parseInt(trimmedLine.split(':')[1].trim());
+      } else if (trimmedLine.includes('Subscription count:')) {
+        info.subscriberCount = parseInt(trimmedLine.split(':')[1].trim());
+      } 
+      // Parse QoS settings
+      else if (trimmedLine.includes('Reliability:')) {
+        qos.reliability = trimmedLine.split(':')[1].trim();
+      } else if (trimmedLine.includes('Durability:')) {
+        qos.durability = trimmedLine.split(':')[1].trim();
+      } else if (trimmedLine.includes('Deadline:')) {
+        qos.deadline = trimmedLine.split(':')[1].trim();
+      } else if (trimmedLine.includes('Lifespan:')) {
+        qos.lifespan = trimmedLine.split(':')[1].trim();
+      } else if (trimmedLine.includes('Liveliness:')) {
+        qos.liveliness = trimmedLine.split(':')[1].trim();
+      } else if (trimmedLine.includes('Liveliness lease duration:')) {
+        qos.livelinessLeaseDuration = trimmedLine.split(':')[1].trim();
       }
+    }
+    
+    // Only add QoS if we found at least one QoS setting
+    if (qos.reliability || qos.durability || qos.deadline || qos.lifespan || qos.liveliness) {
+      info.qos = qos;
     }
     
     return info;

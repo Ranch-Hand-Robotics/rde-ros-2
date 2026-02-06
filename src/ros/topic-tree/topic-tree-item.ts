@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import * as vscode from 'vscode';
-import { TopicInfo, isImageType } from '../ros2/topic-types';
+import { TopicInfo, TopicQoS, isImageType } from '../ros2/topic-types';
 
 export enum TopicTreeItemType {
   Topic = 'topic',
@@ -91,7 +91,7 @@ export class TopicTreeItem extends vscode.TreeItem {
   /**
    * Update tooltip with metrics
    */
-  public setMetrics(frequency?: number, publisherCount?: number, subscriberCount?: number): void {
+  public setMetrics(frequency?: number, publisherCount?: number, subscriberCount?: number, qos?: TopicQoS): void {
     const tooltip = new vscode.MarkdownString();
     tooltip.appendMarkdown(`**${this.topicInfo?.name}**\n\n`);
     tooltip.appendMarkdown(`Type: \`${this.topicInfo?.type}\`\n\n`);
@@ -106,6 +106,32 @@ export class TopicTreeItem extends vscode.TreeItem {
     
     if (subscriberCount !== undefined) {
       tooltip.appendMarkdown(`Subscribers: ${subscriberCount}\n\n`);
+    }
+    
+    // Add QoS information if available
+    if (qos) {
+      tooltip.appendMarkdown(`**QoS Settings:**\n\n`);
+      
+      if (qos.reliability) {
+        tooltip.appendMarkdown(`- Reliability: ${qos.reliability}\n`);
+      }
+      if (qos.durability) {
+        tooltip.appendMarkdown(`- Durability: ${qos.durability}\n`);
+      }
+      if (qos.deadline) {
+        tooltip.appendMarkdown(`- Deadline: ${qos.deadline}\n`);
+      }
+      if (qos.lifespan) {
+        tooltip.appendMarkdown(`- Lifespan: ${qos.lifespan}\n`);
+      }
+      if (qos.liveliness) {
+        tooltip.appendMarkdown(`- Liveliness: ${qos.liveliness}\n`);
+      }
+      if (qos.livelinessLeaseDuration) {
+        tooltip.appendMarkdown(`- Liveliness Lease Duration: ${qos.livelinessLeaseDuration}\n`);
+      }
+      
+      tooltip.appendMarkdown(`\n`);
     }
     
     this.tooltip = tooltip;

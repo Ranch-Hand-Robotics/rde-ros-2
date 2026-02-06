@@ -10,7 +10,12 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private subscribedTopics = new Set<string>();
-  private topicMetricsCache = new Map<string, { frequency?: number, publisherCount?: number, subscriberCount?: number }>();
+  private topicMetricsCache = new Map<string, { 
+    frequency?: number, 
+    publisherCount?: number, 
+    subscriberCount?: number,
+    qos?: import('../ros2/topic-types').TopicQoS 
+  }>();
   private refreshInterval?: NodeJS.Timeout;
   private isWindowFocused = true;
 
@@ -49,7 +54,7 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
     if (element.type === TopicTreeItemType.Topic && element.topicInfo) {
       const metrics = this.topicMetricsCache.get(element.topicInfo.name);
       if (metrics) {
-        element.setMetrics(metrics.frequency, metrics.publisherCount, metrics.subscriberCount);
+        element.setMetrics(metrics.frequency, metrics.publisherCount, metrics.subscriberCount, metrics.qos);
       }
     }
     return element;
@@ -104,6 +109,7 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
         const cached = this.topicMetricsCache.get(topicName) || {};
         cached.publisherCount = info.publisherCount;
         cached.subscriberCount = info.subscriberCount;
+        cached.qos = info.qos;
         this.topicMetricsCache.set(topicName, cached);
       }
     } catch (error) {

@@ -9,6 +9,7 @@ export interface TopicInfo {
   type: string;
   publisherCount?: number;
   subscriberCount?: number;
+  qos?: TopicQoS;
 }
 
 /**
