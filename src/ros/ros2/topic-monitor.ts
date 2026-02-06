@@ -43,7 +43,8 @@ export async function listTopics(): Promise<TopicInfo[]> {
     // Filter out ros2cli internal topics
     return topics.filter(topic => !topic.name.includes('ros2cli'));
   } catch (error) {
-    extension.outputChannel.appendLine(`Error listing topics: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    extension.outputChannel.appendLine(`Error listing topics: ${errorMessage}`);
     return [];
   }
 }
@@ -76,7 +77,8 @@ export async function getTopicInfo(topicName: string): Promise<TopicInfo | null>
     
     return info;
   } catch (error) {
-    extension.outputChannel.appendLine(`Error getting topic info for ${topicName}: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    extension.outputChannel.appendLine(`Error getting topic info for ${topicName}: ${errorMessage}`);
     return null;
   }
 }
@@ -118,7 +120,8 @@ export async function getTopicFrequency(topicName: string, durationSec: number =
     
     return metrics;
   } catch (error) {
-    extension.outputChannel.appendLine(`Error getting topic frequency for ${topicName}: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    extension.outputChannel.appendLine(`Error getting topic frequency for ${topicName}: ${errorMessage}`);
     return null;
   }
 }
@@ -176,7 +179,8 @@ export class TopicEchoManager {
           
           onMessage(message);
         } catch (error) {
-          extension.outputChannel.appendLine(`Error parsing message from ${topicName}: ${error.message}`);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          extension.outputChannel.appendLine(`Error parsing message from ${topicName}: ${errorMessage}`);
         }
       }
     });
@@ -241,9 +245,13 @@ export class TopicEchoManager {
           let value: any = trimmed.substring(colonIndex + 1).trim();
           
           // Try to parse numbers and booleans
-          if (value === 'true') value = true;
-          else if (value === 'false') value = false;
-          else if (!isNaN(Number(value)) && value !== '') value = Number(value);
+          if (value === 'true') {
+            value = true;
+          } else if (value === 'false') {
+            value = false;
+          } else if (value.length > 0 && !isNaN(Number(value)) && value.trim() !== '') {
+            value = Number(value);
+          }
           
           obj[key] = value;
         }

@@ -12,16 +12,26 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   private subscribedTopics = new Set<string>();
   private topicMetricsCache = new Map<string, { frequency?: number, publisherCount?: number, subscriberCount?: number }>();
   private refreshInterval?: NodeJS.Timeout;
+  private isWindowFocused = true;
 
   constructor(
     private context: vscode.ExtensionContext,
     private outputChannel: vscode.OutputChannel,
     private onTopicSubscriptionChanged: (topicName: string, subscribe: boolean) => void
   ) {
-    // Auto-refresh every 5 seconds to update metrics
+    // Auto-refresh every 5 seconds when window is focused
     this.refreshInterval = setInterval(() => {
-      this.refresh();
+      if (this.isWindowFocused) {
+        this.refresh();
+      }
     }, 5000);
+
+    // Track window focus to pause refreshing when not active
+    context.subscriptions.push(
+      vscode.window.onDidChangeWindowState((state) => {
+        this.isWindowFocused = state.focused;
+      })
+    );
   }
 
   /**
@@ -69,7 +79,8 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
         
         // Update metrics cache asynchronously (don't block rendering)
         this.updateTopicMetrics(topic.name).catch(err => {
-          this.outputChannel.appendLine(`Error updating metrics for ${topic.name}: ${err.message}`);
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.outputChannel.appendLine(`Error updating metrics for ${topic.name}: ${errorMessage}`);
         });
         
         return item;
@@ -77,7 +88,8 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
 
       return items;
     } catch (error) {
-      this.outputChannel.appendLine(`Error getting topics: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.outputChannel.appendLine(`Error getting topics: ${errorMessage}`);
       return [TopicTreeItem.createErrorItem('Failed to retrieve topics')];
     }
   }
