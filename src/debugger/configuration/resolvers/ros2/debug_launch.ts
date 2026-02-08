@@ -39,11 +39,28 @@ function getExtensionFilePath(extensionFile: string): string {
 export class LaunchResolver implements vscode.DebugConfigurationProvider {
     // tslint:disable-next-line: max-line-length
     public async resolveDebugConfigurationWithSubstitutedVariables(folder: vscode.WorkspaceFolder | undefined, config: requests.ILaunchRequest, token?: vscode.CancellationToken) {
-        if (!path.isAbsolute(config.target)) {
-            throw new Error("Launch request requires an absolute path as target.");
+        if (!config.target) {
+            throw new Error("Debug launch request requires a 'target' property specifying the launch file path.");
         }
-        else if (path.extname(config.target) !== ".py" && path.extname(config.target) !== ".xml") {
-            throw new Error("Launch request requires an extension '.py' or '.xml' as target.");
+
+        if (!path.isAbsolute(config.target)) {
+            throw new Error("Debug launch request requires an absolute path as target.");
+        }
+
+        const filename = path.basename(config.target).toLowerCase();
+        
+        // Check if file has a valid launch file extension
+        // Valid extensions include: .py, .xml, .launch (XML), .launch.py, .launch.xml
+        const isValidLaunchFile = 
+            filename.endsWith('.py') ||
+            filename.endsWith('.xml') ||
+            filename.endsWith('.launch') ||
+            filename.endsWith('.launch.py') ||
+            filename.endsWith('.launch.xml');
+
+        if (!isValidLaunchFile) {
+            throw new Error(`Debug launch request requires a valid launch file extension. Got '${path.basename(config.target)}'.\n` +
+                `Valid extensions: .py, .xml, .launch, .launch.py, .launch.xml`);
         }
 
         // Merge environment variables from envFile and env

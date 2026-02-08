@@ -368,10 +368,32 @@ function findSourcePythonFile(executablePath: string): { sourcePath: string; pat
 export class LaunchResolver implements vscode.DebugConfigurationProvider {
     // tslint:disable-next-line: max-line-length
     public async resolveDebugConfigurationWithSubstitutedVariables(folder: vscode.WorkspaceFolder | undefined, config: requests.ILaunchRequest, token?: vscode.CancellationToken) {
+        // Validate that target is defined and not empty
+        if (!config.target) {
+            throw new Error("Launch request requires a 'target' property specifying the launch file path.");
+        }
+
+        const targetPath = config.target;
+        const filename = path.basename(targetPath).toLowerCase();
+        
         await fsp.access(config.target, fs.constants.R_OK);
 
-        if (path.extname(config.target) !== ".py" && path.extname(config.target) !== ".xml" && path.extname(config.target) !== ".yaml") {
-            throw new Error("Launch request requires an extension '.py', '.xml' or '.yaml'.");
+        // Check if file has a valid launch file extension
+        // Valid extensions include: .py, .xml, .yaml, .launch (XML), .launch.py, .launch.xml, .launch.yaml
+        const isValidLaunchFile = 
+            filename.endsWith('.py') ||
+            filename.endsWith('.xml') ||
+            filename.endsWith('.yaml') ||
+            filename.endsWith('.yml') ||
+            filename.endsWith('.launch') ||
+            filename.endsWith('.launch.py') ||
+            filename.endsWith('.launch.xml') ||
+            filename.endsWith('.launch.yaml') ||
+            filename.endsWith('.launch.yml');
+
+        if (!isValidLaunchFile) {
+            throw new Error(`Launch request requires a valid launch file extension. Got '${path.basename(config.target)}'.\n` +
+                `Valid extensions: .py, .xml, .yaml, .yml, .launch, .launch.py, .launch.xml, .launch.yaml`);
         }
 
         const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -482,9 +504,9 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
 
         // Filter shell scripts - just launch them
         //  https://github.com/ranchhandrobotics/rde-ros-2/issues/474 
-        let executableExt = path.extname(executable);
+        let executableExt = path.extname(executable).toLowerCase();
         if (executableExt && 
-            ["bash", "sh", "bat", "cmd", "ps1"].includes(executableExt)) {
+            [".bash", ".sh", ".bat", ".cmd", ".ps1"].includes(executableExt)) {
           return null;
         }
 
@@ -518,6 +540,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
     }
 
     private createPythonLaunchConfig(request: ILaunchRequest, stopOnEntry: boolean): IPythonLaunchConfiguration {
+        extension.outputChannel.appendLine(`[DEBUG] createPythonLaunchConfig: for node '${request.nodeName}'`);
+        
         let programPath = request.executable;
         let pathMappings: Array<{ localRoot: string; remoteRoot: string; }> | undefined;
         
@@ -525,22 +549,25 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         const useSourceFiles = vscode.workspace.getConfiguration('ROS2').get<boolean>('debugPythonUsingSourceFiles', false);
         
         if (useSourceFiles) {
+            extension.outputChannel.appendLine(`[DEBUG] Source file debugging enabled`);
             // Try to find the source Python file for better debugging experience
             const sourceInfo = findSourcePythonFile(request.executable);
             if (sourceInfo) {
                 // Use the source file as the program to launch
                 programPath = sourceInfo.sourcePath;
                 
-                extension.outputChannel.appendLine(`Python source file debugging enabled - found source file:`);
+                extension.outputChannel.appendLine(`[DEBUG] Python source file debugging enabled - found source file:`);
                 extension.outputChannel.appendLine(`  Original executable: ${request.executable}`);
                 extension.outputChannel.appendLine(`  Using source file: ${sourceInfo.sourcePath}`);
                 
                 // Only add path mappings if we think they're needed for complex scenarios
                 // For now, let's try without them since we're launching the source directly
             } else {
-                extension.outputChannel.appendLine(`Python source file debugging enabled, but no source file found for: ${request.executable}`);
-                extension.outputChannel.appendLine(`Using installed executable for debugging.`);
+                extension.outputChannel.appendLine(`[DEBUG] Python source file debugging enabled, but no source file found for: ${request.executable}`);
+                extension.outputChannel.appendLine(`[DEBUG] Using installed executable for debugging.`);
             }
+        } else {
+            extension.outputChannel.appendLine(`[DEBUG] Using installed executable: ${programPath}`);
         }
         
         const pythonLaunchConfig: IPythonLaunchConfiguration = {
@@ -554,10 +581,14 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             justMyCode: false,
         };
         
+        extension.outputChannel.appendLine(`[DEBUG] Python launch config created: program=${pythonLaunchConfig.program}, args=${pythonLaunchConfig.args?.join(' ')}`);
+        
         return pythonLaunchConfig;
     }
 
     private createCppLaunchConfig(request: ILaunchRequest, stopOnEntry: boolean): ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration | ILldbLaunchConfiguration {
+        extension.outputChannel.appendLine(`[DEBUG] createCppLaunchConfig: for node '${request.nodeName}', executable: ${request.executable}`);
+        
         const envConfigs: ICppEnvConfig[] = [];
         for (const key in request.env) {
             if (request.env.hasOwnProperty(key)) {
@@ -571,6 +602,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         const isCppToolsInstalled = vscode_utils.isCppToolsExtensionInstalled();
         const isLldbInstalled = vscode_utils.isLldbExtensionInstalled();
         const isCursor = vscode_utils.isCursorEditor();
+
+        extension.outputChannel.appendLine(`[DEBUG] C++ debugger availability - CppTools: ${isCppToolsInstalled}, LLDB: ${isLldbInstalled}, Cursor: ${isCursor}`);
 
         if (!isCppToolsInstalled && !isLldbInstalled) {
             let message: string;
@@ -596,6 +629,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                     symbolSearchPath: request.symbolSearchPath,
                     sourceFileMap: request.sourceFileMap
                 };
+                extension.outputChannel.appendLine(`[DEBUG] C++ launch config created (cppvsdbg): program=${cppvsdbgLaunchConfig.program}`);
                 return cppvsdbgLaunchConfig;
             } else {
                 const cppdbgLaunchConfig: ICppdbgLaunchConfiguration = {
@@ -617,6 +651,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                         }
                     ]
                 };
+                extension.outputChannel.appendLine(`[DEBUG] C++ launch config created (cppdbg): program=${cppdbgLaunchConfig.program}`);
                 return cppdbgLaunchConfig;
             }
         } else if (isLldbInstalled) {
@@ -630,6 +665,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 env: request.env,
                 stopAtEntry: stopOnEntry
             };
+            extension.outputChannel.appendLine(`[DEBUG] C++ launch config created (lldb): program=${lldbLaunchConfig.program}`);
             return lldbLaunchConfig;
         } else {
             throw new Error("No C++ debugger available");
@@ -639,10 +675,14 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
     private async executeLaunchRequest(request: ILaunchRequest, stopOnEntry: boolean) {
         let debugConfig: ICppvsdbgLaunchConfiguration | ICppdbgLaunchConfiguration | IPythonLaunchConfiguration | ILldbLaunchConfiguration;
 
+        extension.outputChannel.appendLine(`[DEBUG] executeLaunchRequest: starting for node '${request.nodeName}' (executable: ${request.executable})`);
+
         if (os.platform() === "win32") {
+            extension.outputChannel.appendLine(`[DEBUG] Windows platform detected`);
             let nodePath = path.parse(request.executable);
 
             if (nodePath.ext.toLowerCase() === ".exe") {
+                extension.outputChannel.appendLine(`[DEBUG] Executable is .exe: ${request.executable}`);
 
                 // On Windows, colcon will compile Python scripts, C# and Rust programs to .exe. 
                 // Discriminate between different runtimes by introspection.
@@ -654,13 +694,16 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 let pythonPath = path.join(nodePath.dir, "..", "site-packages", nodePath.name, nodePath.name + ".py");
 
                 try {
+                    extension.outputChannel.appendLine(`[DEBUG] Checking for Python source file: ${pythonPath}`);
                     await fsp.access(pythonPath, fs.constants.R_OK);
+                    extension.outputChannel.appendLine(`[DEBUG] Found Python source file, treating as Python`);
 
                     // If the python file is available, then treat it as python and fall through.
                     request.executable = pythonPath;
                     debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
-                } catch {
+                } catch (error) {
                     // The python file is not available then this must be...
+                    extension.outputChannel.appendLine(`[DEBUG] Python source file not found (${error}), treating as C++`);
 
                     // C#? Todo
 
@@ -670,51 +713,104 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                     debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
                 }
             } else if (nodePath.ext.toLowerCase() === ".py") {
+                extension.outputChannel.appendLine(`[DEBUG] Executable is .py file`);
                 debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
             }
 
             if (!debugConfig) {
                 throw (new Error(`Failed to create a debug configuration!`));
             }
+            extension.outputChannel.appendLine(`[DEBUG] Starting debugger on Windows (type: ${debugConfig.type})`);
             const launched = await vscode.debug.startDebugging(undefined, debugConfig);
             if (!launched) {
                 throw (new Error(`Failed to start debug session!`));
             }
+            extension.outputChannel.appendLine(`[DEBUG] Debugger started successfully`);
         } else {
-            // this should be guaranteed by roslaunch
-            await fsp.access(request.executable, fs.constants.X_OK | fs.constants.R_OK);
+            // Linux/Mac path
+            extension.outputChannel.appendLine(`[DEBUG] Unix-based platform detected`);
+            extension.outputChannel.appendLine(`[DEBUG] Checking file permissions: ${request.executable}`);
+            
+            try {
+                // this should be guaranteed by roslaunch
+                await fsp.access(request.executable, fs.constants.X_OK | fs.constants.R_OK);
+                extension.outputChannel.appendLine(`[DEBUG] File permissions verified`);
+            } catch (error) {
+                extension.outputChannel.appendLine(`[DEBUG] ERROR: File access check failed: ${error}`);
+                throw error;
+            }
 
-            const fileStream = fs.createReadStream(request.executable);
-            const rl = readline.createInterface({
-                input: fileStream,
-                crlfDelay: Infinity,
-            });
+            // Wrap readline in a Promise to properly wait for async completion
+            await new Promise<void>((resolve, reject) => {
+                extension.outputChannel.appendLine(`[DEBUG] Creating readline interface for shebang detection`);
+                const fileStream = fs.createReadStream(request.executable);
+                const rl = readline.createInterface({
+                    input: fileStream,
+                    crlfDelay: Infinity,
+                });
 
-            // we only want to read 1 line to check for shebang line
-            let linesToRead: number = 1;
-            rl.on("line", async (line) => {
-                if (linesToRead <= 0) {
-                    return;
-                }
-                linesToRead--;
-                if (!linesToRead) {
-                    rl.close();
-                }
+                // we only want to read 1 line to check for shebang line
+                let linesToRead: number = 1;
+                rl.on("line", async (line) => {
+                    if (linesToRead <= 0) {
+                        return;
+                    }
+                    linesToRead--;
+                    if (!linesToRead) {
+                        rl.close();
+                    }
 
-                // look for Python in shebang line
-                if (line.startsWith("#!") && line.toLowerCase().indexOf("python") !== -1) {
-                    debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
-                } else {
-                    debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
-                }
+                    try {
+                        extension.outputChannel.appendLine(`[DEBUG] Read shebang line: ${line?.substring(0, 100)}`);
+                        
+                        // look for Python in shebang line
+                        if (line.startsWith("#!") && line.toLowerCase().indexOf("python") !== -1) {
+                            extension.outputChannel.appendLine(`[DEBUG] Detected Python runtime from shebang`);
+                            debugConfig = this.createPythonLaunchConfig(request, stopOnEntry);
+                        } else {
+                            extension.outputChannel.appendLine(`[DEBUG] Detected C++ runtime (or other non-Python)`);
+                            debugConfig = this.createCppLaunchConfig(request, stopOnEntry);
+                        }
 
-                if (!debugConfig) {
-                    throw (new Error(`Failed to create a debug configuration!`));
-                }
-                const launched = await vscode.debug.startDebugging(undefined, debugConfig);
-                if (!launched) {
-                    throw (new Error(`Failed to start debug session!`));
-                }
+                        if (!debugConfig) {
+                            const errorMsg = `Failed to create a debug configuration!`;
+                            extension.outputChannel.appendLine(`[ERROR] ${errorMsg}`);
+                            reject(new Error(errorMsg));
+                            return;
+                        }
+                        
+                        extension.outputChannel.appendLine(`[DEBUG] Starting debugger (type: ${debugConfig.type}, stopOnEntry: ${stopOnEntry})`);
+                        const launched = await vscode.debug.startDebugging(undefined, debugConfig);
+                        if (!launched) {
+                            const errorMsg = `Failed to start debug session!`;
+                            extension.outputChannel.appendLine(`[ERROR] ${errorMsg}`);
+                            reject(new Error(errorMsg));
+                            return;
+                        }
+                        
+                        extension.outputChannel.appendLine(`[DEBUG] Debugger started successfully for node '${request.nodeName}'`);
+                        resolve();
+                    } catch (error) {
+                        const errorMsg = `Exception during debugger startup: ${error}`;
+                        extension.outputChannel.appendLine(`[ERROR] ${errorMsg}`);
+                        reject(error);
+                    }
+                });
+
+                rl.on("error", (error) => {
+                    const errorMsg = `Readline error: ${error}`;
+                    extension.outputChannel.appendLine(`[ERROR] ${errorMsg}`);
+                    reject(error);
+                });
+
+                rl.on("close", () => {
+                    if (linesToRead > 0) {
+                        // File was empty or had no lines
+                        const errorMsg = `Could not read shebang line from ${request.executable}`;
+                        extension.outputChannel.appendLine(`[ERROR] ${errorMsg}`);
+                        reject(new Error(errorMsg));
+                    }
+                });
             });
         }
     }

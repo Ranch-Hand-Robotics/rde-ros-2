@@ -332,28 +332,35 @@ if __name__ == "__main__":
                 continue
             
             # Skip non-process actions that don't represent debuggable entities
-            # - LogInfo: prints informational messages
-            # - DeclareLaunchArgument: declares launch file arguments
-            # - OpaqueFunction: executes Python functions without creating processes
-            # - Environment/Configuration actions: modify environment/config without creating processes
-            # - IncludeLaunchDescription: container action (visits to expand contents)
-            if 'skip_types_tuple' not in locals():
-                skip_types_list = [LogInfo, DeclareLaunchArgument, OpaqueFunction, IncludeLaunchDescription]
+            # Separate handling for different action types:
+            # - VISIT & EXPAND: IncludeLaunchDescription (container action that expands contents)
+            # - VISIT & EXPAND: Environment variable actions (affect node behavior during debugging)
+            # - SKIP WITHOUT VISITING: LogInfo (just prints messages, no sub-entities)
+            # - SKIP WITHOUT VISITING: DeclareLaunchArgument (declares arguments, no behavior change)
+            # - SKIP WITHOUT VISITING: OpaqueFunction (executes Python functions, unpredictable side effects)
+            
+            # Build lists for different skip handling strategies
+            if 'visit_and_expand_types_tuple' not in locals():
+                visit_and_expand_list = [IncludeLaunchDescription]
                 if SetEnvironmentVariable is not None:
-                    skip_types_list.append(SetEnvironmentVariable)
+                    visit_and_expand_list.append(SetEnvironmentVariable)
                 if UnsetEnvironmentVariable is not None:
-                    skip_types_list.append(UnsetEnvironmentVariable)
+                    visit_and_expand_list.append(UnsetEnvironmentVariable)
                 if AppendEnvironmentVariable is not None:
-                    skip_types_list.append(AppendEnvironmentVariable)
+                    visit_and_expand_list.append(AppendEnvironmentVariable)
                 if PrependEnvironmentVariable is not None:
-                    skip_types_list.append(PrependEnvironmentVariable)
-                skip_types_tuple = tuple(skip_types_list)
+                    visit_and_expand_list.append(PrependEnvironmentVariable)
+                visit_and_expand_types_tuple = tuple(visit_and_expand_list)
+                
+                skip_without_visit_types_tuple = (LogInfo, DeclareLaunchArgument, OpaqueFunction)
             
-            # Use isinstance instead of safe_is_a to avoid type checking issues
-            is_skip_type = isinstance(entity, skip_types_tuple)
+            # Check action types
+            is_visit_and_expand_type = isinstance(entity, visit_and_expand_types_tuple)
+            is_skip_without_visit_type = isinstance(entity, skip_without_visit_types_tuple)
             
-            if is_skip_type:
-                # For IncludeLaunchDescription and other skip types, still try to visit and expand
+            if is_visit_and_expand_type:
+                # Visit and expand environment variable actions and included launch descriptions
+                # These affect the launch context and behavior
                 try:
                     visit_future = entity.visit(context)
                     if visit_future is not None:
@@ -362,6 +369,11 @@ if __name__ == "__main__":
                 except Exception:
                     # Some actions may not support visit(), that's okay
                     pass
+                continue
+            
+            if is_skip_without_visit_type:
+                # Skip these actions entirely - they don't affect node debugging
+                # Don't visit them as they have no sub-entities and may cause side effects
                 continue
             
             try:
