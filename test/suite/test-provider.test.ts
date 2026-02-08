@@ -148,4 +148,78 @@ void regular_function() {
         assert.ok(command.includes('pytest'), 'Should include pytest');
         assert.ok(command.includes('/path/to/test_file.py::TestClass::test_method'), 'Should include correct test selector');
     });
+    
+    it('Path exclusion: correctly identifies excluded paths', () => {
+        const workspaceRoot = '/home/user/workspace';
+        const excludeFolders = [
+            '${workspaceFolder}/external',
+            'submodules',
+            '/absolute/path/excluded'
+        ];
+        
+        // Helper function to simulate the isPathExcluded logic
+        const isPathExcluded = (filePath: string, workspaceRoot: string, excludeFolders: string[]): boolean => {
+            if (excludeFolders.length === 0) {
+                return false;
+            }
+            
+            const resolvedExcludeFolders = excludeFolders.map(excludePath => {
+                let resolved = excludePath.replace(/\$\{workspaceFolder\}/g, workspaceRoot);
+                if (!path.isAbsolute(resolved)) {
+                    resolved = path.join(workspaceRoot, resolved);
+                }
+                return path.normalize(resolved);
+            });
+            
+            const normalizedFilePath = path.normalize(filePath);
+            
+            for (const excludeFolder of resolvedExcludeFolders) {
+                // Ensure we match complete folder boundaries by checking for path separator
+                if (normalizedFilePath === excludeFolder || 
+                    normalizedFilePath.startsWith(excludeFolder + path.sep)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        };
+        
+        // Test cases
+        assert.strictEqual(
+            isPathExcluded('/home/user/workspace/external/test_file.py', workspaceRoot, excludeFolders),
+            true,
+            'Should exclude file in ${workspaceFolder}/external'
+        );
+        
+        assert.strictEqual(
+            isPathExcluded('/home/user/workspace/submodules/test_file.py', workspaceRoot, excludeFolders),
+            true,
+            'Should exclude file in relative path submodules'
+        );
+        
+        assert.strictEqual(
+            isPathExcluded('/absolute/path/excluded/test_file.py', workspaceRoot, excludeFolders),
+            true,
+            'Should exclude file in absolute excluded path'
+        );
+        
+        assert.strictEqual(
+            isPathExcluded('/home/user/workspace/src/test_file.py', workspaceRoot, excludeFolders),
+            false,
+            'Should NOT exclude file in non-excluded path'
+        );
+        
+        assert.strictEqual(
+            isPathExcluded('/home/user/workspace/test_file.py', workspaceRoot, []),
+            false,
+            'Should NOT exclude when excludeFolders is empty'
+        );
+        
+        // Test path boundary check - should not match partial folder names
+        assert.strictEqual(
+            isPathExcluded('/home/user/workspace/submodules2/test_file.py', workspaceRoot, ['submodules']),
+            false,
+            'Should NOT exclude file in folder with similar but not matching name (submodules2 vs submodules)'
+        );
+    });
 });

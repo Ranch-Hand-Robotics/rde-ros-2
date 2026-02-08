@@ -29,3 +29,29 @@ The extension automatically discovers tests by scanning for test files matching 
 * C++: `test_*.cpp`, `*_test.cpp`, `*Test.cpp`
 
 Tests are refreshed automatically when test files are created, modified, or deleted.
+
+### Filtering Test Discovery
+
+You can exclude specific folders from test discovery to prevent third-party or submodule tests from appearing in the Test Explorer. Configure this in your workspace settings:
+
+**Settings:**
+- **ROS2.testExcludeFolders**: List of folder paths to exclude when discovering ROS tests
+
+**Example configuration** (`.vscode/settings.json`):
+
+```json
+{
+  "ROS2.testExcludeFolders": [
+    "${workspaceFolder}/external",
+    "${workspaceFolder}/third_party",
+    "submodules"
+  ]
+}
+```
+
+**Path formats supported:**
+- Absolute paths: `/absolute/path/to/exclude`
+- Relative paths: `submodules` (relative to workspace root)
+- Variable substitution: `${workspaceFolder}/external`
+
+When a folder is excluded, all test files within that folder and its subdirectories will be ignored during test discovery.

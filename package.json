@@ -323,6 +323,14 @@
                     "additionalProperties": {
                         "type": "boolean"
                     }
+                },
+                "ROS2.testExcludeFolders": {
+                    "type": "array",
+                    "default": [],
+                    "description": "List of folder paths to exclude when discovering ROS tests. Paths can be absolute or relative to the workspace folder. Supports ${workspaceFolder} variable. Example: ['${workspaceFolder}/external', 'submodules']",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
