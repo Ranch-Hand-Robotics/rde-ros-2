@@ -87,6 +87,43 @@ export class RosTestProvider {
     }
 
     /**
+     * Check if a file path should be excluded based on testExcludeFolders setting
+     */
+    private isPathExcluded(filePath: string, workspaceRoot: string): boolean {
+        const config = vscode.workspace.getConfiguration('ROS2');
+        const excludeFolders: string[] = config.get('testExcludeFolders', []);
+        
+        if (excludeFolders.length === 0) {
+            return false;
+        }
+        
+        // Resolve variables in exclude paths
+        const resolvedExcludeFolders = excludeFolders.map(excludePath => {
+            // Replace ${workspaceFolder} with actual workspace root
+            let resolved = excludePath.replace(/\$\{workspaceFolder\}/g, workspaceRoot);
+            
+            // If path is not absolute, make it relative to workspace root
+            if (!path.isAbsolute(resolved)) {
+                resolved = path.join(workspaceRoot, resolved);
+            }
+            
+            // Normalize path for comparison
+            return path.normalize(resolved);
+        });
+        
+        const normalizedFilePath = path.normalize(filePath);
+        
+        // Check if file is under any excluded folder
+        for (const excludeFolder of resolvedExcludeFolders) {
+            if (normalizedFilePath.startsWith(excludeFolder)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
      * Discover all ROS 2 tests in the workspace
      */
     private async discoverTests(): Promise<void> {
@@ -149,6 +186,12 @@ export class RosTestProvider {
         for (const fileUri of testFiles) {
             const filePath = fileUri.fsPath;
             
+            // Skip if path is excluded
+            if (this.isPathExcluded(filePath, workspaceRoot)) {
+                extension.outputChannel.appendLine(`  Skipped ${path.relative(workspaceRoot, filePath)} - path excluded by testExcludeFolders setting`);
+                continue;
+            }
+            
             const relativePath = path.relative(workspaceRoot, filePath);
             
             // Extract package name from path structure
@@ -200,6 +243,13 @@ export class RosTestProvider {
 
         for (const fileUri of testFiles) {
             const filePath = fileUri.fsPath;
+            
+            // Skip if path is excluded
+            if (this.isPathExcluded(filePath, workspaceRoot)) {
+                extension.outputChannel.appendLine(`  Skipped ${path.relative(workspaceRoot, filePath)} - path excluded by testExcludeFolders setting`);
+                continue;
+            }
+            
             const packageName = TestDiscoveryUtils.findPackageName(filePath);
 
             const fileItem = this.testController.createTestItem(
