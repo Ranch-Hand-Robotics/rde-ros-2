@@ -115,12 +115,23 @@ export class RosTestProvider {
         
         // Check if file is under any excluded folder
         for (const excludeFolder of resolvedExcludeFolders) {
-            if (normalizedFilePath.startsWith(excludeFolder)) {
+            // Ensure we match complete folder boundaries by checking for path separator
+            if (normalizedFilePath === excludeFolder || 
+                normalizedFilePath.startsWith(excludeFolder + path.sep)) {
                 return true;
             }
         }
         
         return false;
+    }
+
+    /**
+     * Log that a test file was skipped due to exclusion
+     */
+    private logExcludedFile(filePath: string, workspaceRoot: string): void {
+        extension.outputChannel.appendLine(
+            `  Skipped ${path.relative(workspaceRoot, filePath)} - path excluded by testExcludeFolders setting`
+        );
     }
 
     /**
@@ -188,7 +199,7 @@ export class RosTestProvider {
             
             // Skip if path is excluded
             if (this.isPathExcluded(filePath, workspaceRoot)) {
-                extension.outputChannel.appendLine(`  Skipped ${path.relative(workspaceRoot, filePath)} - path excluded by testExcludeFolders setting`);
+                this.logExcludedFile(filePath, workspaceRoot);
                 continue;
             }
             
@@ -246,7 +257,7 @@ export class RosTestProvider {
             
             // Skip if path is excluded
             if (this.isPathExcluded(filePath, workspaceRoot)) {
-                extension.outputChannel.appendLine(`  Skipped ${path.relative(workspaceRoot, filePath)} - path excluded by testExcludeFolders setting`);
+                this.logExcludedFile(filePath, workspaceRoot);
                 continue;
             }
             

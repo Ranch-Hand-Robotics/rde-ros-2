@@ -174,7 +174,9 @@ void regular_function() {
             const normalizedFilePath = path.normalize(filePath);
             
             for (const excludeFolder of resolvedExcludeFolders) {
-                if (normalizedFilePath.startsWith(excludeFolder)) {
+                // Ensure we match complete folder boundaries by checking for path separator
+                if (normalizedFilePath === excludeFolder || 
+                    normalizedFilePath.startsWith(excludeFolder + path.sep)) {
                     return true;
                 }
             }
@@ -211,6 +213,13 @@ void regular_function() {
             isPathExcluded('/home/user/workspace/test_file.py', workspaceRoot, []),
             false,
             'Should NOT exclude when excludeFolders is empty'
+        );
+        
+        // Test path boundary check - should not match partial folder names
+        assert.strictEqual(
+            isPathExcluded('/home/user/workspace/submodules2/test_file.py', workspaceRoot, ['submodules']),
+            false,
+            'Should NOT exclude file in folder with similar but not matching name (submodules2 vs submodules)'
         );
     });
 });
