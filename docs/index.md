@@ -12,6 +12,7 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Resolve dependencies with `rosdep` shortcut
 * Syntax highlighting for `.msg`, `.urdf` and other ROS files.
 * [IntelliSense support for ROS message files](intellisense.md) with hover information showing message properties and go-to-definition
+* [Code snippets](snippets.md) for Python, C++, and launch files to accelerate development
 * Automatically add the ROS C++ include and Python import paths.
 * Format C++ using the ROS `clang-format` style.
 * [Discover and run ROS 2 tests](test-explorer.md) with integrated Test Explorer support
