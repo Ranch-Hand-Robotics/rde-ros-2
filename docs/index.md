@@ -9,6 +9,7 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 * Allows starting, stopping and viewing the ROS core status.
 * Automatically create `colcon` build and test tasks.
 * Run and Debug ROS Launch Files
+* **Monitor ROS 2 topics in real-time** with the integrated Topic Monitor
 * Resolve dependencies with `rosdep` shortcut
 * Syntax highlighting for `.msg`, `.urdf` and other ROS files.
 * [IntelliSense support for ROS message files](intellisense.md) with hover information showing message properties and go-to-definition
