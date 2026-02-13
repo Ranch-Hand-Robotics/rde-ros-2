@@ -40,13 +40,11 @@ jobs:
       - name: Run unit tests (headless)
         id: test
         run: |
+          set -o pipefail
           if [ "$RUNNER_OS" == "Linux" ]; then
             npm run headless-test 2>&1 | tee test-output.txt
-            exit ${PIPESTATUS[0]}
           else
             npm test 2>&1 | tee test-output.txt
-            exit_code=$?
-            exit $exit_code
           fi
       - name: Publish test results
         if: always() && runner.os == 'Linux'
