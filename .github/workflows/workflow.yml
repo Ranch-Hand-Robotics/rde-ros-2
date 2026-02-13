@@ -45,9 +45,11 @@ jobs:
             exit ${PIPESTATUS[0]}
           else
             npm test 2>&1 | tee test-output.txt
+            exit_code=$?
+            exit $exit_code
           fi
       - name: Publish test results
-        if: always()
+        if: always() && runner.os == 'Linux'
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: 'test-results/junit.xml'
