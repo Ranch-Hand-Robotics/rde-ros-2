@@ -53,8 +53,8 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: 'test-results/junit.xml'
-          check_name: 'Unit Test Results (${{ matrix.os }})'
-          comment_title: '🧪 Unit Test Results (${{ matrix.os }})'
+          check_name: 'Unit Test Results (Linux)'
+          comment_title: '🧪 Unit Test Results (Linux)'
       - name: Generate test summary
         if: always()
         run: |
