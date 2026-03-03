@@ -1,0 +1,293 @@
+{
+  "ROS2 C++ Node Class": {
+    "prefix": "ros2node",
+    "body": [
+      "#include \"rclcpp/rclcpp.hpp\"",
+      "",
+      "class ${1:MyNode} : public rclcpp::Node",
+      "{",
+      "public:",
+      "\t${1:MyNode}() : Node(\"${2:my_node}\")",
+      "\t{",
+      "\t\t${0}",
+      "\t}",
+      "",
+      "private:",
+      "\t",
+      "};",
+      "",
+      "int main(int argc, char * argv[])",
+      "{",
+      "\trclcpp::init(argc, argv);",
+      "\trclcpp::spin(std::make_shared<${1:MyNode}>());",
+      "\trclcpp::shutdown();",
+      "\treturn 0;",
+      "}"
+    ],
+    "description": "ROS 2 C++ node class template"
+  },
+  "ROS2 C++ Component Node": {
+    "prefix": "ros2component",
+    "body": [
+      "#include \"rclcpp/rclcpp.hpp\"",
+      "#include \"rclcpp_components/register_node_macro.hpp\"",
+      "",
+      "namespace ${1:my_namespace}",
+      "{",
+      "",
+      "class ${2:MyNode} : public rclcpp::Node",
+      "{",
+      "public:",
+      "\texplicit ${2:MyNode}(const rclcpp::NodeOptions & options)",
+      "\t: Node(\"${3:my_node}\", options)",
+      "\t{",
+      "\t\t${0}",
+      "\t}",
+      "",
+      "private:",
+      "\t",
+      "};",
+      "",
+      "}  // namespace ${1:my_namespace}",
+      "",
+      "RCLCPP_COMPONENTS_REGISTER_NODE(${1:my_namespace}::${2:MyNode})"
+    ],
+    "description": "ROS 2 C++ component node template"
+  },
+  "ROS2 C++ Publisher": {
+    "prefix": "ros2pub",
+    "body": [
+      "publisher_ = this->create_publisher<${1:std_msgs::msg::String}>(",
+      "\t\"${2:topic_name}\", ${3:10});",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ publisher"
+  },
+  "ROS2 C++ Publisher with Timer": {
+    "prefix": "ros2pubtimer",
+    "body": [
+      "publisher_ = this->create_publisher<${1:std_msgs::msg::String}>(",
+      "\t\"${2:topic_name}\", ${3:10});",
+      "timer_ = this->create_wall_timer(",
+      "\tstd::chrono::milliseconds(${4:500}),",
+      "\tstd::bind(&${5:MyNode}::${6:timer_callback}, this));",
+      "",
+      "void ${6:timer_callback}()",
+      "{",
+      "\tauto message = ${1:std_msgs::msg::String}();",
+      "\tmessage.data = \"${7:Hello}\";",
+      "\tRCLCPP_INFO(this->get_logger(), \"Publishing: '%s'\", message.data.c_str());",
+      "\tpublisher_->publish(message);",
+      "}",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ publisher with timer callback"
+  },
+  "ROS2 C++ Subscriber": {
+    "prefix": "ros2sub",
+    "body": [
+      "subscription_ = this->create_subscription<${1:std_msgs::msg::String}>(",
+      "\t\"${2:topic_name}\", ${3:10},",
+      "\tstd::bind(&${4:MyNode}::${5:topic_callback}, this, std::placeholders::_1));",
+      "",
+      "void ${5:topic_callback}(const ${1:std_msgs::msg::String}::SharedPtr msg)",
+      "{",
+      "\tRCLCPP_INFO(this->get_logger(), \"I heard: '%s'\", msg->data.c_str());",
+      "}",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ subscriber"
+  },
+  "ROS2 C++ Subscriber Lambda": {
+    "prefix": "ros2sublambda",
+    "body": [
+      "subscription_ = this->create_subscription<${1:std_msgs::msg::String}>(",
+      "\t\"${2:topic_name}\", ${3:10},",
+      "\t[this](const ${1:std_msgs::msg::String}::SharedPtr msg) {",
+      "\t\tRCLCPP_INFO(this->get_logger(), \"I heard: '%s'\", msg->data.c_str());",
+      "\t\t${0}",
+      "\t});",
+      ""
+    ],
+    "description": "ROS 2 C++ subscriber with lambda"
+  },
+  "ROS2 C++ Timer": {
+    "prefix": "ros2timer",
+    "body": [
+      "timer_ = this->create_wall_timer(",
+      "\tstd::chrono::milliseconds(${1:500}),",
+      "\tstd::bind(&${2:MyNode}::${3:timer_callback}, this));",
+      "",
+      "void ${3:timer_callback}()",
+      "{",
+      "\t${0}",
+      "}"
+    ],
+    "description": "ROS 2 C++ timer"
+  },
+  "ROS2 C++ Service Server": {
+    "prefix": "ros2srv",
+    "body": [
+      "service_ = this->create_service<${1:std_srvs::srv::AddTwoInts}>(",
+      "\t\"${2:add_two_ints}\",",
+      "\tstd::bind(&${3:MyNode}::${4:handle_service},",
+      "\t\tthis, std::placeholders::_1, std::placeholders::_2));",
+      "",
+      "void ${4:handle_service}(",
+      "\tconst std::shared_ptr<${1:std_srvs::srv::AddTwoInts}::Request> request,",
+      "\tstd::shared_ptr<${1:std_srvs::srv::AddTwoInts}::Response> response)",
+      "{",
+      "\t${0}",
+      "}"
+    ],
+    "description": "ROS 2 C++ service server"
+  },
+  "ROS2 C++ Service Client": {
+    "prefix": "ros2client",
+    "body": [
+      "client_ = this->create_client<${1:std_srvs::srv::AddTwoInts}>(\"${2:add_two_ints}\");",
+      "",
+      "while (!client_->wait_for_service(std::chrono::seconds(1))) {",
+      "\tif (!rclcpp::ok()) {",
+      "\t\tRCLCPP_ERROR(this->get_logger(), \"Interrupted while waiting for service.\");",
+      "\t\treturn;",
+      "\t}",
+      "\tRCLCPP_INFO(this->get_logger(), \"Service not available, waiting...\");",
+      "}",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ service client"
+  },
+  "ROS2 C++ Service Call": {
+    "prefix": "ros2call",
+    "body": [
+      "auto request = std::make_shared<${1:std_srvs::srv::AddTwoInts}::Request>();",
+      "${2:request->a = 1;}",
+      "${3:request->b = 2;}",
+      "auto result = client_->async_send_request(request);",
+      "if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), result) ==",
+      "\trclcpp::FutureReturnCode::SUCCESS)",
+      "{",
+      "\tRCLCPP_INFO(this->get_logger(), \"Result: %ld\", result.get()->sum);",
+      "} else {",
+      "\tRCLCPP_ERROR(this->get_logger(), \"Failed to call service\");",
+      "}",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ async service call"
+  },
+  "ROS2 C++ Declare Parameter": {
+    "prefix": "ros2param",
+    "body": [
+      "this->declare_parameter(\"${1:param_name}\", ${2:default_value});",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ declare parameter"
+  },
+  "ROS2 C++ Get Parameter": {
+    "prefix": "ros2getparam",
+    "body": [
+      "this->get_parameter(\"${1:param_name}\", ${2:variable});",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ get parameter"
+  },
+  "ROS2 C++ Declare and Get Parameter": {
+    "prefix": "ros2declgetparam",
+    "body": [
+      "this->declare_parameter(\"${1:param_name}\", ${2:default_value});",
+      "this->get_parameter(\"${1:param_name}\", ${3:variable});",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ declare and get parameter"
+  },
+  "ROS2 C++ Log Debug": {
+    "prefix": "ros2debug",
+    "body": [
+      "RCLCPP_DEBUG(this->get_logger(), \"${1:message}\");",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ debug log"
+  },
+  "ROS2 C++ Log Info": {
+    "prefix": "ros2info",
+    "body": [
+      "RCLCPP_INFO(this->get_logger(), \"${1:message}\");",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ info log"
+  },
+  "ROS2 C++ Log Warning": {
+    "prefix": "ros2warn",
+    "body": [
+      "RCLCPP_WARN(this->get_logger(), \"${1:message}\");",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ warning log"
+  },
+  "ROS2 C++ Log Error": {
+    "prefix": "ros2error",
+    "body": [
+      "RCLCPP_ERROR(this->get_logger(), \"${1:message}\");",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ error log"
+  },
+  "ROS2 C++ Log Fatal": {
+    "prefix": "ros2fatal",
+    "body": [
+      "RCLCPP_FATAL(this->get_logger(), \"${1:message}\");",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ fatal log"
+  },
+  "ROS2 C++ QoS Profile": {
+    "prefix": "ros2qos",
+    "body": [
+      "auto qos = rclcpp::QoS(rclcpp::KeepLast(${1:10}));",
+      "qos.${2|reliable,best_effort|}();",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ QoS profile"
+  },
+  "ROS2 C++ Action Server": {
+    "prefix": "ros2actionserver",
+    "body": [
+      "#include \"rclcpp_action/rclcpp_action.hpp\"",
+      "",
+      "using ${1:Fibonacci} = ${2:example_interfaces::action::Fibonacci};",
+      "using GoalHandle${1:Fibonacci} = rclcpp_action::ServerGoalHandle<${1:Fibonacci}>;",
+      "",
+      "action_server_ = rclcpp_action::create_server<${1:Fibonacci}>(",
+      "\tthis,",
+      "\t\"${3:fibonacci}\",",
+      "\tstd::bind(&${4:MyNode}::handle_goal, this, std::placeholders::_1, std::placeholders::_2),",
+      "\tstd::bind(&${4:MyNode}::handle_cancel, this, std::placeholders::_1),",
+      "\tstd::bind(&${4:MyNode}::handle_accepted, this, std::placeholders::_1));",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ action server"
+  },
+  "ROS2 C++ Action Client": {
+    "prefix": "ros2actionclient",
+    "body": [
+      "#include \"rclcpp_action/rclcpp_action.hpp\"",
+      "",
+      "action_client_ = rclcpp_action::create_client<${1:example_interfaces::action::Fibonacci}>(",
+      "\tthis,",
+      "\t\"${2:fibonacci}\");",
+      "${0}"
+    ],
+    "description": "ROS 2 C++ action client"
+  },
+  "ROS2 C++ Component Register Macro": {
+    "prefix": "ros2register",
+    "body": [
+      "#include \"rclcpp_components/register_node_macro.hpp\"",
+      "",
+      "RCLCPP_COMPONENTS_REGISTER_NODE(${1:namespace}::${2:ClassName})",
+      "${0}"
+    ],
+    "description": "ROS 2 component registration macro"
+  }
+}

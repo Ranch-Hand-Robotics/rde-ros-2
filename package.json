@@ -14,6 +14,7 @@
     "aiKey": "",
     "categories": [
         "Debuggers",
+        "Snippets",
         "Other"
     ],
     "capabilities": {
@@ -165,9 +166,117 @@
             {
                 "command": "ROS2.showWelcome",
                 "title": "Show Getting Started Guide",
+            },
+            {
+                "command": "ROS2.launchTree.refresh",
+                "title": "Refresh Launch Tree",
+                "category": "ROS2",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "ROS2.launchTree.reveal",
+                "title": "Reveal in Launch Tree",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.launchTree.findUsages",
+                "title": "Find Launch File Usages",
+                "category": "ROS2",
+                "icon": "$(search)"
+            },
+            {
+                "command": "ROS2.launchTree.run",
+                "title": "Run Launch File",
+                "category": "ROS2",
+                "icon": "$(play)"
+            },
+            {
+                "command": "ROS2.launchTree.debug",
+                "title": "Debug Launch File",
+                "category": "ROS2",
+                "icon": "$(debug-alt)"
+            },
+            {
+                "command": "ROS2.colcon.toggleIgnore",
+                "title": "Toggle Colcon Ignore",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.colcon.buildPackageRelease",
+                "title": "Colcon Build (Release)",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.colcon.buildPackageDebug",
+                "title": "Colcon Build (Debug)",
                 "category": "ROS2"
             }
         ],
+        "menus": {
+            "explorer/context": [
+                {
+                    "submenu": "ROS2.explorer",
+                    "group": "ROS2",
+                    "when": "explorerResourceIsFolder"
+                }
+            ],
+            "ROS2.explorer": [
+                {
+                    "command": "ROS2.colcon.toggleIgnore",
+                    "group": "1_colcon@1"
+                },
+                {
+                    "command": "ROS2.colcon.buildPackageRelease",
+                    "group": "1_colcon@2"
+                },
+                {
+                    "command": "ROS2.colcon.buildPackageDebug",
+                    "group": "1_colcon@3"
+                }
+            ]
+        },
+        "submenus": [
+            {
+                "id": "ROS2.explorer",
+                "label": "ROS 2"
+            }
+        ],
+        "views": {
+            "explorer": [
+                {
+                    "id": "ros2LaunchTree",
+                    "name": "ROS 2 Launch Files",
+                    "contextualTitle": "ROS 2 Launch Tree",
+                    "visibility": "visible"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "ROS2.launchTree.refresh",
+                    "when": "view == ros2LaunchTree",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "ROS2.launchTree.run",
+                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "group": "1_run@1"
+                },
+                {
+                    "command": "ROS2.launchTree.debug",
+                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "group": "1_run@2"
+                },
+                {
+                    "command": "ROS2.launchTree.findUsages",
+                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "group": "2_navigation@1"
+                }
+            ]
+        },
         "mcpServerDefinitionProviders": [
             {
                 "id": "ROS 2",
@@ -196,6 +305,11 @@
                     "default": true,
                     "description": "Automatically show the ROS 2 output channel when there are warnings or errors."
                 },
+                "ROS2.enableFileDecorations": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show Explorer file decorations indicating whether a package is ignored or included in colcon builds."
+                },
                 "ROS2.debugPythonUsingSourceFiles": {
                     "type": "boolean",
                     "default": false,
@@ -210,6 +324,22 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Show the Getting Started walkthrough when the extension is first installed or when ROS 2 is not detected."
+                },
+                "ROS2.colconIgnore": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Map of package names to ignore during colcon build. Keys are package names, values are boolean (true to ignore).",
+                    "additionalProperties": {
+                        "type": "boolean"
+                    }
+                },
+                "ROS2.testExcludeFolders": {
+                    "type": "array",
+                    "default": [],
+                    "description": "List of folder paths to exclude when discovering ROS tests. Paths can be absolute or relative to the workspace folder. Supports ${workspaceFolder} variable. Example: ['${workspaceFolder}/external', 'submodules']",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -399,6 +529,24 @@
                 "path": "./languages/syntaxes/ROS Interface.tmLanguage.json"
             }
         ],
+        "snippets": [
+            {
+                "language": "python",
+                "path": "./snippets/python.json"
+            },
+            {
+                "language": "cpp",
+                "path": "./snippets/cpp.json"
+            },
+            {
+                "language": "python",
+                "path": "./snippets/launch-py.json"
+            },
+            {
+                "language": "xml",
+                "path": "./snippets/launch-xml.json"
+            }
+        ],
         "problemMatchers": [
             {
                 "name": "colcon-gcc",
@@ -543,6 +691,7 @@
         "test-compile": "tsc -p ./"
     },
     "dependencies": {
+        "@ranchhandrobotics/rde-common": "^1.0.0",
         "@vscode/debugadapter": "^1.68.0",
         "@vscode/extension-telemetry": "^1.2.0",
         "@vscode/vsce": "^3.7.0",

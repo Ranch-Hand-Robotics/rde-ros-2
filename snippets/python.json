@@ -1,0 +1,241 @@
+{
+  "ROS2 Python Node Class": {
+    "prefix": "ros2node",
+    "body": [
+      "import rclpy",
+      "from rclpy.node import Node",
+      "",
+      "",
+      "class ${1:MyNode}(Node):",
+      "\tdef __init__(self):",
+      "\t\tsuper().__init__('${2:my_node}')",
+      "\t\t${0}",
+      "",
+      "",
+      "def main(args=None):",
+      "\trclpy.init(args=args)",
+      "\tnode = ${1:MyNode}()",
+      "\trclpy.spin(node)",
+      "\tnode.destroy_node()",
+      "\trclpy.shutdown()",
+      "",
+      "",
+      "if __name__ == '__main__':",
+      "\tmain()"
+    ],
+    "description": "ROS 2 Python node class template"
+  },
+  "ROS2 Python Publisher": {
+    "prefix": "ros2pub",
+    "body": [
+      "self.publisher_ = self.create_publisher(",
+      "\t${1:String},",
+      "\t'${2:topic_name}',",
+      "\t${3:10}",
+      ")",
+      "${0}"
+    ],
+    "description": "ROS 2 publisher"
+  },
+  "ROS2 Python Publisher with Timer": {
+    "prefix": "ros2pubtimer",
+    "body": [
+      "self.publisher_ = self.create_publisher(",
+      "\t${1:String},",
+      "\t'${2:topic_name}',",
+      "\t${3:10}",
+      ")",
+      "self.timer = self.create_timer(${4:1.0}, self.timer_callback)",
+      "",
+      "def timer_callback(self):",
+      "\tmsg = ${1:String}()",
+      "\tmsg.data = '${5:Hello}'",
+      "\tself.publisher_.publish(msg)",
+      "\tself.get_logger().info('Publishing: \"${5:Hello}\"')",
+      "${0}"
+    ],
+    "description": "ROS 2 publisher with timer callback"
+  },
+  "ROS2 Python Subscriber": {
+    "prefix": "ros2sub",
+    "body": [
+      "self.subscription = self.create_subscription(",
+      "\t${1:String},",
+      "\t'${2:topic_name}',",
+      "\tself.${3:listener_callback},",
+      "\t${4:10}",
+      ")",
+      "",
+      "def ${3:listener_callback}(self, msg):",
+      "\tself.get_logger().info('Received: \"%s\"' % msg.data)",
+      "${0}"
+    ],
+    "description": "ROS 2 subscriber"
+  },
+  "ROS2 Python Timer": {
+    "prefix": "ros2timer",
+    "body": [
+      "self.timer = self.create_timer(${1:1.0}, self.${2:timer_callback})",
+      "",
+      "def ${2:timer_callback}(self):",
+      "\t${0:pass}"
+    ],
+    "description": "ROS 2 timer"
+  },
+  "ROS2 Python Service Server": {
+    "prefix": "ros2srv",
+    "body": [
+      "self.srv = self.create_service(",
+      "\t${1:AddTwoInts},",
+      "\t'${2:add_two_ints}',",
+      "\tself.${3:handle_service}",
+      ")",
+      "",
+      "def ${3:handle_service}(self, request, response):",
+      "\t${0:pass}",
+      "\treturn response"
+    ],
+    "description": "ROS 2 service server"
+  },
+  "ROS2 Python Service Client": {
+    "prefix": "ros2client",
+    "body": [
+      "self.client = self.create_client(",
+      "\t${1:AddTwoInts},",
+      "\t'${2:add_two_ints}'",
+      ")",
+      "while not self.client.wait_for_service(timeout_sec=1.0):",
+      "\tself.get_logger().info('service not available, waiting...')",
+      "${0}"
+    ],
+    "description": "ROS 2 service client"
+  },
+  "ROS2 Python Service Call": {
+    "prefix": "ros2call",
+    "body": [
+      "request = ${1:AddTwoInts}.Request()",
+      "${2:request.a = 1}",
+      "${3:request.b = 2}",
+      "future = self.client.call_async(request)",
+      "rclpy.spin_until_future_complete(self, future)",
+      "response = future.result()",
+      "${0}"
+    ],
+    "description": "ROS 2 async service call"
+  },
+  "ROS2 Python Declare Parameter": {
+    "prefix": "ros2param",
+    "body": [
+      "self.declare_parameter('${1:param_name}', ${2:default_value})",
+      "${0}"
+    ],
+    "description": "ROS 2 declare parameter"
+  },
+  "ROS2 Python Get Parameter": {
+    "prefix": "ros2getparam",
+    "body": [
+      "self.get_parameter('${1:param_name}').${2:value}",
+      "${0}"
+    ],
+    "description": "ROS 2 get parameter"
+  },
+  "ROS2 Python Declare and Get Parameter": {
+    "prefix": "ros2declgetparam",
+    "body": [
+      "self.declare_parameter('${1:param_name}', ${2:default_value})",
+      "${3:value} = self.get_parameter('${1:param_name}').${4:value}",
+      "${0}"
+    ],
+    "description": "ROS 2 declare and get parameter"
+  },
+  "ROS2 Python Log Debug": {
+    "prefix": "ros2debug",
+    "body": [
+      "self.get_logger().debug('${1:message}')",
+      "${0}"
+    ],
+    "description": "ROS 2 debug log"
+  },
+  "ROS2 Python Log Info": {
+    "prefix": "ros2info",
+    "body": [
+      "self.get_logger().info('${1:message}')",
+      "${0}"
+    ],
+    "description": "ROS 2 info log"
+  },
+  "ROS2 Python Log Warning": {
+    "prefix": "ros2warn",
+    "body": [
+      "self.get_logger().warning('${1:message}')",
+      "${0}"
+    ],
+    "description": "ROS 2 warning log"
+  },
+  "ROS2 Python Log Error": {
+    "prefix": "ros2error",
+    "body": [
+      "self.get_logger().error('${1:message}')",
+      "${0}"
+    ],
+    "description": "ROS 2 error log"
+  },
+  "ROS2 Python Log Fatal": {
+    "prefix": "ros2fatal",
+    "body": [
+      "self.get_logger().fatal('${1:message}')",
+      "${0}"
+    ],
+    "description": "ROS 2 fatal log"
+  },
+  "ROS2 Python Action Server": {
+    "prefix": "ros2actionserver",
+    "body": [
+      "from rclpy.action import ActionServer",
+      "",
+      "self._action_server = ActionServer(",
+      "\tself,",
+      "\t${1:Fibonacci},",
+      "\t'${2:fibonacci}',",
+      "\tself.${3:execute_callback}",
+      ")",
+      "",
+      "def ${3:execute_callback}(self, goal_handle):",
+      "\tself.get_logger().info('Executing goal...')",
+      "\t${4:# Process the goal}",
+      "\tgoal_handle.succeed()",
+      "\tresult = ${1:Fibonacci}.Result()",
+      "\treturn result",
+      "${0}"
+    ],
+    "description": "ROS 2 action server"
+  },
+  "ROS2 Python Action Client": {
+    "prefix": "ros2actionclient",
+    "body": [
+      "from rclpy.action import ActionClient",
+      "",
+      "self._action_client = ActionClient(",
+      "\tself,",
+      "\t${1:Fibonacci},",
+      "\t'${2:fibonacci}'",
+      ")",
+      "${0}"
+    ],
+    "description": "ROS 2 action client"
+  },
+  "ROS2 Python QoS Profile": {
+    "prefix": "ros2qos",
+    "body": [
+      "from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy",
+      "",
+      "qos_profile = QoSProfile(",
+      "\treliability=ReliabilityPolicy.${1|RELIABLE,BEST_EFFORT|},",
+      "\thistory=HistoryPolicy.${2|KEEP_LAST,KEEP_ALL|},",
+      "\tdepth=${3:10}",
+      ")",
+      "${0}"
+    ],
+    "description": "ROS 2 QoS profile"
+  }
+}

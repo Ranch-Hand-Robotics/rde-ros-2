@@ -5,7 +5,6 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 import * as extension from "../extension";
-import * as pfs from "../promise-fs";
 import * as telemetry from "../telemetry-helper";
 import * as colcon from "./colcon";
 

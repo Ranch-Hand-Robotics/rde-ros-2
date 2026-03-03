@@ -2,44 +2,33 @@
 // Licensed under the MIT License.
 
 import * as path from "path";
+import { promises as fsPromises } from "fs";
 import * as vscode from "vscode";
 
 import * as extension from "../extension";
-import * as pfs from "../promise-fs";
 import * as telemetry from "../telemetry-helper";
 import { rosApi } from "./ros";
 
-const PYTHON_AUTOCOMPLETE_PATHS = "python.autoComplete.extraPaths";
-const PYTHON_ANALYSIS_PATHS = "python.analysis.extraPaths";
+// Import common utilities
+import { makeWorkspaceRelative } from "@ranchhandrobotics/rde-common";
+
+// Re-export for backwards compatibility
+export { makeWorkspaceRelative };
 
 /**
- * Converts an absolute path to a workspace-relative path.
- * If the path is within the workspace, returns a relative path.
- * Otherwise, returns the original absolute path.
+ * Check if a file or directory exists.
  */
-export function makeWorkspaceRelative(absolutePath: string | null | undefined, workspaceRoot: string | null | undefined): string {
-    if (!absolutePath || !workspaceRoot) {
-        return absolutePath || "";
+async function exists(filePath: string): Promise<boolean> {
+    try {
+        await fsPromises.access(filePath);
+        return true;
+    } catch {
+        return false;
     }
-    
-    // Normalize both paths for comparison
-    const normalizedAbsolute = path.normalize(absolutePath);
-    const normalizedWorkspace = path.normalize(workspaceRoot);
-    
-    // Check if the path is within the workspace
-    // Add path separator to ensure we're matching the full directory name
-    const workspaceWithSep = normalizedWorkspace.endsWith(path.sep) 
-        ? normalizedWorkspace 
-        : normalizedWorkspace + path.sep;
-    
-    if (normalizedAbsolute.startsWith(workspaceWithSep) || normalizedAbsolute === normalizedWorkspace) {
-        const relativePath = path.relative(normalizedWorkspace, normalizedAbsolute);
-        return relativePath;
-    }
-    
-    // Path is outside the workspace, return as-is
-    return absolutePath;
 }
+
+const PYTHON_AUTOCOMPLETE_PATHS = "python.autoComplete.extraPaths";
+const PYTHON_ANALYSIS_PATHS = "python.analysis.extraPaths";
 
 /**
  * Creates config files which don't exist.
@@ -60,8 +49,8 @@ export async function createConfigFiles() {
     const dir = path.join(vscode.workspace.rootPath, ".vscode");
 
     // Update the C++ path.
-    pfs.exists(path.join(dir, "c_cpp_properties.json")).then(exists => {
-        if (!exists) {
+    exists(path.join(dir, "c_cpp_properties.json")).then(existsResult => {
+        if (!existsResult) {
             updateCppPropertiesInternal();
         }
     });
@@ -133,9 +122,7 @@ async function updateCppPropertiesInternal(): Promise<void> {
 
         // read the existing file
         try {
-            let existing: any = JSON.parse(await pfs
-                .readFile(filename)
-                .then(buffer => buffer.toString()));
+            let existing: any = JSON.parse(await fsPromises.readFile(filename, 'utf8'));
 
             // if the existing configurations are different from the defaults, use the existing values
             if (existing.configurations && existing.configurations.length > 0) {
@@ -155,11 +142,11 @@ async function updateCppPropertiesInternal(): Promise<void> {
     // Ensure the ".vscode" directory exists then update the C++ path.
     const dir = path.join(vscode.workspace.rootPath, ".vscode");
 
-    if (!await pfs.exists(dir)) {
-        await pfs.mkdir(dir);
+    if (!await exists(dir)) {
+        await fsPromises.mkdir(dir, { recursive: true });
     }
 
-    await pfs.writeFile(filename, JSON.stringify(cppProperties, undefined, 2));
+    await fsPromises.writeFile(filename, JSON.stringify(cppProperties, undefined, 2), 'utf8');
 }
 
 export function updatePythonPath(context: vscode.ExtensionContext) {

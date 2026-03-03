@@ -2,6 +2,17 @@
 
 All notable changes to the Robot Developer Extensions for ROS 2 are documented in this file.
 
+## [Unreleased]
+
+### Added
+- Code snippets for Python (rclpy), C++ (rclcpp), and launch files (Python and XML)
+  - Node templates with publishers, subscribers, services, actions, and parameters
+  - Logging statements (debug, info, warn, error, fatal)
+  - Launch file templates with nodes, arguments, includes, and composable nodes
+  - QoS profile snippets
+  - Component registration macros for C++
+- Documentation for using code snippets
+
 ## [1.1.0] - 2025-12-21
 
 ### Added
