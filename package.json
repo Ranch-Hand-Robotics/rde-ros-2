@@ -164,6 +164,10 @@
                 "icon": "$(debug-alt)"
             },
             {
+                "command": "ROS2.showWelcome",
+                "title": "Show Getting Started Guide"
+            },
+            {
                 "command": "ROS2.launchTree.refresh",
                 "title": "Refresh Launch Tree",
                 "category": "ROS2",
@@ -229,25 +233,7 @@
                     "command": "ROS2.colcon.buildPackageDebug",
                     "group": "1_colcon@3"
                 }
-            ]
-        },
-        "submenus": [
-            {
-                "id": "ROS2.explorer",
-                "label": "ROS 2"
-            }
-        ],
-        "views": {
-            "explorer": [
-                {
-                    "id": "ros2LaunchTree",
-                    "name": "ROS 2 Launch Files",
-                    "contextualTitle": "ROS 2 Launch Tree",
-                    "visibility": "visible"
-                }
-            ]
-        },
-        "menus": {
+            ],
             "view/title": [
                 {
                     "command": "ROS2.launchTree.refresh",
@@ -270,6 +256,22 @@
                     "command": "ROS2.launchTree.findUsages",
                     "when": "view == ros2LaunchTree && viewItem == launchFile",
                     "group": "2_navigation@1"
+                }
+            ]
+        },
+        "submenus": [
+            {
+                "id": "ROS2.explorer",
+                "label": "ROS 2"
+            }
+        ],
+        "views": {
+            "explorer": [
+                {
+                    "id": "ros2LaunchTree",
+                    "name": "ROS 2 Launch Files",
+                    "contextualTitle": "ROS 2 Launch Tree",
+                    "visibility": "visible"
                 }
             ]
         },
@@ -315,6 +317,16 @@
                     "type": "string",
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
+                },
+                "ROS2.showWelcomeOnStartup": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show the Getting Started walkthrough when the extension is first installed or when ROS 2 is not detected."
+                },
+                "ROS2.hasShownWelcome": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Whether the welcome walkthrough has been shown to the user."
                 },
                 "ROS2.colconIgnore": {
                     "type": "object",
@@ -613,6 +625,57 @@
             {
                 "id": "ros2-test-provider",
                 "label": "ROS 2 Tests"
+            }
+        ],
+        "walkthroughs": [
+            {
+                "id": "ros2.gettingStarted",
+                "title": "Get Started with ROS 2",
+                "description": "Learn how to set up and use the Robot Developer Extensions for ROS 2",
+                "steps": [
+                    {
+                        "id": "ros2.welcome",
+                        "title": "Welcome to ROS 2 Development",
+                        "description": "Learn about the powerful features available in the Robot Developer Extensions for ROS 2.",
+                        "media": {
+                            "markdown": "media/walkthroughs/getting-started.md"
+                        }
+                    },
+                    {
+                        "id": "ros2.installLinux",
+                        "title": "Install ROS 2 on Linux",
+                        "description": "Follow this guide if you're on Linux and need to install ROS 2 using apt.",
+                        "media": {
+                            "markdown": "media/walkthroughs/install-ros-linux.md"
+                        },
+                        "when": "isLinux"
+                    },
+                    {
+                        "id": "ros2.installPixi",
+                        "title": "Install ROS 2 with Pixi",
+                        "description": "Learn how to install ROS 2 using Pixi on Windows or macOS.",
+                        "media": {
+                            "markdown": "media/walkthroughs/install-ros-pixi.md"
+                        },
+                        "when": "isWindows || isMac"
+                    },
+                    {
+                        "id": "ros2.aiFeatures",
+                        "title": "Use AI Features for Robotics Development",
+                        "description": "Learn how to use AI-powered completions, the MCP server, and custom agents for ROS 2 development.",
+                        "media": {
+                            "markdown": "media/walkthroughs/ai-features.md"
+                        }
+                    },
+                    {
+                        "id": "ros2.learnFeatures",
+                        "title": "Explore Extension Features",
+                        "description": "Discover the commands and features available for ROS 2 development.",
+                        "media": {
+                            "markdown": "media/walkthroughs/commands-and-features.md"
+                        }
+                    }
+                ]
             }
         ]
     },

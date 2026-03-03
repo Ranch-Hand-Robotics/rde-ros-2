@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 import * as path from "path";
-import * as fs from "fs";
 import { promises as fsPromises } from "fs";
 import * as vscode from "vscode";
 import * as child_process from "child_process";
@@ -96,6 +95,7 @@ export enum Commands {
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
     LifecycleTriggerTransition = "ROS2.lifecycle.triggerTransition",
+    ShowWelcome = "ROS2.showWelcome",
     LaunchTreeRefresh = "ROS2.launchTree.refresh",
     LaunchTreeReveal = "ROS2.launchTree.reveal",
     LaunchTreeFindUsages = "ROS2.launchTree.findUsages",
@@ -105,6 +105,11 @@ export enum Commands {
     ColconBuildPackageRelease = "ROS2.colcon.buildPackageRelease",
     ColconBuildPackageDebug = "ROS2.colcon.buildPackageDebug"
 }
+
+/**
+ * The walkthrough ID for the getting started guide
+ */
+const WALKTHROUGH_ID = "Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted";
 
 /**
  * Shuts down the MCP server if it's currently running.
@@ -142,7 +147,7 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
     }
 
     try {
-        const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
+        const mcpServerPort = await vscode_utils.findAvailablePort(3002);
         const serverPath = path.join(extPath, "assets", "scripts", "server.py");
         
         // Show MCP server information for users without MCP support
@@ -167,9 +172,7 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
                             const basicConfig = {
                                 "mcpServers": {
                                     "ros2": {
-                                        "command": "npx",
-                                        "args": ["-y", "@modelcontextprotocol/server-ros2", "stdio"],
-                                        "env": {}
+                                        "url": `http://localhost:${mcpServerPort}/sse`
                                     }
                                 }
                             };
@@ -227,10 +230,7 @@ async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
                     provideMcpServerDefinitions: async () => {
                         let output: any[] = [];
 
-                        // Get the port from configuration or use default
-                        const mcpServerPort = vscode_utils.getExtensionConfiguration().get<number>("mcpServerPort", 3002);
-
-                        // Use the configured port for the MCP server
+                        // Use the discovered port for the MCP server
                         // Note: McpHttpServerDefinition might not be available in all environments
                         if ('McpHttpServerDefinition' in vscode) {
                             const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
@@ -584,6 +584,13 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    // Register Welcome/Walkthrough command
+    vscode.commands.registerCommand(Commands.ShowWelcome, () => {
+        ensureErrorMessageOnException(() => {
+            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
+        });
+    });
+
     // Register Launch Tree commands
     vscode.commands.registerCommand(Commands.LaunchTreeRefresh, () => {
         ensureErrorMessageOnException(() => {
@@ -774,10 +781,47 @@ export async function activate(context: vscode.ExtensionContext) {
     // Activate the workspace environment if possible.
     await activateEnvironment(context);
 
+    // Show welcome walkthrough on first install or if ROS is not detected
+    await showWelcomeIfNeeded(context);
+
     return {
         getEnv: () => env,
         onDidChangeEnv: (listener: () => any, thisArg: any) => onDidChangeEnv(listener, thisArg),
     };
+}
+
+/**
+ * Shows the welcome walkthrough if needed based on first install or ROS detection
+ */
+async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<void> {
+    const config = vscode_utils.getExtensionConfiguration();
+    const showWelcomeOnStartup = config.get("showWelcomeOnStartup", true);
+    
+    // Check if user has disabled the welcome screen
+    if (!showWelcomeOnStartup) {
+        return;
+    }
+
+    // Double-check this is a ROS workspace before showing walkthrough.
+    const hasPackageXml = await vscode_utils.workspaceContainsPackageXml(5);
+    if (!hasPackageXml) {
+        outputChannel.appendLine("Skipping welcome walkthrough: workspace does not contain package.xml.");
+        return;
+    }
+
+    // Check if this is the first time the extension is being activated
+    const hasShownWelcome = config.get("hasShownWelcome", false);
+    
+    // Show welcome if this is first install
+    if (!hasShownWelcome) {
+        // Mark that we've shown the welcome
+        await config.update("hasShownWelcome", true);
+        
+        // Show the walkthrough with a slight delay to ensure VS Code is ready
+        setTimeout(() => {
+            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
+        }, 1000);
+    }
 }
 
 export async function deactivate() {
@@ -824,12 +868,14 @@ export async function activateEnvironment(context: vscode.ExtensionContext) {
 
     await sourceRosAndWorkspace();
 
-    if (typeof env.ROS_DISTRO === "undefined") {
+    if (!env || typeof env.ROS_DISTRO === "undefined") {
+        outputChannel.appendLine("ROS environment not detected. ROS 2 features will be limited. Please install ROS 2 or configure a ROS setup script.");
         processingWorkspace = false;
         return;
     }
 
     if (typeof env.ROS_VERSION === "undefined") {
+        outputChannel.appendLine("ROS_VERSION not set in environment. Please verify your ROS 2 installation.");
         processingWorkspace = false;
         return;
     }
@@ -933,26 +979,27 @@ async function sourceRosAndWorkspace(): Promise<void> {
         let distro = config.get("distro", "");
 
         // Is there a distro defined either by setting or environment?
-        outputChannel.appendLine(`Current ROS_DISTRO environment variable: ${process.env.ROS_DISTRO}`);
+        outputChannel.appendLine(`No ROS 2 distro configured, attempting ROS 2 distro auto-discovery`);
         if (!distro) {
             // No? Try to find one.
             const installedDistros = await ros_utils.getDistros();
             if (!installedDistros.length) {
-                outputChannel.appendLine(`No distros found.`);
+                outputChannel.appendLine(`No ROS 2 distros found.`);
 
-                throw new Error("ROS has not been found on this system.");
+                const message = "No ROS 2 distros found. Please install a ROS 2 distribution.";
+                await vscode.window.setStatusBarMessage(message, kWorkspaceConfigTimeout);
             } else if (installedDistros.length === 1) {
-                outputChannel.appendLine(`Only one distro, selecting ${installedDistros[0]}`);
+                outputChannel.appendLine(`Only one ROS 2 distro found, selecting ${installedDistros[0]}`);
 
-                // if there is only one distro installed, directly choose it
+                // if there is only one ROS 2 distro installed, directly choose it
                 config.update("distro", installedDistros[0]);
                 distro = installedDistros[0];
             } else {
-                outputChannel.appendLine(`Multiple distros found, prompting user to select one.`);
+                outputChannel.appendLine(`Multiple ROS 2 distros found, prompting user to select one.`);
                 // dump installedDistros to outputChannel
-                outputChannel.appendLine(`Installed distros: ${installedDistros}`);
+                outputChannel.appendLine(`Installed ROS 2 distros: ${installedDistros}`);
 
-                const message = "Unable to determine ROS distribution, please configure this workspace by adding \"ROS2.distro\": \"<ROS Distro>\" in settings.json";
+                const message = "Unable to determine ROS 2 distribution, please configure this workspace by adding \"ROS2.distro\": \"<ROS 2 Distro>\" in settings.json";
                 await vscode.window.setStatusBarMessage(message, kWorkspaceConfigTimeout);
             }
         }
@@ -993,9 +1040,9 @@ async function sourceRosAndWorkspace(): Promise<void> {
     let workspaceOverlayPath: string = "";
     // Source the workspace setup over the top.
 
-    if (newEnv.ROS_VERSION === "1") {
-        outputChannel.appendLine(`this extension does not support ROS 1`);
-    } else {    // FUTURE: Revisit if ROS_VERSION changes - not clear it will be called 3
+    if (newEnv && newEnv.ROS_VERSION === "1") {
+        outputChannel.appendLine(`RDE ROS 2 does not support ROS 1`);
+    } else if (newEnv) {    // FUTURE: Revisit if ROS_VERSION changes - not clear it will be called 3
         if (!await exists(workspaceOverlayPath)) {
             workspaceOverlayPath = path.join(`${vscode.workspace.rootPath}`, "install");
         }

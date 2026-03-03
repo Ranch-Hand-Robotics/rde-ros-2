@@ -3,7 +3,7 @@
 
 import * as child_process from "child_process";
 import * as path from "path";
-import { promises as fsPromises } from "fs";
+import { promises as fsPromises, Stats } from "fs";
 import * as vscode from "vscode";
 
 import * as extension from "../extension";
@@ -71,9 +71,12 @@ export function xacro(filename: string): Promise<any> {
 /**
  * Gets the names of installed distros.
  */
-export function getDistros(): Promise<string[]> {
+export async function getDistros(): Promise<string[]> {
     try {
-        return fsPromises.readdir("/opt/ros");
+        const stats = await fsPromises.stat("/opt/ros");
+        if (stats.isDirectory()) {
+            return await fsPromises.readdir("/opt/ros");
+        }
     } catch (error) {
         return Promise.resolve([]);
     }
