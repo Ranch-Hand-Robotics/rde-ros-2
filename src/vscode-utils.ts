@@ -6,6 +6,7 @@ import * as fs from "fs";
 import { promises as fsPromises } from "fs";
 import * as child_process from "child_process";
 import * as vscode from "vscode";
+import * as net from 'net';
 
 import * as ros_utils from "./ros/utils";
 import * as extension from "./extension";
@@ -103,6 +104,71 @@ async function exists(filePath: string): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+/**
+ * Check if the current workspace contains a package.xml file up to a max depth.
+ */
+export async function workspaceContainsPackageXml(maxDepth: number = 5): Promise<boolean> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        return false;
+    }
+
+    const excludedDirs = new Set([
+        ".git",
+        ".hg",
+        ".svn",
+        "node_modules",
+        "build",
+        "install",
+        "log",
+        "dist",
+        "out",
+    ]);
+
+    const hasPackageXmlInDir = async (dir: string, depth: number): Promise<boolean> => {
+        let entries: fs.Dirent[];
+        try {
+            entries = await fsPromises.readdir(dir, { withFileTypes: true });
+        } catch {
+            return false;
+        }
+
+        for (const entry of entries) {
+            if (entry.isFile() && entry.name === "package.xml") {
+                return true;
+            }
+        }
+
+        if (depth >= maxDepth) {
+            return false;
+        }
+
+        for (const entry of entries) {
+            if (!entry.isDirectory()) {
+                continue;
+            }
+            if (excludedDirs.has(entry.name)) {
+                continue;
+            }
+
+            const nextPath = path.join(dir, entry.name);
+            if (await hasPackageXmlInDir(nextPath, depth + 1)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    for (const folder of folders) {
+        if (await hasPackageXmlInDir(folder.uri.fsPath, 0)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -241,4 +307,40 @@ export function isPythonExtensionInstalled(): boolean {
  */
 export function isCursorEditor(): boolean {
     return commonIsCursorEditor();
+}
+
+
+export async function findAvailablePort(startPort: number = 3005, maxAttempts: number = 100): Promise<number> {
+  for (let port = startPort; port < startPort + maxAttempts; port++) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+  throw new Error(`No available port found in range ${startPort}-${startPort + maxAttempts - 1}`);
+}
+
+/**
+ * Check if a port is available
+ * @param port Port number to check
+ * @returns Promise that resolves to true if port is available
+ */
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    
+    server.once('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false); // Port is in use
+      } else {
+        resolve(false); // Other error, assume not available
+      }
+    });
+    
+    server.once('listening', () => {
+      server.close();
+      resolve(true); // Port is available
+    });
+    
+    server.listen(port, '127.0.0.1');
+  });
 }
