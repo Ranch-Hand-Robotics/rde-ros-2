@@ -18,3 +18,11 @@ Welcome to the Robot Developer Extensions for ROS 2! This extension provides pow
 4. **Start Developing** - Use the command palette (`Ctrl+Shift+P`) to access ROS 2 commands
 
 For more information, visit the [documentation](https://ranchhandrobotics.github.io/rde-ros-2/).
+
+## Support
+Have questions, feedback, or feature requests? Join our community and connect with other developers:
+**[GitHub Discussions](https://github.com/orgs/Ranch-Hand-Robotics/discussions)**
+
+## Sponsor
+Help keep this extension thriving by supporting the project with a one-time or recurring sponsorship:
+**[Become a Sponsor](https://github.com/sponsors/Ranch-Hand-Robotics)**

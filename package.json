@@ -1,6 +1,6 @@
 {
     "name": "rde-ros-2",
-    "version": "1.2.1",
+    "version": "1.3.0",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
         "vscode": "^1.101.0"
@@ -318,7 +318,7 @@
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
                 },
-                "ROS2.showWelcomeOnStartup": {
+                "ROS2.showROS2WelcomeOnStartup": {
                     "type": "boolean",
                     "default": true,
                     "description": "Show the Getting Started walkthrough when the extension is first installed or when ROS 2 is not detected."

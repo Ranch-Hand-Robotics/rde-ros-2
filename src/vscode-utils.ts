@@ -10,6 +10,7 @@ import * as net from 'net';
 
 import * as ros_utils from "./ros/utils";
 import * as extension from "./extension";
+import * as mcp from "./mcp";
 
 import { 
     checkExternallyManagedEnvironment,
@@ -209,7 +210,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                             if (selection === 'Install Now') {
                                 // Install python3-venv using MCP terminal
-                                terminal = extension.getMcpTerminal();
+                                terminal = mcp.getMcpTerminal();
                                 terminal.sendText("sudo apt update && sudo apt install -y python3-venv");
                                 
                                 vscode.window.showInformationMessage(
@@ -236,7 +237,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                 if (!terminal) {
                     // Create a terminal if not already created
-                    terminal = extension.getMcpTerminal();
+                    terminal = mcp.getMcpTerminal();
                     terminal.sendText(`source ${path.join(venvPath, 'bin', 'activate')}`);
                 }
 
