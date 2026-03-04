@@ -112,6 +112,14 @@ export enum Commands {
  */
 const WALKTHROUGH_ID = "Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted";
 
+/**
+ * Updates workspace-scoped context keys used by UI visibility conditions.
+ */
+async function updateWorkspaceContextKeys(): Promise<void> {
+    const hasPackageXml = await vscode_utils.workspaceContainsPackageXml(5);
+    await vscode.commands.executeCommand("setContext", "ros2.hasPackageXml", hasPackageXml);
+}
+
 export async function activate(context: vscode.ExtensionContext) {
     try {
         const reporter = telemetry.getReporter();
@@ -120,8 +128,22 @@ export async function activate(context: vscode.ExtensionContext) {
         extensionContext = context; // Store the context for later use
         context.subscriptions.push(outputChannel);
 
+        // Set workspace context keys used by view visibility.
+        await updateWorkspaceContextKeys();
+
+        // Set explicit platform context keys for walkthrough visibility.
+        const isLinuxHost = process.platform === "linux";
+        const isWindowsHost = process.platform === "win32";
+        const isMacHost = process.platform === "darwin";
+        await Promise.all([
+            vscode.commands.executeCommand("setContext", "ros2.isLinuxHost", isLinuxHost),
+            vscode.commands.executeCommand("setContext", "ros2.isWindowsHost", isWindowsHost),
+            vscode.commands.executeCommand("setContext", "ros2.isMacHost", isMacHost),
+        ]);
+
         // Log extension activation
         outputChannel.appendLine("ROS 2 Extension activating...");
+        outputChannel.appendLine(`Platform context: linux=${isLinuxHost}, windows=${isWindowsHost}, mac=${isMacHost}`);
         
     } catch (error) {
         console.error("Error during extension activation:", error);
@@ -145,6 +167,21 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Activate components when the ROS env is changed.
     context.subscriptions.push(onDidChangeEnv(activateEnvironment.bind(null, context)));
+
+    // Keep workspace visibility context updated.
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        void updateWorkspaceContextKeys();
+    }));
+    context.subscriptions.push(vscode.workspace.onDidCreateFiles((event) => {
+        if (event.files.some(file => path.basename(file.fsPath) === "package.xml")) {
+            void updateWorkspaceContextKeys();
+        }
+    }));
+    context.subscriptions.push(vscode.workspace.onDidDeleteFiles((event) => {
+        if (event.files.some(file => path.basename(file.fsPath) === "package.xml")) {
+            void updateWorkspaceContextKeys();
+        }
+    }));
 
     // Activate components which don't require the ROS env.
     context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(
@@ -632,7 +669,7 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 /**
- * Shows the welcome walkthrough if needed based on first install or ROS detection
+ * Shows the welcome walkthrough if needed based on first install, version upgrade, or ROS detection
  */
 async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<void> {
     const config = vscode_utils.getExtensionConfiguration();
@@ -650,19 +687,38 @@ async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<vo
         return;
     }
 
-    // Check if this is the first time the extension is being activated
-    const hasShownWelcome = config.get("hasShownWelcome", false);
+    // Get current extension version and compare with last shown version
+    const currentVersion = context.extension.packageJSON.version as string;
+    const lastShownVersion = config.get("lastShownWelcomeVersion", "");
     
-    // Show welcome if this is first install
-    if (!hasShownWelcome) {
-        // Mark that we've shown the welcome
-        await config.update("hasShownWelcome", true);
+    // Show welcome on first install or version upgrade
+    if (shouldShowWelcome(lastShownVersion, currentVersion)) {
+        // Update the stored version
+        await config.update("lastShownWelcomeVersion", currentVersion);
         
         // Show the walkthrough with a slight delay to ensure VS Code is ready
         setTimeout(() => {
             vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
         }, 1000);
     }
+}
+
+/**
+ * Compare two semantic versions and determine if welcome should be shown.
+ * Welcome is shown on first install and on major/minor upgrades only.
+ * Patch-only updates are intentionally ignored.
+ * @param lastVersion The last version the welcome was shown (empty string if never)
+ * @param currentVersion The current extension version
+ * @returns true if welcome should be shown (first install or major/minor upgrade)
+ */
+function shouldShowWelcome(lastVersion: string, currentVersion: string): boolean {
+    // Show on first install (lastVersion is empty)
+    if (!lastVersion) {
+        return true;
+    }
+    
+    // Product decision: compare major/minor only, ignore patch updates for welcome prompts.
+    return vscode_utils.compareVersions(lastVersion, currentVersion, true) < 0;
 }
 
 export async function deactivate() {

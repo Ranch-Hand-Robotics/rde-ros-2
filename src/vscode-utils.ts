@@ -345,3 +345,27 @@ function isPortAvailable(port: number): Promise<boolean> {
     server.listen(port, '127.0.0.1');
   });
 }
+
+/**
+ * Compare two semantic versions
+ * @param ignorePatch If true, compare only major/minor components and ignore patch differences.
+ * @returns -1 if v1 < v2, 0 if v1 === v2, 1 if v1 > v2
+ */
+export function compareVersions(v1: string, v2: string, ignorePatch: boolean = false): number {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+
+    const maxParts = ignorePatch
+        ? 2
+        : Math.max(parts1.length, parts2.length);
+    
+    for (let i = 0; i < maxParts; i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        
+        if (p1 < p2) return -1;
+        if (p1 > p2) return 1;
+    }
+    
+    return 0;
+}

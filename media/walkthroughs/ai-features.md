@@ -1,6 +1,25 @@
 # AI Features for Robotics Development
 
-The Robot Developer Extensions for ROS 2 integrate powerful AI capabilities to enhance your development experience. This guide covers the AI-powered features available in VS Code and Cursor. The Model Context Protocol (MCP) server allows large language models and AI assistants to introspect your running ROS 2 system and understand its current state. It provides a structured way for your AI assistant to query system information and interact with ROS 2 components. And it even works remotely over SSH or dev tunnels!
+The Robot Developer Extensions for ROS 2 integrate powerful AI capabilities to enhance your development experience. This guide covers the AI-powered features available in VS Code and Cursor. The Model Context Protocol (MCP) server allows large language models (LLMs) and AI assistants like *Github Copilot* to introspect your running ROS 2 system - to understand ***and modify*** its current state. It provides a structured way for your AI assistant to query system information and interact with ROS 2 components. And it even works remotely over SSH or dev tunnels!
+
+Ask Copilot:
+**Debugging**
+> "Why isn't my node connecting to this topic? What nodes are currently running?"
+
+**System Exploration**
+> "List all services available in my ROS 2 system and their types"
+
+**Development**
+> "Show me the definition of this message type and help me create a publisher for it"
+
+**Monitoring**
+> "What's the current state of my lifecycle nodes? Can I safely transition them?"
+
+**Testing**
+> "Execute this launch file and show me what nodes are running"
+
+**Analysis**
+> "Record the /cmd_vel topic to a bag file for later analysis"
 
 ### What MCP Can Do
 
@@ -35,67 +54,16 @@ With the MCP server running, your AI assistant can:
 **Development Support**
 - Inspect ROS 2 message, service, and action definitions
 - Get package manifest information
-- Run diagnostics with `ros2 doctor`
+- Run diagnostics with `ros2 doctor`, and have ***copilot fix your code***!
 - Execute ROS 2 package executables
 
 ### Starting the MCP Server
 
 1. Open the command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Type **"ROS2: Start MCP Server"** and press Enter
-3. The server will start on an available port (starting from 3002)
+2. Find or type **"ROS2: Start MCP Server"** and press Enter
+3. The server will start and register itself with Copilot
 
 **First Time Setup**: On the first run, the extension will create a Python virtual environment inside the extension directory. You may be prompted for your super user password to install dependencies.
-
-### Monitoring the Server
-
-The MCP server runs in a dedicated terminal called "ROS 2 MCP Server". You can:
-- View the terminal to see server startup logs
-- Monitor for any connection issues
-- Check that your ROS 2 environment was properly sourced
-
-The extension will also display information about the MCP server connection details so you can connect your AI assistant.
-
-### Connecting Your AI Assistant
-
-**In Cursor**: The MCP server is automatically discovered and registered. Your AI assistant can directly query ROS 2 information without additional configuration.
-
-**In VS Code**: If your AI extension supports MCP, you can manually register the server. When the MCP server starts (without native VS Code MCP support), it will show you:
-- The connection URL (typically `http://localhost:PORT/sse`)
-- Instructions to add it to your `.cursor/mcp.json` or extension config
-
-Example configuration:
-
-```json
-{
-  "mcpServers": {
-    "ros2": {
-      "url": "http://localhost:3002/sse"
-    }
-  }
-}
-```
-
-Replace `3002` with the actual port displayed by the extension.
-
-### Example Use Cases
-
-**Debugging**
-> "Why isn't my node connecting to this topic? What nodes are currently running?"
-
-**System Exploration**
-> "List all services available in my ROS 2 system and their types"
-
-**Development**
-> "Show me the definition of this message type and help me create a publisher for it"
-
-**Monitoring**
-> "What's the current state of my lifecycle nodes? Can I safely transition them?"
-
-**Testing**
-> "Execute this launch file and show me what nodes are running"
-
-**Analysis**
-> "Record the /cmd_vel topic to a bag file for later analysis"
 
 ## AI Completions
 
@@ -117,23 +85,6 @@ Completions work seamlessly in:
 - Press `Ctrl+Space` (or `Cmd+Space` on Mac) to manually trigger completions
 - Completions appear automatically as you type
 - Completions adapt based on your ROS 2 environment context
-
-## Setting Up Your Environment
-
-To get the most out of AI features:
-
-1. **Configure ROS 2 Environment**
-   - Ensure `ROS2.distro` or `ROS2.rosSetupScript` is configured
-   - The extension will auto-detect installed ROS 2 distributions
-
-2. **Start the MCP Server** (optional but recommended)
-   - Command: `ROS2: Start MCP Server`
-   - Enables rich AI queries about your ROS 2 system
-
-3. **Enable AI Features in Your Editor**
-   - Use AI completions with `Ctrl+Space`
-   - Ask your AI assistant questions about your ROS 2 system
-   - Leverage the MCP server for system introspection
 
 ## Tips for Better AI Assistance
 
@@ -173,23 +124,3 @@ To get the most out of AI features:
 - The MCP server maintains its own Python virtual environment in `.venv` directory
 - Do not manually modify this directory
 - If you encounter persistent issues, you can delete `.venv` and restart the server
-
-## Advanced Configuration
-
-### Custom MCP Server Port
-
-The extension automatically discovers an available port starting from 3002. If you need to specify a different starting port, check the extension settings for `ROS2.mcpServerPort` (future enhancement).
-
-### Workspace Integration
-
-The MCP server will use the same ROS 2 environment as the extension, including:
-- Your configured distro or setup script
-- Environment variables and sourced files
-- Installed packages and overlays
-
-## Learn More
-
-- [Configuration Guide](../configuration.md) - Detailed settings reference
-- [Debug Support](../debug-support.md) - ROS 2 debugging features
-- [Test Explorer](../test-explorer.md) - Test discovery and execution
-- [Model Context Protocol Documentation](../ModelContextProtocol.md) - Detailed MCP implementation and available tools

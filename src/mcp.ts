@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import * as path from "path";
+import * as http from "http";
 import * as vscode from "vscode";
 
 import * as vscode_utils from "./vscode-utils";
@@ -20,6 +21,118 @@ import {
  * The MCP server terminal
  */
 export let mcpServerTerminal: vscode.Terminal | null = null;
+let mcpServerDefinitionProvider: vscode.Disposable | null = null;
+let activeMcpServerPort: number | null = null;
+
+const kDefaultMcpStartupTimeoutMs = 15000;
+const kDefaultMcpPollIntervalMs = 250;
+const kDefaultMcpProbeTimeoutMs = 1000;
+
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function supportsMcpRegistration(): boolean {
+    return ("lm" in vscode && vscode.lm && "registerMcpServerDefinitionProvider" in vscode.lm);
+}
+
+function disposeMcpServerDefinitionProvider(): void {
+    if (mcpServerDefinitionProvider) {
+        mcpServerDefinitionProvider.dispose();
+        mcpServerDefinitionProvider = null;
+    }
+}
+
+export async function isMcpServerReady(port: number, probeTimeoutMs: number = kDefaultMcpProbeTimeoutMs): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+        let settled = false;
+        const finish = (result: boolean): void => {
+            if (!settled) {
+                settled = true;
+                resolve(result);
+            }
+        };
+
+        const request = http.request({
+            host: "127.0.0.1",
+            port,
+            path: "/sse",
+            method: "GET",
+            timeout: probeTimeoutMs,
+        }, (response) => {
+            const statusCode = response.statusCode ?? 0;
+            response.resume();
+            finish(statusCode >= 200 && statusCode < 300);
+            request.destroy();
+        });
+
+        request.on("timeout", () => {
+            request.destroy();
+            finish(false);
+        });
+
+        request.on("error", () => {
+            finish(false);
+        });
+
+        request.end();
+    });
+}
+
+export async function waitForMcpServerReady(
+    port: number,
+    startupTimeoutMs: number = kDefaultMcpStartupTimeoutMs,
+    pollIntervalMs: number = kDefaultMcpPollIntervalMs,
+    probeTimeoutMs: number = kDefaultMcpProbeTimeoutMs,
+): Promise<boolean> {
+    const deadline = Date.now() + startupTimeoutMs;
+
+    while (Date.now() < deadline) {
+        if (await isMcpServerReady(port, probeTimeoutMs)) {
+            return true;
+        }
+
+        if (mcpServerTerminal?.exitStatus) {
+            return false;
+        }
+
+        await delay(pollIntervalMs);
+    }
+
+    return false;
+}
+
+function registerMcpServerDefinitionProvider(mcpServerPort: number): void {
+    try {
+        disposeMcpServerDefinitionProvider();
+
+        // Use type assertion to handle the API that might not be available in all environments
+        const lm = vscode.lm as any;
+        mcpServerDefinitionProvider = lm.registerMcpServerDefinitionProvider("ROS 2", {
+            provideMcpServerDefinitions: async () => {
+                const output: any[] = [];
+
+                // Use the discovered port for the MCP server
+                // Note: McpHttpServerDefinition might not be available in all environments
+                if ("McpHttpServerDefinition" in vscode) {
+                    const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
+                    output.push(
+                        new McpHttpServerDefinition(
+                            "ROS 2",
+                            vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`),
+                        ),
+                    );
+                }
+
+                return output;
+            }
+        });
+
+        outputChannel.appendLine(`Registered MCP server with VS Code on port ${mcpServerPort}`);
+    } catch (error) {
+        outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
+    }
+}
 
 /**
  * Shuts down the MCP server if it's currently running.
@@ -30,6 +143,9 @@ export function shutdownMcpServer(): void {
         mcpServerTerminal.dispose();
         mcpServerTerminal = null;
     }
+
+    disposeMcpServerDefinitionProvider();
+    activeMcpServerPort = null;
 }
 
 /**
@@ -40,6 +156,15 @@ export async function startMcpServer(context: vscode.ExtensionContext): Promise<
     // MCP server is already running
     if (mcpServerTerminal && !mcpServerTerminal.exitStatus) {
         outputChannel.appendLine("MCP server is already running");
+
+        if (supportsMcpRegistration() && !mcpServerDefinitionProvider && activeMcpServerPort !== null) {
+            outputChannel.appendLine("MCP server appears to be running, waiting for readiness before registering with VS Code.");
+            const ready = await waitForMcpServerReady(activeMcpServerPort);
+            if (ready) {
+                registerMcpServerDefinitionProvider(activeMcpServerPort);
+            }
+        }
+
         return;
     }
 
@@ -61,9 +186,9 @@ export async function startMcpServer(context: vscode.ExtensionContext): Promise<
         const serverPath = path.join(extPath, "assets", "scripts", "server.py");
         
         // Show MCP server information for users without MCP support
-        let supportsMcpRegistration = ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm);
+        let canRegisterMcp = supportsMcpRegistration();
 
-        if (!supportsMcpRegistration) {
+        if (!canRegisterMcp) {
             const infoMessage = `ROS 2 MCP Server starting on port ${mcpServerPort}.\n\nTo use MCP features in Cursor, add this server to your .cursor/mcp.json:\n\nServer URL: http://localhost:${mcpServerPort}/sse`;
 
             vscode.window.showInformationMessage(infoMessage, "Copy URL", "Open MCP Config", "Dismiss").then(selection => {
@@ -119,6 +244,7 @@ export async function startMcpServer(context: vscode.ExtensionContext): Promise<
                 mcpTerminal.sendText(`${shellInfo.sourceCommand} ${activateScript}`);
             }
             mcpTerminal.sendText(`${pythonExecutable} ${serverPath} --port ${mcpServerPort}`);
+            activeMcpServerPort = mcpServerPort;
 
             // Add to subscriptions to ensure it's terminated on environment change
             subscriptions.push({
@@ -131,36 +257,21 @@ export async function startMcpServer(context: vscode.ExtensionContext): Promise<
         }
 
 
-        // Register MCP server definition provider (only when LLDB extension is not available)
-        if (supportsMcpRegistration) {
-            try {
-                // Use type assertion to handle the API that might not be available in all environments
-                const lm = vscode.lm as any;
-                context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
-                    provideMcpServerDefinitions: async () => {
-                        let output: any[] = [];
+        // Register MCP server definition provider only after startup is confirmed.
+        if (canRegisterMcp) {
+            outputChannel.appendLine(`Waiting for MCP server startup on port ${mcpServerPort} before registering with VS Code...`);
+            const ready = await waitForMcpServerReady(mcpServerPort);
 
-                        // Use the discovered port for the MCP server
-                        // Note: McpHttpServerDefinition might not be available in all environments
-                        if ('McpHttpServerDefinition' in vscode) {
-                            const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
-                            output.push( 
-                                new McpHttpServerDefinition(
-                                    "ROS 2",
-                                    vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                                )
-                            );
-                        }
-
-                        return output;
-                    }
-                }));
-            } catch (error) {
-                outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
+            if (ready) {
+                registerMcpServerDefinitionProvider(mcpServerPort);
+            } else {
+                outputChannel.appendLine(`MCP server did not become ready within ${kDefaultMcpStartupTimeoutMs}ms. Skipping VS Code MCP registration.`);
+                vscode.window.showWarningMessage("ROS 2 MCP server did not become ready in time. It was not registered with VS Code.");
             }
         }
 
     } catch (err) {
+        activeMcpServerPort = null;
         outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
         vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
 
@@ -200,6 +311,9 @@ export function getMcpTerminal(): vscode.Terminal {
     // Clean up terminal reference when closed
     const disposable = vscode.window.onDidCloseTerminal((closedTerminal) => {
         if (closedTerminal === mcpServerTerminal) {
+            mcpServerTerminal = null;
+            activeMcpServerPort = null;
+            disposeMcpServerDefinitionProvider();
             disposable.dispose();
         }
     });
