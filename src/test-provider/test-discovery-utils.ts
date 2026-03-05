@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { TestType, RosTestData } from "./ros-test-provider";
+import * as vscode_utils from "../vscode-utils";
 
 /**
  * Utilities for discovering and parsing ROS 2 test files
@@ -199,13 +200,17 @@ export class TestDiscoveryUtils {
     }
     
     /**
-     * Find package.xml file in parent directories to determine package name
+     * Find package.xml file in parent directories to determine package name.
+     * Only searches within the workspace folder boundaries.
      */
     static findPackageName(filePath: string): string | undefined {
         let currentPath = path.dirname(filePath);
-        const root = path.parse(currentPath).root;
+        const workspaceRoot = vscode_utils.getWorkspaceFolder(currentPath);
         
-        while (currentPath && currentPath !== root) {
+        // If not in a workspace, still search up to filesystem root for compatibility
+        const searchBoundary = workspaceRoot || path.parse(currentPath).root;
+        
+        while (currentPath) {
             const packageXmlPath = path.join(currentPath, 'package.xml');
             if (fs.existsSync(packageXmlPath)) {
                 try {
@@ -221,7 +226,18 @@ export class TestDiscoveryUtils {
                     return path.basename(currentPath);
                 }
             }
-            currentPath = path.dirname(currentPath);
+            
+            // Stop at workspace boundary (or filesystem root if no workspace)
+            if (currentPath === searchBoundary) {
+                break;
+            }
+            
+            const parentPath = path.dirname(currentPath);
+            if (parentPath === currentPath) {
+                // Reached filesystem root
+                break;
+            }
+            currentPath = parentPath;
         }
         
         return undefined;
@@ -318,20 +334,35 @@ export class TestDiscoveryUtils {
     }
     
     /**
-     * Find the package directory containing the test file
+     * Find the package directory containing the test file.
+     * Only searches within the workspace folder boundaries.
      */
     private static findPackageDirectory(filePath: string): string | undefined {
         let currentPath = path.dirname(filePath);
-        const root = path.parse(currentPath).root;
+        const workspaceRoot = vscode_utils.getWorkspaceFolder(currentPath);
         
-        while (currentPath && currentPath !== root) {
+        // If not in a workspace, still search up to filesystem root for compatibility
+        const searchBoundary = workspaceRoot || path.parse(currentPath).root;
+        
+        while (currentPath) {
             const packageXmlPath = path.join(currentPath, 'package.xml');
             const cmakeListsPath = path.join(currentPath, 'CMakeLists.txt');
             
             if (fs.existsSync(packageXmlPath) && fs.existsSync(cmakeListsPath)) {
                 return currentPath;
             }
-            currentPath = path.dirname(currentPath);
+            
+            // Stop at workspace boundary (or filesystem root if no workspace)
+            if (currentPath === searchBoundary) {
+                break;
+            }
+            
+            const parentPath = path.dirname(currentPath);
+            if (parentPath === currentPath) {
+                // Reached filesystem root
+                break;
+            }
+            currentPath = parentPath;
         }
         
         return undefined;

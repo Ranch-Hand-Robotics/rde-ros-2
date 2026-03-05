@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import * as extension from "../extension";
 import * as telemetry from "../telemetry-helper";
 import * as colcon from "./colcon";
+import * as vscode_utils from "../vscode-utils";
 
 export abstract class BuildTool {
     public static current: BuildTool;
@@ -53,17 +54,37 @@ BuildTool.current = new NotImplementedBuildTool();
 
 /**
  * Determines build system and workspace path in use by checking for unique
- * auto-generated files.
+ * auto-generated files. Searches parent directories but stops at workspace boundaries.
  */
 export async function determineBuildTool(dir: string): Promise<boolean> {
-    while (dir && path.dirname(dir) !== dir) {
-        if (await ColconBuildTool.isApplicable(dir)) {
+    // Get the workspace folder to establish boundaries
+    const workspaceFolder = vscode_utils.getWorkspaceFolder(dir);
+    if (!workspaceFolder) {
+        // Not in a workspace, cannot determine build tool
+        return false;
+    }
+    
+    // Search parent directories up to the workspace boundary
+    let currentDir = dir;
+    while (currentDir) {
+        if (await ColconBuildTool.isApplicable(currentDir)) {
             BuildTool.current = new ColconBuildTool();
             return true;
         }
-
-        dir = path.dirname(dir);
+        
+        // Stop at workspace boundary
+        if (currentDir === workspaceFolder) {
+            break;
+        }
+        
+        const parentDir = path.dirname(currentDir);
+        if (parentDir === currentDir) {
+            // Reached filesystem root (shouldn't happen if workspace boundary is enforced)
+            break;
+        }
+        currentDir = parentDir;
     }
+    
     return false;
 }
 
