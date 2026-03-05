@@ -27,6 +27,8 @@ import { RosTestProvider } from "./test-provider/ros-test-provider";
 import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
 import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
 
+import * as mcp from "./mcp";
+
 /**
  * Check if a file or directory exists.
  */
@@ -47,7 +49,6 @@ export let processingWorkspace = false;
 
 export let extPath: string;
 export let outputChannel: vscode.OutputChannel;
-export let mcpServerTerminal: vscode.Terminal | null = null;
 export let extensionContext: vscode.ExtensionContext | null = null;
 export let rosTestProvider: RosTestProvider | null = null;
 export let launchTreeProvider: LaunchTreeDataProvider | null = null;
@@ -69,7 +70,7 @@ export async function resolvedEnv() {
 /**
  * Subscriptions to dispose when the environment is changed.
  */
-let subscriptions = <vscode.Disposable[]>[];
+export let subscriptions = <vscode.Disposable[]>[];
 
 export enum Commands {
     CreateTerminal = "ROS2.createTerminal",
@@ -88,9 +89,6 @@ export enum Commands {
     UpdatePythonPath = "ROS2.updatePythonPath",
     PreviewURDF = "ROS2.previewUrdf",
     Doctor = "ROS2.doctor",
-    StartMcpServer = "ROS2.startMcpServer",
-    StopMcpServer = "ROS2.stopMcpServer",
-    ShowMcpTerminal = "ROS2.showMcpTerminal",
     LifecycleListNodes = "ROS2.lifecycle.listNodes",
     LifecycleGetState = "ROS2.lifecycle.getState",
     LifecycleSetState = "ROS2.lifecycle.setState",
@@ -109,155 +107,21 @@ export enum Commands {
 /**
  * The walkthrough ID for the getting started guide
  */
+/**
+ * The walkthrough ID for the getting started guide
+ */
 const WALKTHROUGH_ID = "Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted";
+const UPDATED_WELCOME_PROMPT = "The Robot Developer Extension for ROS 2 has been updated, would you like to see the welcome screen";
+const UPDATED_WELCOME_PROMPT_YES = "Yes";
+const UPDATED_WELCOME_PROMPT_NO = "No";
+const UPDATED_WELCOME_PROMPT_NEVER = "Never show again";
 
 /**
- * Shuts down the MCP server if it's currently running.
+ * Updates workspace-scoped context keys used by UI visibility conditions.
  */
-function shutdownMcpServer(): void {
-    if (mcpServerTerminal) {
-        outputChannel.appendLine("Shutting down MCP server");
-        mcpServerTerminal.dispose();
-        mcpServerTerminal = null;
-    }
-}
-
-/**
- * Starts the MCP server with proper setup and dependency management.
- * @param context The VS Code extension context
- */
-async function startMcpServer(context: vscode.ExtensionContext): Promise<void> {
-    // MCP server is already running
-    if (mcpServerTerminal && !mcpServerTerminal.exitStatus) {
-        outputChannel.appendLine("MCP server is already running");
-        return;
-    }
-
-    // Get or create the MCP terminal for setup operations
-    const mcpTerminal = getMcpTerminal();
-    outputChannel.appendLine("Using MCP server terminal for setup operations");
-
-    // Ensure we have a proper MCP virtual environment
-    const canProceed = await vscode_utils.ensureMcpVirtualEnvironment(context, outputChannel, extPath);
-    if (!canProceed) {
-        outputChannel.appendLine("Virtual environment for MCP server is not ready.");
-        vscode.window.showInformationMessage("Virtual environment for MCP server is not ready. Please check the MCP Server terminal and output channel for details.");
-        showMcpServerTerminal();
-        return;
-    }
-
-    try {
-        const mcpServerPort = await vscode_utils.findAvailablePort(3002);
-        const serverPath = path.join(extPath, "assets", "scripts", "server.py");
-        
-        // Show MCP server information for users without MCP support
-        let supportsMcpRegistration = ('lm' in vscode && vscode.lm && 'registerMcpServerDefinitionProvider' in vscode.lm);
-
-        if (!supportsMcpRegistration) {
-            const infoMessage = `ROS 2 MCP Server starting on port ${mcpServerPort}.\n\nTo use MCP features in Cursor, add this server to your .cursor/mcp.json:\n\nServer URL: http://localhost:${mcpServerPort}/sse`;
-
-            vscode.window.showInformationMessage(infoMessage, "Copy URL", "Open MCP Config", "Dismiss").then(selection => {
-                if (selection === "Copy URL") {
-                    vscode.env.clipboard.writeText(`http://localhost:${mcpServerPort}/sse`);
-                    vscode.window.showInformationMessage("MCP Server URL copied to clipboard!");
-                } else if (selection === "Open MCP Config") {
-                    // Open the .cursor/mcp.json file if it exists, otherwise create it
-                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-                    if (workspaceRoot) {
-                        const mcpConfigPath = path.join(workspaceRoot, '.cursor', 'mcp.json');
-                        vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
-                            vscode.window.showTextDocument(doc);
-                        }, () => {
-                            // File doesn't exist, create it with basic structure
-                            const basicConfig = {
-                                "mcpServers": {
-                                    "ros2": {
-                                        "url": `http://localhost:${mcpServerPort}/sse`
-                                    }
-                                }
-                            };
-                            vscode.workspace.fs.writeFile(
-                                vscode.Uri.file(mcpConfigPath),
-                                Buffer.from(JSON.stringify(basicConfig, null, 2))
-                            ).then(() => {
-                                vscode.workspace.openTextDocument(mcpConfigPath).then(doc => {
-                                    vscode.window.showTextDocument(doc);
-                                }, () => {
-                                    // Handle any errors silently
-                                });
-                            });
-                        });
-                    }
-                }
-            });
-        }
-        
-        if (await exists(serverPath)) {
-            outputChannel.appendLine(`Starting MCP server from ${serverPath} on port ${mcpServerPort}`);
-
-            
-            const venvPath = path.join(extPath, ".venv");
-            const pythonExecutable = process.platform === "win32" 
-                ? path.join(venvPath, "Scripts", "python3.exe")
-                : path.join(venvPath, "bin", "python3");
-
-            if (process.platform === "win32") {
-                mcpTerminal.sendText(`${path.join(venvPath, 'Scripts', 'activate.bat')}`);
-            } else {
-                const shellInfo = ros_utils.detectUserShell();
-                const activateScript = path.join(venvPath, 'bin', 'activate');
-                mcpTerminal.sendText(`${shellInfo.sourceCommand} ${activateScript}`);
-            }
-            mcpTerminal.sendText(`${pythonExecutable} ${serverPath} --port ${mcpServerPort}`);
-
-            // Add to subscriptions to ensure it's terminated on environment change
-            subscriptions.push({
-                dispose: () => {
-                    shutdownMcpServer();
-                }
-            });
-        } else {
-            throw new Error(`MCP server script not found at ${serverPath}`);
-        }
-
-
-        // Register MCP server definition provider (only when LLDB extension is not available)
-        if (supportsMcpRegistration) {
-            try {
-                // Use type assertion to handle the API that might not be available in all environments
-                const lm = vscode.lm as any;
-                context.subscriptions.push(lm.registerMcpServerDefinitionProvider('ROS 2', {
-                    provideMcpServerDefinitions: async () => {
-                        let output: any[] = [];
-
-                        // Use the discovered port for the MCP server
-                        // Note: McpHttpServerDefinition might not be available in all environments
-                        if ('McpHttpServerDefinition' in vscode) {
-                            const McpHttpServerDefinition = (vscode as any).McpHttpServerDefinition;
-                            output.push( 
-                                new McpHttpServerDefinition(
-                                    "ROS 2",
-                                    vscode.Uri.parse(`http://localhost:${mcpServerPort}/sse`)
-                                )
-                            );
-                        }
-
-                        return output;
-                    }
-                }));
-            } catch (error) {
-                outputChannel.appendLine(`Failed to register MCP server definition provider: ${error.message}`);
-            }
-        }
-
-    } catch (err) {
-        outputChannel.appendLine(`Failed to start MCP server: ${err.message}`);
-        vscode.window.showErrorMessage(`Failed to start MCP server: ${err.message}`);
-
-        return;
-    }
-
-    
+async function updateWorkspaceContextKeys(): Promise<void> {
+    const hasPackageXml = await vscode_utils.workspaceContainsPackageXml(5);
+    await vscode.commands.executeCommand("setContext", "ros2.hasPackageXml", hasPackageXml);
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -268,8 +132,22 @@ export async function activate(context: vscode.ExtensionContext) {
         extensionContext = context; // Store the context for later use
         context.subscriptions.push(outputChannel);
 
+        // Set workspace context keys used by view visibility.
+        await updateWorkspaceContextKeys();
+
+        // Set explicit platform context keys for walkthrough visibility.
+        const isLinuxHost = process.platform === "linux";
+        const isWindowsHost = process.platform === "win32";
+        const isMacHost = process.platform === "darwin";
+        await Promise.all([
+            vscode.commands.executeCommand("setContext", "ros2.isLinuxHost", isLinuxHost),
+            vscode.commands.executeCommand("setContext", "ros2.isWindowsHost", isWindowsHost),
+            vscode.commands.executeCommand("setContext", "ros2.isMacHost", isMacHost),
+        ]);
+
         // Log extension activation
         outputChannel.appendLine("ROS 2 Extension activating...");
+        outputChannel.appendLine(`Platform context: linux=${isLinuxHost}, windows=${isWindowsHost}, mac=${isMacHost}`);
         
     } catch (error) {
         console.error("Error during extension activation:", error);
@@ -293,6 +171,21 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Activate components when the ROS env is changed.
     context.subscriptions.push(onDidChangeEnv(activateEnvironment.bind(null, context)));
+
+    // Keep workspace visibility context updated.
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        void updateWorkspaceContextKeys();
+    }));
+    context.subscriptions.push(vscode.workspace.onDidCreateFiles((event) => {
+        if (event.files.some(file => path.basename(file.fsPath) === "package.xml")) {
+            void updateWorkspaceContextKeys();
+        }
+    }));
+    context.subscriptions.push(vscode.workspace.onDidDeleteFiles((event) => {
+        if (event.files.some(file => path.basename(file.fsPath) === "package.xml")) {
+            void updateWorkspaceContextKeys();
+        }
+    }));
 
     // Activate components which don't require the ROS env.
     context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(
@@ -417,20 +310,6 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(Commands.Doctor, () => {
         ensureErrorMessageOnException(() => {
             rosApi.doctor();
-        });
-    });
-
-    // Register MCP server commands
-    vscode.commands.registerCommand(Commands.StartMcpServer, () => {
-        ensureErrorMessageOnException(() => {
-            return startMcpServer(context);
-        });
-    });
-
-    vscode.commands.registerCommand(Commands.StopMcpServer, () => {
-        ensureErrorMessageOnException(() => {
-            shutdownMcpServer();
-            vscode.window.showInformationMessage("MCP server stopped");
         });
     });
 
@@ -775,6 +654,9 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    // Register MCP commands
+    mcp.registerMcpCommands(context);
+
     const reporter = telemetry.getReporter();
     reporter.sendTelemetryActivate();
 
@@ -791,11 +673,11 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 /**
- * Shows the welcome walkthrough if needed based on first install or ROS detection
+ * Shows the welcome walkthrough if needed based on first install, version upgrade, or ROS detection
  */
 async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<void> {
     const config = vscode_utils.getExtensionConfiguration();
-    const showWelcomeOnStartup = config.get("showWelcomeOnStartup", true);
+    const showWelcomeOnStartup = config.get("showROS2WelcomeOnStartup", true);
     
     // Check if user has disabled the welcome screen
     if (!showWelcomeOnStartup) {
@@ -809,36 +691,88 @@ async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<vo
         return;
     }
 
-    // Check if this is the first time the extension is being activated
-    const hasShownWelcome = config.get("hasShownWelcome", false);
+    // Get current extension version and compare with last shown version
+    const currentVersion = context.extension.packageJSON.version as string;
+    const lastShownVersion = config.get("lastShownWelcomeVersion", "");
+    // Show the walkthrough with a slight delay to ensure VS Code is ready
+    setTimeout(async () => {
+        if (shouldShowWelcome(lastShownVersion, currentVersion)) {
+            const selection = await vscode.window.showInformationMessage(
+                    UPDATED_WELCOME_PROMPT,
+                    UPDATED_WELCOME_PROMPT_YES,
+                    UPDATED_WELCOME_PROMPT_NO,
+                    UPDATED_WELCOME_PROMPT_NEVER
+                );
+
+            await config.update("lastShownWelcomeVersion", currentVersion);
+            if (selection === UPDATED_WELCOME_PROMPT_NEVER) {
+                await config.update("showROS2WelcomeOnStartup",
+                    false, vscode.ConfigurationTarget.Global);
+                return;
+            } else if (selection === UPDATED_WELCOME_PROMPT_NO || selection === undefined) {
+                return;
+            } else {
+                vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
+            }
+        }
+    }, 5000);
+}
+
+/**
+ * Compare two semantic versions and determine if welcome should be shown.
+ * Welcome is shown on first install and on major/minor upgrades only.
+ * Patch-only updates are intentionally ignored.
+ * @param lastVersion The last version the welcome was shown (empty string if never)
+ * @param currentVersion The current extension version
+ * @returns true if welcome should be shown (first install or major/minor upgrade)
+ */
+export function shouldShowWelcome(lastVersion: string, currentVersion: string): boolean {
+    // Show on first install (lastVersion is empty)
+    if (!lastVersion) {
+        return true;
+    }
     
-    // Show welcome if this is first install
-    if (!hasShownWelcome) {
-        // Mark that we've shown the welcome
-        await config.update("hasShownWelcome", true);
-        
-        // Show the walkthrough with a slight delay to ensure VS Code is ready
-        setTimeout(() => {
-            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
-        }, 1000);
+    // Product decision: compare major/minor only, ignore patch updates for welcome prompts.
+    return vscode_utils.compareVersions(lastVersion, currentVersion, true) < 0;
+}
+
+/**
+ * Resolves the user's welcome prompt selection, defaulting to undefined when the timeout expires.
+ */
+export async function resolveWelcomePromptSelectionWithTimeout(
+    selectionPromise: Thenable<string | undefined>,
+    timeoutMs: number,
+): Promise<string | undefined> {
+    if (timeoutMs <= 0) {
+        return undefined;
+    }
+
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<undefined>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve(undefined), timeoutMs);
+    });
+
+    try {
+        return await Promise.race([
+            Promise.resolve(selectionPromise),
+            timeoutPromise,
+        ]);
+    } finally {
+        if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+        }
     }
 }
 
 export async function deactivate() {
     subscriptions.forEach(disposable => disposable.dispose());
     await telemetry.clearReporter();
-    shutdownMcpServer();
+    mcp.shutdownMcpServer();
     
     // Clean up test provider
     if (rosTestProvider) {
         rosTestProvider.dispose();
         rosTestProvider = null;
-    }
-    
-    // Clean up MCP terminal
-    if (mcpServerTerminal && !mcpServerTerminal.exitStatus) {
-        mcpServerTerminal.dispose();
-        mcpServerTerminal = null;
     }
 }
 
@@ -1070,43 +1004,5 @@ async function sourceRosAndWorkspace(): Promise<void> {
 
     // Notify listeners the environment has changed.
     onEnvChanged.fire();
-}
-
-/**
- * Shows the MCP server terminal.
- */
-function showMcpServerTerminal(): void {
-    if (mcpServerTerminal && !mcpServerTerminal.exitStatus) {
-        mcpServerTerminal.show();
-    }
-}
-
-export function getMcpTerminal(): vscode.Terminal {
-    if (mcpServerTerminal) {
-        return mcpServerTerminal;
-    }
-
-    // Check if there's already a terminal with the same name
-    const existingTerminal = vscode.window.terminals.find(terminal => terminal.name === 'ROS 2 MCP Server');
-    if (existingTerminal) {
-        mcpServerTerminal = existingTerminal;
-        return mcpServerTerminal;
-    }
-
-    mcpServerTerminal = vscode.window.createTerminal({
-        name: 'ROS 2 MCP Server',
-        env: env
-    });
-    
-    // Clean up terminal reference when closed
-    const disposable = vscode.window.onDidCloseTerminal((closedTerminal) => {
-        if (closedTerminal === mcpServerTerminal) {
-            disposable.dispose();
-        }
-    });
-    
-    extensionContext.subscriptions.push(disposable);
-    
-    return mcpServerTerminal;
 }
 

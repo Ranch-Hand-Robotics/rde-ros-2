@@ -1,6 +1,6 @@
 {
     "name": "rde-ros-2",
-    "version": "1.2.1",
+    "version": "1.3.0",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
         "vscode": "^1.101.0"
@@ -271,7 +271,8 @@
                     "id": "ros2LaunchTree",
                     "name": "ROS 2 Launch Files",
                     "contextualTitle": "ROS 2 Launch Tree",
-                    "visibility": "visible"
+                    "visibility": "visible",
+                    "when": "ros2.hasPackageXml"
                 }
             ]
         },
@@ -318,15 +319,16 @@
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
                 },
-                "ROS2.showWelcomeOnStartup": {
+                "ROS2.showROS2WelcomeOnStartup": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Show the Getting Started walkthrough when the extension is first installed or when ROS 2 is not detected."
+                    "description": "Show the Getting Started walkthrough when the extension is first installed or updated."
+
                 },
-                "ROS2.hasShownWelcome": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Whether the welcome walkthrough has been shown to the user."
+                "ROS2.lastShownWelcomeVersion": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The version of the extension when the welcome walkthrough was last shown to the user."
                 },
                 "ROS2.colconIgnore": {
                     "type": "object",
@@ -613,7 +615,14 @@
             },
             {
                 "type": "colcon",
+                "required": [
+                    "command"
+                ],
                 "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "command to execute in ROS environment"
+                    },
                     "args": {
                         "type": "array",
                         "description": "Command line arguments to colcon"
@@ -640,24 +649,6 @@
                         "media": {
                             "markdown": "media/walkthroughs/getting-started.md"
                         }
-                    },
-                    {
-                        "id": "ros2.installLinux",
-                        "title": "Install ROS 2 on Linux",
-                        "description": "Follow this guide if you're on Linux and need to install ROS 2 using apt.",
-                        "media": {
-                            "markdown": "media/walkthroughs/install-ros-linux.md"
-                        },
-                        "when": "isLinux"
-                    },
-                    {
-                        "id": "ros2.installPixi",
-                        "title": "Install ROS 2 with Pixi",
-                        "description": "Learn how to install ROS 2 using Pixi on Windows or macOS.",
-                        "media": {
-                            "markdown": "media/walkthroughs/install-ros-pixi.md"
-                        },
-                        "when": "isWindows || isMac"
                     },
                     {
                         "id": "ros2.aiFeatures",

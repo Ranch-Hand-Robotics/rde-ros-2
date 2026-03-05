@@ -10,6 +10,7 @@ import * as net from 'net';
 
 import * as ros_utils from "./ros/utils";
 import * as extension from "./extension";
+import * as mcp from "./mcp";
 
 import { 
     checkExternallyManagedEnvironment,
@@ -209,7 +210,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                             if (selection === 'Install Now') {
                                 // Install python3-venv using MCP terminal
-                                terminal = extension.getMcpTerminal();
+                                terminal = mcp.getMcpTerminal();
                                 terminal.sendText("sudo apt update && sudo apt install -y python3-venv");
                                 
                                 vscode.window.showInformationMessage(
@@ -236,7 +237,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                 if (!terminal) {
                     // Create a terminal if not already created
-                    terminal = extension.getMcpTerminal();
+                    terminal = mcp.getMcpTerminal();
                     terminal.sendText(`source ${path.join(venvPath, 'bin', 'activate')}`);
                 }
 
@@ -343,4 +344,28 @@ function isPortAvailable(port: number): Promise<boolean> {
     
     server.listen(port, '127.0.0.1');
   });
+}
+
+/**
+ * Compare two semantic versions
+ * @param ignorePatch If true, compare only major/minor components and ignore patch differences.
+ * @returns -1 if v1 < v2, 0 if v1 === v2, 1 if v1 > v2
+ */
+export function compareVersions(v1: string, v2: string, ignorePatch: boolean = false): number {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+
+    const maxParts = ignorePatch
+        ? 2
+        : Math.max(parts1.length, parts2.length);
+    
+    for (let i = 0; i < maxParts; i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        
+        if (p1 < p2) return -1;
+        if (p1 > p2) return 1;
+    }
+    
+    return 0;
 }
