@@ -111,6 +111,10 @@ export enum Commands {
  * The walkthrough ID for the getting started guide
  */
 const WALKTHROUGH_ID = "Ranch-Hand-Robotics.rde-ros-2#ros2.gettingStarted";
+const UPDATED_WELCOME_PROMPT = "The Robot Developer Extension for ROS 2 has been updated, would you like to see the welcome screen";
+const UPDATED_WELCOME_PROMPT_YES = "Yes";
+const UPDATED_WELCOME_PROMPT_NO = "No";
+const UPDATED_WELCOME_PROMPT_NEVER = "Never show again";
 
 /**
  * Updates workspace-scoped context keys used by UI visibility conditions.
@@ -690,17 +694,28 @@ async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<vo
     // Get current extension version and compare with last shown version
     const currentVersion = context.extension.packageJSON.version as string;
     const lastShownVersion = config.get("lastShownWelcomeVersion", "");
-    
-    // Show welcome on first install or version upgrade
-    if (shouldShowWelcome(lastShownVersion, currentVersion)) {
-        // Update the stored version
-        await config.update("lastShownWelcomeVersion", currentVersion);
-        
-        // Show the walkthrough with a slight delay to ensure VS Code is ready
-        setTimeout(() => {
-            vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
-        }, 1000);
-    }
+    // Show the walkthrough with a slight delay to ensure VS Code is ready
+    setTimeout(async () => {
+        if (shouldShowWelcome(lastShownVersion, currentVersion)) {
+            const selection = await vscode.window.showInformationMessage(
+                    UPDATED_WELCOME_PROMPT,
+                    UPDATED_WELCOME_PROMPT_YES,
+                    UPDATED_WELCOME_PROMPT_NO,
+                    UPDATED_WELCOME_PROMPT_NEVER
+                );
+
+            await config.update("lastShownWelcomeVersion", currentVersion);
+            if (selection === UPDATED_WELCOME_PROMPT_NEVER) {
+                await config.update("showROS2WelcomeOnStartup",
+                    false, vscode.ConfigurationTarget.Global);
+                return;
+            } else if (selection === UPDATED_WELCOME_PROMPT_NO || selection === undefined) {
+                return;
+            } else {
+                vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID);
+            }
+        }
+    }, 5000);
 }
 
 /**
@@ -711,7 +726,7 @@ async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<vo
  * @param currentVersion The current extension version
  * @returns true if welcome should be shown (first install or major/minor upgrade)
  */
-function shouldShowWelcome(lastVersion: string, currentVersion: string): boolean {
+export function shouldShowWelcome(lastVersion: string, currentVersion: string): boolean {
     // Show on first install (lastVersion is empty)
     if (!lastVersion) {
         return true;
@@ -719,6 +734,34 @@ function shouldShowWelcome(lastVersion: string, currentVersion: string): boolean
     
     // Product decision: compare major/minor only, ignore patch updates for welcome prompts.
     return vscode_utils.compareVersions(lastVersion, currentVersion, true) < 0;
+}
+
+/**
+ * Resolves the user's welcome prompt selection, defaulting to undefined when the timeout expires.
+ */
+export async function resolveWelcomePromptSelectionWithTimeout(
+    selectionPromise: Thenable<string | undefined>,
+    timeoutMs: number,
+): Promise<string | undefined> {
+    if (timeoutMs <= 0) {
+        return undefined;
+    }
+
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<undefined>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve(undefined), timeoutMs);
+    });
+
+    try {
+        return await Promise.race([
+            Promise.resolve(selectionPromise),
+            timeoutPromise,
+        ]);
+    } finally {
+        if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+        }
+    }
 }
 
 export async function deactivate() {
