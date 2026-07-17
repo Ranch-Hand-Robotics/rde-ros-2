@@ -50,6 +50,23 @@ const extensionConfig = {
 };
 
 /** @type WebpackConfig */
+const installRosWorkerConfig = {
+  ...baseConfig,
+  target: "node",
+  entry: "./src/ros/installer/install-ros-worker.ts",
+  externals: {
+    vscode: "commonjs vscode",
+    "applicationinsights-native-metrics": "commonjs applicationinsights-native-metrics",
+  },
+  output: {
+    path: path.resolve(__dirname, "dist"),
+    filename: "install-ros-worker.js",
+    libraryTarget: "commonjs2",
+    devtoolModuleFilenameTemplate: "../[resource-path]",
+  },
+};
+
+/** @type WebpackConfig */
 const ros2_webview_config = {
   ...baseConfig,
   target: ["web", "es2022"],
@@ -67,4 +84,4 @@ const ros2_webview_config = {
 };
 
 
-module.exports = [extensionConfig, ros2_webview_config];
+module.exports = [extensionConfig, ros2_webview_config, installRosWorkerConfig];

@@ -7,7 +7,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as vscode from "vscode";
 
-import * as install_ros from "../../src/ros/install-ros";
+import * as install_ros from "../../src/ros/installer/install-ros";
 
 suite("Install ROS Test Suite", () => {
   let testWorkspaceFolder: string;
