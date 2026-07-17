@@ -51,7 +51,9 @@
         "onDebug",
         "onDebugInitialConfigurations:ros2",
         "onDebugResolve:ros2",
-        "onDebugDynamicConfigurations:ros2"
+        "onDebugDynamicConfigurations:ros2",
+        "onView:ros2Distributions",
+        "onView:ros2LaunchTree"
     ],
     "contributes": {
         "commands": [
@@ -109,6 +111,22 @@
                 "command": "ROS2.installRos",
                 "title": "Install ROS 2",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.findRos",
+                "title": "Find ROS Installation",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.setActiveDistro",
+                "title": "Set as Active Distribution",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.distributions.refresh",
+                "title": "Refresh ROS Distributions",
+                "category": "ROS2",
+                "icon": "$(refresh)"
             },
             {
                 "command": "ROS2.doctor",
@@ -244,6 +262,11 @@
                     "command": "ROS2.launchTree.refresh",
                     "when": "view == ros2LaunchTree",
                     "group": "navigation"
+                },
+                {
+                    "command": "ROS2.distributions.refresh",
+                    "when": "view == ros2Distributions",
+                    "group": "navigation"
                 }
             ],
             "view/item/context": [
@@ -270,17 +293,38 @@
                 "label": "ROS 2"
             }
         ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "ros2-sidebar",
+                    "title": "ROS 2",
+                    "icon": "media/robot-icon.svg"
+                }
+            ]
+        },
         "views": {
-            "explorer": [
+            "ros2-sidebar": [
+                {
+                    "id": "ros2Distributions",
+                    "name": "Distributions",
+                    "visibility": "visible"
+                },
                 {
                     "id": "ros2LaunchTree",
-                    "name": "ROS 2 Launch Files",
+                    "name": "Launch Files",
                     "contextualTitle": "ROS 2 Launch Tree",
                     "visibility": "visible",
                     "when": "ros2.hasPackageXml"
                 }
             ]
         },
+        "viewsWelcome": [
+            {
+                "view": "ros2Distributions",
+                "when": "ros2.distributionSearchComplete && !ros2.hasDistributions",
+                "contents": "The Robot Developer Extensions work best when associated with a ROS 2 distribution.\n\nNone were found on this system.\n\nWould you like to:\n\n[Find ROS 2 to use in this workspace](command:ROS2.findRos)\n\n[Install ROS 2 on this system](command:ROS2.installRos)\n\n[Create ROS 2 devcontainer for this workspace](command:ROS2.installRosContainer)"
+            }
+        ],
         "mcpServerDefinitionProviders": [
             {
                 "id": "ROS 2",
