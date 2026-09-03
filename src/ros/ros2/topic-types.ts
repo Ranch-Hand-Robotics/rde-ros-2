@@ -39,8 +39,7 @@ export interface TopicMetrics {
  */
 export interface TopicMessage {
   timestamp: number;
-  data: any; // Can be object (parsed JSON) or string
-  rawData?: string;
+  data: unknown;
 }
 
 /**

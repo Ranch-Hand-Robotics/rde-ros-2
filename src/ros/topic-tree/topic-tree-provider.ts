@@ -3,6 +3,7 @@
 
 import * as vscode from 'vscode';
 import * as topicMonitor from '../ros2/topic-monitor';
+import { TopicInfo, TopicQoS } from '../ros2/topic-types';
 import { TopicTreeItem, TopicTreeItemType } from './topic-tree-item';
 
 export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeItem> {
@@ -10,19 +11,22 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private subscribedTopics = new Set<string>();
-  private topicMetricsCache = new Map<string, { 
+  private topicMetricsCache = new Map<string, {
     frequency?: number, 
     publisherCount?: number, 
     subscriberCount?: number,
-    qos?: import('../ros2/topic-types').TopicQoS 
+    qos?: TopicQoS,
+    updatedAt: number
   }>();
+  private topicMetricsRequests = new Map<string, Promise<void>>();
   private refreshInterval?: NodeJS.Timeout;
   private isWindowFocused = true;
+  private readonly metricsCacheDurationMs = 15000;
 
   constructor(
-    private context: vscode.ExtensionContext,
-    private outputChannel: vscode.OutputChannel,
-    private onTopicSubscriptionChanged: (topicName: string, subscribe: boolean) => void
+    context: vscode.ExtensionContext,
+    private readonly outputChannel: vscode.OutputChannel,
+    private readonly onTopicSubscriptionChanged: (topic: TopicInfo, subscribe: boolean) => void | Promise<void>
   ) {
     // Auto-refresh every 5 seconds when window is focused
     this.refreshInterval = setInterval(() => {
@@ -83,7 +87,7 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
         const item = TopicTreeItem.createTopicItem(topic, isSubscribed);
         
         // Update metrics cache asynchronously (don't block rendering)
-        this.updateTopicMetrics(topic.name).catch(err => {
+        void this.updateTopicMetrics(topic.name).catch(err => {
           const errorMessage = err instanceof Error ? err.message : String(err);
           this.outputChannel.appendLine(`Error updating metrics for ${topic.name}: ${errorMessage}`);
         });
@@ -103,17 +107,33 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
    * Update metrics for a topic
    */
   private async updateTopicMetrics(topicName: string): Promise<void> {
-    try {
+    const cached = this.topicMetricsCache.get(topicName);
+    if (cached && Date.now() - cached.updatedAt < this.metricsCacheDurationMs) {
+      return;
+    }
+
+    const existingRequest = this.topicMetricsRequests.get(topicName);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const request = (async () => {
       const info = await topicMonitor.getTopicInfo(topicName);
       if (info) {
-        const cached = this.topicMetricsCache.get(topicName) || {};
-        cached.publisherCount = info.publisherCount;
-        cached.subscriberCount = info.subscriberCount;
-        cached.qos = info.qos;
-        this.topicMetricsCache.set(topicName, cached);
+        this.topicMetricsCache.set(topicName, {
+          publisherCount: info.publisherCount,
+          subscriberCount: info.subscriberCount,
+          qos: info.qos,
+          updatedAt: Date.now()
+        });
       }
-    } catch (error) {
-      // Silently fail for individual topic metrics
+    })();
+
+    this.topicMetricsRequests.set(topicName, request);
+    try {
+      await request;
+    } finally {
+      this.topicMetricsRequests.delete(topicName);
     }
   }
 
@@ -132,10 +152,10 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
 
         if (isChecked) {
           this.subscribedTopics.add(topicName);
-          this.onTopicSubscriptionChanged(topicName, true);
+          await this.onTopicSubscriptionChanged(treeItem.topicInfo, true);
         } else {
           this.subscribedTopics.delete(topicName);
-          this.onTopicSubscriptionChanged(topicName, false);
+          await this.onTopicSubscriptionChanged(treeItem.topicInfo, false);
         }
 
         // Update the tree item
@@ -151,10 +171,11 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   /**
    * Subscribe to a topic programmatically
    */
-  public subscribe(topicName: string): void {
+  public async subscribe(topic: TopicInfo): Promise<void> {
+    const topicName = topic.name;
     if (!this.subscribedTopics.has(topicName)) {
       this.subscribedTopics.add(topicName);
-      this.onTopicSubscriptionChanged(topicName, true);
+      await this.onTopicSubscriptionChanged(topic, true);
       this.refresh();
     }
   }
@@ -162,10 +183,11 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   /**
    * Unsubscribe from a topic programmatically
    */
-  public unsubscribe(topicName: string): void {
+  public async unsubscribe(topic: TopicInfo): Promise<void> {
+    const topicName = topic.name;
     if (this.subscribedTopics.has(topicName)) {
       this.subscribedTopics.delete(topicName);
-      this.onTopicSubscriptionChanged(topicName, false);
+      await this.onTopicSubscriptionChanged(topic, false);
       this.refresh();
     }
   }
@@ -173,9 +195,9 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   /**
    * Unsubscribe from all topics
    */
-  public unsubscribeAll(): void {
+  public async unsubscribeAll(): Promise<void> {
     for (const topicName of this.subscribedTopics) {
-      this.onTopicSubscriptionChanged(topicName, false);
+      await this.onTopicSubscriptionChanged({ name: topicName, type: "" }, false);
     }
     this.subscribedTopics.clear();
     this.refresh();

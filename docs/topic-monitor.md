@@ -9,8 +9,8 @@ The ROS 2 Topic Monitor feature provides an RQT-like interface for monitoring to
 - **Multiple Topics**: Monitor multiple topics simultaneously in separate webview panels
 - **Message Display**: 
   - Generic messages shown as formatted JSON
-  - Image topics displayed as images (planned)
-- **Metrics**: View topic frequency, publisher count, and subscriber count in tooltips
+  - Compressed image topics displayed as images
+- **Metrics**: View publisher count, subscriber count, and QoS details in tooltips
 - **Play/Pause Controls**: Pause and resume topic monitoring per topic or all at once
 
 ## How to Use
@@ -33,7 +33,6 @@ To monitor a topic:
 
 Hover over any topic in the tree to see:
 - Topic type (message type)
-- Publishing frequency (Hz)
 - Number of publishers
 - Number of subscribers
 - **QoS (Quality of Service) settings:**
@@ -79,9 +78,9 @@ Most ROS 2 message types are displayed as formatted JSON with syntax highlightin
 }
 ```
 
-### Image Messages (Planned)
+### Image Messages
 
-Image topics (`sensor_msgs/msg/Image`, `sensor_msgs/msg/CompressedImage`) will be rendered as actual images in the webview.
+Compressed image topics (`sensor_msgs/msg/CompressedImage`) are rendered directly in the webview. Raw `sensor_msgs/msg/Image` topics remain available as structured message data because their encoding and row layout require conversion before browser display.
 
 ## Tips
 
@@ -115,7 +114,7 @@ If clicking a topic checkbox doesn't open a webview:
 
 ## Known Limitations
 
-- Image topic rendering is not yet implemented (shows as JSON currently)
+- Raw `sensor_msgs/msg/Image` topics are shown as structured data rather than converted images
 - Cannot adjust message buffer size (fixed at 100 messages)
 - Cannot filter or search within messages
 

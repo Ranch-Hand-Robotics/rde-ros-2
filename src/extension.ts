@@ -332,19 +332,11 @@ export async function activate(context: vscode.ExtensionContext) {
     topicTreeProvider = new TopicTreeDataProvider(
         context,
         outputChannel,
-        (topicName: string, subscribe: boolean) => {
+        (topic, subscribe: boolean) => {
             if (subscribe && topicWebviewManager) {
-                // Find topic info to get the type
-                (async () => {
-                    const topics = await import("./ros/ros2/topic-monitor");
-                    const topicList = await topics.listTopics();
-                    const topicInfo = topicList.find(t => t.name === topicName);
-                    if (topicInfo && topicWebviewManager) {
-                        topicWebviewManager.openTopicMonitor(topicName, topicInfo.type);
-                    }
-                })();
+                topicWebviewManager.openTopicMonitor(topic.name, topic.type);
             } else if (!subscribe && topicWebviewManager) {
-                topicWebviewManager.closeTopicMonitor(topicName);
+                topicWebviewManager.closeTopicMonitor(topic.name);
             }
         }
     );
@@ -354,9 +346,9 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     
     // Handle checkbox changes
-    topicTreeView.onDidChangeCheckboxState((event) => {
-        topicTreeProvider?.handleCheckboxChange([event]);
-    });
+    context.subscriptions.push(topicTreeView.onDidChangeCheckboxState((event) => {
+        void topicTreeProvider?.handleCheckboxChange([event]);
+    }));
     
     context.subscriptions.push(topicTreeView);
     context.subscriptions.push(topicTreeProvider);
@@ -645,8 +637,8 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     vscode.commands.registerCommand(Commands.TopicTreePauseAll, () => {
-        ensureErrorMessageOnException(() => {
-            topicTreeProvider?.unsubscribeAll();
+        ensureErrorMessageOnException(async () => {
+            await topicTreeProvider?.unsubscribeAll();
             vscode.window.showInformationMessage("All topic monitors stopped");
         });
     });
@@ -1119,4 +1111,3 @@ export function getMcpTerminal(): vscode.Terminal {
     
     return mcpServerTerminal;
 }
-

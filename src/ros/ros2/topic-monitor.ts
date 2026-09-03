@@ -4,26 +4,25 @@
 import * as child_process from "child_process";
 import * as os from "os";
 import * as util from "util";
+import * as yaml from "js-yaml";
 
 import * as extension from "../../extension";
 import {
   TopicInfo,
   TopicQoS,
   TopicMetrics,
-  TopicMessage,
-  TopicMonitorState,
-  TopicMonitorSession
+  TopicMessage
 } from "./topic-types";
 
-const promisifiedExec = util.promisify(child_process.exec);
+const promisifiedExecFile = util.promisify(child_process.execFile);
 
 /**
  * Get list of all topics in the ROS 2 system
  */
 export async function listTopics(): Promise<TopicInfo[]> {
   try {
-    const { stdout } = await promisifiedExec("ros2 topic list -t", { env: extension.env });
-    const lines = stdout.trim().split(os.EOL);
+    const { stdout } = await promisifiedExecFile("ros2", ["topic", "list", "-t"], { env: extension.env });
+    const lines = stdout.trim().split(/\r?\n/);
     
     const topics: TopicInfo[] = [];
     for (const line of lines) {
@@ -45,7 +44,7 @@ export async function listTopics(): Promise<TopicInfo[]> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     extension.outputChannel.appendLine(`Error listing topics: ${errorMessage}`);
-    return [];
+    throw error;
   }
 }
 
@@ -54,7 +53,7 @@ export async function listTopics(): Promise<TopicInfo[]> {
  */
 export async function getTopicInfo(topicName: string): Promise<TopicInfo | null> {
   try {
-    const { stdout } = await promisifiedExec(`ros2 topic info ${topicName} -v`, { env: extension.env });
+    const { stdout } = await promisifiedExecFile("ros2", ["topic", "info", topicName, "-v"], { env: extension.env });
     
     const info: TopicInfo = {
       name: topicName,
@@ -118,42 +117,57 @@ export async function getTopicInfo(topicName: string): Promise<TopicInfo | null>
  * Note: This uses ros2 topic hz which blocks, so use with timeout
  */
 export async function getTopicFrequency(topicName: string, durationSec: number = 2): Promise<TopicMetrics | null> {
-  try {
-    // Use timeout to limit the duration of hz command
-    const command = `timeout ${durationSec} ros2 topic hz ${topicName} || true`;
-    const { stdout } = await promisifiedExec(command, { env: extension.env });
-    
-    const metrics: TopicMetrics = {
-      averageRate: 0
-    };
-    
-    // Parse output: "average rate: X.XXX"
-    const lines = stdout.split(os.EOL);
-    for (const line of lines) {
-      if (line.includes('average rate:')) {
-        const match = line.match(/average rate:\s+([\d.]+)/);
-        if (match) {
-          metrics.averageRate = parseFloat(match[1]);
-        }
-      } else if (line.includes('min:')) {
-        const match = line.match(/min:\s+([\d.]+)/);
-        if (match) {
-          metrics.minRate = parseFloat(match[1]);
-        }
-      } else if (line.includes('max:')) {
-        const match = line.match(/max:\s+([\d.]+)/);
-        if (match) {
-          metrics.maxRate = parseFloat(match[1]);
-        }
+  return new Promise(resolve => {
+    const process = child_process.spawn("ros2", ["topic", "hz", topicName], {
+      env: extension.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
+    });
+    let output = "";
+    let settled = false;
+
+    const finish = (result: TopicMetrics | null): void => {
+      if (settled) {
+        return;
       }
-    }
-    
-    return metrics;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    extension.outputChannel.appendLine(`Error getting topic frequency for ${topicName}: ${errorMessage}`);
+      settled = true;
+      clearTimeout(timeout);
+      resolve(result);
+    };
+
+    process.stdout?.on("data", (data: Buffer) => {
+      output += data.toString();
+    });
+    process.on("error", error => {
+      extension.outputChannel.appendLine(`Error getting topic frequency for ${topicName}: ${error.message}`);
+      finish(null);
+    });
+    process.on("exit", () => finish(parseTopicFrequency(output)));
+
+    const timeout = setTimeout(() => {
+      process.kill();
+      finish(parseTopicFrequency(output));
+    }, durationSec * 1000);
+  });
+}
+
+export function parseTopicFrequency(output: string): TopicMetrics | null {
+  const averageMatch = output.match(/average rate:\s+([\d.]+)/);
+  if (!averageMatch) {
     return null;
   }
+
+  const minMatch = output.match(/min:\s+([\d.]+)/);
+  const maxMatch = output.match(/max:\s+([\d.]+)/);
+  return {
+    averageRate: Number(averageMatch[1]),
+    minRate: minMatch ? Number(minMatch[1]) : undefined,
+    maxRate: maxMatch ? Number(maxMatch[1]) : undefined
+  };
+}
+
+export function parseTopicEchoMessage(message: string): unknown {
+  return yaml.load(message);
 }
 
 /**
@@ -170,13 +184,13 @@ export class TopicEchoManager {
     // Stop any existing process for this topic
     this.stopEcho(topicName);
 
-    const command = `ros2 topic echo ${topicName} --no-arr --no-str-len`;
     const childProcess = child_process.spawn(
-      process.platform === 'win32' ? 'cmd' : 'sh',
-      process.platform === 'win32' ? ['/c', command] : ['-c', command],
+      "ros2",
+      ["topic", "echo", topicName],
       {
         env: extension.env,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true
       }
     );
 
@@ -186,6 +200,10 @@ export class TopicEchoManager {
     let buffer = '';
 
     childProcess.stdout?.on('data', (data: Buffer) => {
+      if (this.activeProcesses.get(topicName) !== childProcess) {
+        return;
+      }
+
       buffer += data.toString();
       
       // Split by YAML document separator (---)
@@ -199,15 +217,15 @@ export class TopicEchoManager {
         if (messageStr.trim().length === 0) continue;
         
         try {
-          // Parse YAML-like output to JSON
-          const jsonData = this.parseYamlToJson(messageStr);
+          const jsonData = parseTopicEchoMessage(messageStr);
           const message: TopicMessage = {
             timestamp: Date.now(),
-            data: jsonData,
-            rawData: messageStr
+            data: jsonData
           };
           
-          onMessage(message);
+          if (this.activeProcesses.get(topicName) === childProcess) {
+            onMessage(message);
+          }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           extension.outputChannel.appendLine(`Error parsing message from ${topicName}: ${errorMessage}`);
@@ -219,10 +237,20 @@ export class TopicEchoManager {
       extension.outputChannel.appendLine(`Error from topic echo ${topicName}: ${data.toString()}`);
     });
 
+    childProcess.on("error", error => {
+      extension.outputChannel.appendLine(`Unable to start topic echo for ${topicName}: ${error.message}`);
+      if (this.activeProcesses.get(topicName) === childProcess) {
+        this.activeProcesses.delete(topicName);
+        this.messageHandlers.delete(topicName);
+      }
+    });
+
     childProcess.on('exit', (code) => {
       extension.outputChannel.appendLine(`Topic echo process for ${topicName} exited with code ${code}`);
-      this.activeProcesses.delete(topicName);
-      this.messageHandlers.delete(topicName);
+      if (this.activeProcesses.get(topicName) === childProcess) {
+        this.activeProcesses.delete(topicName);
+        this.messageHandlers.delete(topicName);
+      }
     });
   }
 
@@ -252,46 +280,6 @@ export class TopicEchoManager {
    */
   public isEchoing(topicName: string): boolean {
     return this.activeProcesses.has(topicName);
-  }
-
-  /**
-   * Parse YAML-like output from ros2 topic echo to JSON
-   * This is a simple parser that handles basic YAML structures
-   */
-  private parseYamlToJson(yaml: string): any {
-    try {
-      // Simple YAML to JSON conversion
-      // For complex messages, we just return the raw string
-      const lines = yaml.trim().split('\n');
-      const obj: any = {};
-      
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.length === 0 || trimmed === '---') continue;
-        
-        const colonIndex = trimmed.indexOf(':');
-        if (colonIndex > 0) {
-          const key = trimmed.substring(0, colonIndex).trim();
-          let value: any = trimmed.substring(colonIndex + 1).trim();
-          
-          // Try to parse numbers and booleans
-          if (value === 'true') {
-            value = true;
-          } else if (value === 'false') {
-            value = false;
-          } else if (value.length > 0 && !isNaN(Number(value)) && value.trim() !== '') {
-            value = Number(value);
-          }
-          
-          obj[key] = value;
-        }
-      }
-      
-      return obj;
-    } catch (error) {
-      // If parsing fails, return the raw string
-      return { raw: yaml };
-    }
   }
 
   /**
