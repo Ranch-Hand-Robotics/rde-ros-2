@@ -11,6 +11,14 @@ import * as rosShell from "./ros-shell";
 import * as colconUtils from "./colcon-utils";
 import { env } from "process";
 
+export const COLCON_TASK_TYPE = "colcon";
+const COLCON_COMMAND = "colcon";
+
+function hasTaskType(task: vscode.Task, expectedType: string): boolean {
+    const definition = task.definition as vscode.TaskDefinition | undefined;
+    return definition?.type === expectedType;
+}
+
 async function makeColcon(name: string, command: string, verb: string, args: string[], category?: string): Promise<vscode.Task> {
     let installType = '--symlink-install';
     if (process.platform === "win32") {
@@ -34,8 +42,8 @@ async function makeColcon(name: string, command: string, verb: string, args: str
         }
     }
 
-    // The task type must match the provider id ('colcon') so VS Code doesn't warn about undefined providers
-    const task = rosShell.make(name, {type: 'colcon', command: command, args: baseArgs}, category);
+    // The task type must match the provider id ('colcon') so VS Code can map tasks to this provider.
+    const task = rosShell.make(name, {type: COLCON_TASK_TYPE, command: command, args: baseArgs}, category);
     task.problemMatchers = ["$colcon-gcc"];
 
     return task;
@@ -58,11 +66,21 @@ export class ColconProvider implements vscode.TaskProvider {
         const testDebug = await makeColcon('Colcon Build Test Debug', 'colcon', 'test', [`-DCMAKE_BUILD_TYPE=Debug`], 'test');
         testDebug.group = vscode.TaskGroup.Test;
 
-        return [make, makeDebug, test, testDebug];
+        const tasks = [make, makeDebug, test, testDebug];
+        return tasks.filter(task => hasTaskType(task, COLCON_TASK_TYPE));
     }
 
     public resolveTask(task: vscode.Task, token?: vscode.CancellationToken): vscode.ProviderResult<vscode.Task> {
-        return rosShell.resolve(task);
+        if (!hasTaskType(task, COLCON_TASK_TYPE)) {
+            return undefined;
+        }
+
+        const resolvedTask = rosShell.resolve(task);
+        if (!hasTaskType(resolvedTask, COLCON_TASK_TYPE)) {
+            return undefined;
+        }
+
+        return resolvedTask;
     }
 }
 
@@ -108,7 +126,7 @@ export async function makeColconPackageTask(packageName: string, buildType: stri
         `-DCMAKE_BUILD_TYPE=${buildType}`
     ];
 
-    const task = rosShell.make(`Colcon Build ${packageName}`, {type: 'colcon', command: 'colcon', args}, 'build');
+    const task = rosShell.make(`Colcon Build ${packageName}`, {type: COLCON_TASK_TYPE, command: COLCON_COMMAND, args}, 'build');
     task.problemMatchers = ["$colcon-gcc"];
     task.group = vscode.TaskGroup.Build;
 

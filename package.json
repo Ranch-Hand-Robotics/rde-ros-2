@@ -1,6 +1,6 @@
 {
     "name": "rde-ros-2",
-    "version": "1.2.1",
+    "version": "1.3.0",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
         "vscode": "^1.101.0"
@@ -14,6 +14,7 @@
     "aiKey": "",
     "categories": [
         "Debuggers",
+        "Snippets",
         "Other"
     ],
     "capabilities": {
@@ -161,6 +162,10 @@
                 "title": "Debug All ROS 2 Tests",
                 "category": "ROS2",
                 "icon": "$(debug-alt)"
+            },
+            {
+                "command": "ROS2.showWelcome",
+                "title": "Show Getting Started Guide"
             },
             {
                 "command": "ROS2.launchTree.refresh",
@@ -326,6 +331,23 @@
                 }
             ]
         },
+        "submenus": [
+            {
+                "id": "ROS2.explorer",
+                "label": "ROS 2"
+            }
+        ],
+        "views": {
+            "explorer": [
+                {
+                    "id": "ros2LaunchTree",
+                    "name": "ROS 2 Launch Files",
+                    "contextualTitle": "ROS 2 Launch Tree",
+                    "visibility": "visible",
+                    "when": "ros2.hasPackageXml"
+                }
+            ]
+        },
         "mcpServerDefinitionProviders": [
             {
                 "id": "ROS 2",
@@ -369,12 +391,31 @@
                     "default": "c:\\pixi_ws",
                     "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
                 },
+                "ROS2.showROS2WelcomeOnStartup": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show the Getting Started walkthrough when the extension is first installed or updated."
+
+                },
+                "ROS2.lastShownWelcomeVersion": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The version of the extension when the welcome walkthrough was last shown to the user."
+                },
                 "ROS2.colconIgnore": {
                     "type": "object",
                     "default": {},
                     "description": "Map of package names to ignore during colcon build. Keys are package names, values are boolean (true to ignore).",
                     "additionalProperties": {
                         "type": "boolean"
+                    }
+                },
+                "ROS2.testExcludeFolders": {
+                    "type": "array",
+                    "default": [],
+                    "description": "List of folder paths to exclude when discovering ROS tests. Paths can be absolute or relative to the workspace folder. Supports ${workspaceFolder} variable. Example: ['${workspaceFolder}/external', 'submodules']",
+                    "items": {
+                        "type": "string"
                     }
                 }
             }
@@ -565,6 +606,24 @@
                 "path": "./languages/syntaxes/ROS Interface.tmLanguage.json"
             }
         ],
+        "snippets": [
+            {
+                "language": "python",
+                "path": "./snippets/python.json"
+            },
+            {
+                "language": "cpp",
+                "path": "./snippets/cpp.json"
+            },
+            {
+                "language": "python",
+                "path": "./snippets/launch-py.json"
+            },
+            {
+                "language": "xml",
+                "path": "./snippets/launch-xml.json"
+            }
+        ],
         "problemMatchers": [
             {
                 "name": "colcon-gcc",
@@ -628,7 +687,14 @@
             },
             {
                 "type": "colcon",
+                "required": [
+                    "command"
+                ],
                 "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "command to execute in ROS environment"
+                    },
                     "args": {
                         "type": "array",
                         "description": "Command line arguments to colcon"
@@ -640,6 +706,39 @@
             {
                 "id": "ros2-test-provider",
                 "label": "ROS 2 Tests"
+            }
+        ],
+        "walkthroughs": [
+            {
+                "id": "ros2.gettingStarted",
+                "title": "Get Started with ROS 2",
+                "description": "Learn how to set up and use the Robot Developer Extensions for ROS 2",
+                "steps": [
+                    {
+                        "id": "ros2.welcome",
+                        "title": "Welcome to ROS 2 Development",
+                        "description": "Learn about the powerful features available in the Robot Developer Extensions for ROS 2.",
+                        "media": {
+                            "markdown": "media/walkthroughs/getting-started.md"
+                        }
+                    },
+                    {
+                        "id": "ros2.aiFeatures",
+                        "title": "Use AI Features for Robotics Development",
+                        "description": "Learn how to use AI-powered completions, the MCP server, and custom agents for ROS 2 development.",
+                        "media": {
+                            "markdown": "media/walkthroughs/ai-features.md"
+                        }
+                    },
+                    {
+                        "id": "ros2.learnFeatures",
+                        "title": "Explore Extension Features",
+                        "description": "Discover the commands and features available for ROS 2 development.",
+                        "media": {
+                            "markdown": "media/walkthroughs/commands-and-features.md"
+                        }
+                    }
+                ]
             }
         ]
     },

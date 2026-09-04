@@ -1,0 +1,168 @@
+{
+  "ROS2 XML Launch Template": {
+    "prefix": "ros2launch",
+    "body": [
+      "<?xml version=\"1.0\"?>",
+      "<launch>",
+      "\t${0}",
+      "</launch>"
+    ],
+    "description": "ROS 2 XML launch file template"
+  },
+  "ROS2 XML Launch Node": {
+    "prefix": "ros2node",
+    "body": [
+      "<node pkg=\"${1:package_name}\" exec=\"${2:executable_name}\" name=\"${3:node_name}\" output=\"${4|screen,log|}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML launch node"
+  },
+  "ROS2 XML Launch Node with Namespace": {
+    "prefix": "ros2nodens",
+    "body": [
+      "<node pkg=\"${1:package_name}\" exec=\"${2:executable_name}\" name=\"${3:node_name}\" namespace=\"${4:namespace}\" output=\"${5|screen,log|}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML launch node with namespace"
+  },
+  "ROS2 XML Launch Node Block": {
+    "prefix": "ros2nodeblock",
+    "body": [
+      "<node pkg=\"${1:package_name}\" exec=\"${2:executable_name}\" name=\"${3:node_name}\">",
+      "\t${0}",
+      "</node>"
+    ],
+    "description": "ROS 2 XML launch node block"
+  },
+  "ROS2 XML Launch Argument": {
+    "prefix": "ros2arg",
+    "body": [
+      "<arg name=\"${1:arg_name}\" default=\"${2:default_value}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML launch argument"
+  },
+  "ROS2 XML Launch Argument No Default": {
+    "prefix": "ros2argnodefault",
+    "body": [
+      "<arg name=\"${1:arg_name}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML launch argument without default"
+  },
+  "ROS2 XML Launch Include": {
+    "prefix": "ros2include",
+    "body": [
+      "<include file=\"$(find-pkg-share ${1:package_name})/${2:launch/file.launch.xml}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML include launch file"
+  },
+  "ROS2 XML Launch Include with Args": {
+    "prefix": "ros2includeargs",
+    "body": [
+      "<include file=\"$(find-pkg-share ${1:package_name})/${2:launch/file.launch.xml}\">",
+      "\t<arg name=\"${3:arg_name}\" value=\"${4:arg_value}\" />",
+      "</include>",
+      "${0}"
+    ],
+    "description": "ROS 2 XML include launch file with arguments"
+  },
+  "ROS2 XML Launch Parameter": {
+    "prefix": "ros2param",
+    "body": [
+      "<param name=\"${1:param_name}\" value=\"${2:param_value}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML launch parameter"
+  },
+  "ROS2 XML Launch Parameter from YAML": {
+    "prefix": "ros2paramfile",
+    "body": [
+      "<param from=\"$(find-pkg-share ${1:package_name})/${2:config/params.yaml}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML parameter from YAML file"
+  },
+  "ROS2 XML Launch Remap": {
+    "prefix": "ros2remap",
+    "body": [
+      "<remap from=\"${1:from_topic}\" to=\"${2:to_topic}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML topic remap"
+  },
+  "ROS2 XML Launch Group": {
+    "prefix": "ros2group",
+    "body": [
+      "<group>",
+      "\t${0}",
+      "</group>"
+    ],
+    "description": "ROS 2 XML launch group"
+  },
+  "ROS2 XML Launch Push Namespace": {
+    "prefix": "ros2namespace",
+    "body": [
+      "<push-ros-namespace namespace=\"${1:namespace}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML push ROS namespace"
+  },
+  "ROS2 XML Launch Environment Variable": {
+    "prefix": "ros2env",
+    "body": [
+      "<env name=\"${1:ENV_NAME}\" value=\"${2:value}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML environment variable"
+  },
+  "ROS2 XML Launch Set Environment": {
+    "prefix": "ros2setenv",
+    "body": [
+      "<set_env name=\"${1:ENV_NAME}\" value=\"${2:value}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML set environment variable"
+  },
+  "ROS2 XML Launch Let Variable": {
+    "prefix": "ros2let",
+    "body": [
+      "<let name=\"${1:var_name}\" value=\"${2:var_value}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML let variable"
+  },
+  "ROS2 XML Get Variable": {
+    "prefix": "ros2var",
+    "body": [
+      "$(var ${1:var_name})",
+      "${0}"
+    ],
+    "description": "ROS 2 XML get variable substitution"
+  },
+  "ROS2 XML Get Environment": {
+    "prefix": "ros2getenv",
+    "body": [
+      "$(env ${1:ENV_NAME})",
+      "${0}"
+    ],
+    "description": "ROS 2 XML get environment variable"
+  },
+  "ROS2 XML Find Package Share": {
+    "prefix": "ros2findpkg",
+    "body": [
+      "$(find-pkg-share ${1:package_name})",
+      "${0}"
+    ],
+    "description": "ROS 2 XML find package share directory"
+  },
+  "ROS2 XML Launch Executable": {
+    "prefix": "ros2exec",
+    "body": [
+      "<executable cmd=\"${1:command}\" output=\"${2|screen,log|}\" />",
+      "${0}"
+    ],
+    "description": "ROS 2 XML launch executable"
+  }
+}

@@ -2,6 +2,25 @@
 
 All notable changes to the Robot Developer Extensions for ROS 2 are documented in this file.
 
+## [Unreleased]
+
+## [1.3.0] - 2026-03-03
+
+### Added
+- Code snippets for Python (rclpy), C++ (rclcpp), and launch files (Python and XML)
+  - Node templates with publishers, subscribers, services, actions, and parameters
+  - Logging statements (debug, info, warn, error, fatal)
+  - Launch file templates with nodes, arguments, includes, and composable nodes
+  - QoS profile snippets
+  - Component registration macros for C++
+- Documentation for using code snippets
+- Support and Sponsor sections in the Getting Started walkthrough
+
+### Changed
+- Refactored MCP command handling out of `src/extension.ts` into `src/mcp.ts`
+- Renamed setting `ROS2.showWelcomeOnStartup` to `ROS2.showROS2WelcomeOnStartup` for clearer ownership
+- Improved Support and Sponsor walkthrough copy and link labels
+
 ## [1.1.0] - 2025-12-21
 
 ### Added

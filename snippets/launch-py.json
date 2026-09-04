@@ -1,0 +1,184 @@
+{
+  "ROS2 Launch Template": {
+    "prefix": "ros2launch",
+    "body": [
+      "from launch import LaunchDescription",
+      "from launch_ros.actions import Node",
+      "",
+      "",
+      "def generate_launch_description():",
+      "\treturn LaunchDescription([",
+      "\t\t${0}",
+      "\t])"
+    ],
+    "description": "ROS 2 Python launch file template"
+  },
+  "ROS2 Launch Node": {
+    "prefix": "ros2launchnode",
+    "body": [
+      "Node(",
+      "\tpackage='${1:package_name}',",
+      "\texecutable='${2:executable_name}',",
+      "\tname='${3:node_name}',",
+      "\tnamespace='${4}',",
+      "\tparameters=[${5}],",
+      "\toutput='${6|screen,log|}',",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 launch node"
+  },
+  "ROS2 Launch Node Simple": {
+    "prefix": "ros2node",
+    "body": [
+      "Node(",
+      "\tpackage='${1:package_name}',",
+      "\texecutable='${2:executable_name}',",
+      "\tname='${3:node_name}',",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 simple launch node"
+  },
+  "ROS2 Launch Node with Remappings": {
+    "prefix": "ros2launchremap",
+    "body": [
+      "Node(",
+      "\tpackage='${1:package_name}',",
+      "\texecutable='${2:executable_name}',",
+      "\tname='${3:node_name}',",
+      "\tremappings=[",
+      "\t\t('${4:from_topic}', '${5:to_topic}'),",
+      "\t],",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 launch node with remappings"
+  },
+  "ROS2 Launch Include": {
+    "prefix": "ros2launchinclude",
+    "body": [
+      "from launch.actions import IncludeLaunchDescription",
+      "from launch.launch_description_sources import PythonLaunchDescriptionSource",
+      "from ament_index_python.packages import get_package_share_directory",
+      "import os",
+      "",
+      "IncludeLaunchDescription(",
+      "\tPythonLaunchDescriptionSource(",
+      "\t\tos.path.join(",
+      "\t\t\tget_package_share_directory('${1:package_name}'),",
+      "\t\t\t'launch',",
+      "\t\t\t'${2:launch_file.launch.py}'",
+      "\t\t)",
+      "\t),",
+      "\tlaunch_arguments={",
+      "\t\t'${3:arg_name}': '${4:arg_value}'",
+      "\t}.items(),",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 include launch file"
+  },
+  "ROS2 Launch Declare Argument": {
+    "prefix": "ros2launcharg",
+    "body": [
+      "from launch.actions import DeclareLaunchArgument",
+      "",
+      "DeclareLaunchArgument(",
+      "\t'${1:arg_name}',",
+      "\tdefault_value='${2:default_value}',",
+      "\tdescription='${3:Description of the argument}'",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 declare launch argument"
+  },
+  "ROS2 Launch Get Argument": {
+    "prefix": "ros2launchgetarg",
+    "body": [
+      "from launch.substitutions import LaunchConfiguration",
+      "",
+      "LaunchConfiguration('${1:arg_name}'),",
+      "${0}"
+    ],
+    "description": "ROS 2 get launch argument"
+  },
+  "ROS2 Launch Executable": {
+    "prefix": "ros2launchexec",
+    "body": [
+      "from launch.actions import ExecuteProcess",
+      "",
+      "ExecuteProcess(",
+      "\tcmd=['${1:command}', '${2:arg1}', '${3:arg2}'],",
+      "\toutput='${4|screen,log|}',",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 launch execute process"
+  },
+  "ROS2 Launch ComposableNode": {
+    "prefix": "ros2composable",
+    "body": [
+      "from launch_ros.actions import ComposableNodeContainer",
+      "from launch_ros.descriptions import ComposableNode",
+      "",
+      "ComposableNodeContainer(",
+      "\tname='${1:container_name}',",
+      "\tnamespace='',",
+      "\tpackage='rclcpp_components',",
+      "\texecutable='component_container',",
+      "\tcomposable_node_descriptions=[",
+      "\t\tComposableNode(",
+      "\t\t\tpackage='${2:package_name}',",
+      "\t\t\tplugin='${3:namespace::ClassName}',",
+      "\t\t\tname='${4:node_name}',",
+      "\t\t),",
+      "\t],",
+      "\toutput='screen',",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 composable node container"
+  },
+  "ROS2 Launch Group Action": {
+    "prefix": "ros2launchgroup",
+    "body": [
+      "from launch.actions import GroupAction",
+      "from launch_ros.actions import PushRosNamespace",
+      "",
+      "GroupAction(",
+      "\tactions=[",
+      "\t\tPushRosNamespace('${1:namespace}'),",
+      "\t\t${0}",
+      "\t]",
+      "),"
+    ],
+    "description": "ROS 2 launch group action"
+  },
+  "ROS2 Launch Set Parameter": {
+    "prefix": "ros2launchparam",
+    "body": [
+      "from launch.actions import SetParameter",
+      "",
+      "SetParameter(name='${1:param_name}', value='${2:param_value}'),",
+      "${0}"
+    ],
+    "description": "ROS 2 set launch parameter"
+  },
+  "ROS2 Launch Lifecycle Node": {
+    "prefix": "ros2lifecycle",
+    "body": [
+      "from launch_ros.actions import LifecycleNode",
+      "",
+      "LifecycleNode(",
+      "\tpackage='${1:package_name}',",
+      "\texecutable='${2:executable_name}',",
+      "\tname='${3:node_name}',",
+      "\tnamespace='${4}',",
+      "\toutput='screen',",
+      "),",
+      "${0}"
+    ],
+    "description": "ROS 2 lifecycle node"
+  }
+}

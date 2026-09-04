@@ -6,9 +6,11 @@ import * as fs from "fs";
 import { promises as fsPromises } from "fs";
 import * as child_process from "child_process";
 import * as vscode from "vscode";
+import * as net from 'net';
 
 import * as ros_utils from "./ros/utils";
 import * as extension from "./extension";
+import * as mcp from "./mcp";
 
 import { 
     checkExternallyManagedEnvironment,
@@ -27,6 +29,30 @@ export type IPackageInfo = CommonIPackageInfo;
 export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
     const rosConfigurationName: string = "ROS2";
     return vscode.workspace.getConfiguration(rosConfigurationName);
+}
+
+/**
+ * Gets the workspace folder that contains the given path.
+ * Returns the workspace folder path or null if not in a workspace.
+ * This function ensures workspace boundary enforcement across the extension.
+ */
+export function getWorkspaceFolder(dirPath: string): string | null {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+        return null;
+    }
+    
+    const normalizedPath = path.normalize(dirPath);
+    
+    // Find the workspace folder that contains this path
+    for (const folder of vscode.workspace.workspaceFolders) {
+        const folderPath = path.normalize(folder.uri.fsPath);
+        
+        if (normalizedPath === folderPath || normalizedPath.startsWith(folderPath + path.sep)) {
+            return folderPath;
+        }
+    }
+    
+    return null;
 }
 
 /**
@@ -106,6 +132,71 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 /**
+ * Check if the current workspace contains a package.xml file up to a max depth.
+ */
+export async function workspaceContainsPackageXml(maxDepth: number = 5): Promise<boolean> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        return false;
+    }
+
+    const excludedDirs = new Set([
+        ".git",
+        ".hg",
+        ".svn",
+        "node_modules",
+        "build",
+        "install",
+        "log",
+        "dist",
+        "out",
+    ]);
+
+    const hasPackageXmlInDir = async (dir: string, depth: number): Promise<boolean> => {
+        let entries: fs.Dirent[];
+        try {
+            entries = await fsPromises.readdir(dir, { withFileTypes: true });
+        } catch {
+            return false;
+        }
+
+        for (const entry of entries) {
+            if (entry.isFile() && entry.name === "package.xml") {
+                return true;
+            }
+        }
+
+        if (depth >= maxDepth) {
+            return false;
+        }
+
+        for (const entry of entries) {
+            if (!entry.isDirectory()) {
+                continue;
+            }
+            if (excludedDirs.has(entry.name)) {
+                continue;
+            }
+
+            const nextPath = path.join(dir, entry.name);
+            if (await hasPackageXmlInDir(nextPath, depth + 1)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    for (const folder of folders) {
+        if (await hasPackageXmlInDir(folder.uri.fsPath, 0)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Creates and ensures the extension's virtual environment exists for MCP server use only.
  * This function is specifically for MCP server requirements and should not be used elsewhere.
  */
@@ -143,7 +234,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                             if (selection === 'Install Now') {
                                 // Install python3-venv using MCP terminal
-                                terminal = extension.getMcpTerminal();
+                                terminal = mcp.getMcpTerminal();
                                 terminal.sendText("sudo apt update && sudo apt install -y python3-venv");
                                 
                                 vscode.window.showInformationMessage(
@@ -170,7 +261,7 @@ export async function ensureMcpVirtualEnvironment(context: vscode.ExtensionConte
 
                 if (!terminal) {
                     // Create a terminal if not already created
-                    terminal = extension.getMcpTerminal();
+                    terminal = mcp.getMcpTerminal();
                     terminal.sendText(`source ${path.join(venvPath, 'bin', 'activate')}`);
                 }
 
@@ -241,4 +332,64 @@ export function isPythonExtensionInstalled(): boolean {
  */
 export function isCursorEditor(): boolean {
     return commonIsCursorEditor();
+}
+
+
+export async function findAvailablePort(startPort: number = 3005, maxAttempts: number = 100): Promise<number> {
+  for (let port = startPort; port < startPort + maxAttempts; port++) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+  throw new Error(`No available port found in range ${startPort}-${startPort + maxAttempts - 1}`);
+}
+
+/**
+ * Check if a port is available
+ * @param port Port number to check
+ * @returns Promise that resolves to true if port is available
+ */
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    
+    server.once('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false); // Port is in use
+      } else {
+        resolve(false); // Other error, assume not available
+      }
+    });
+    
+    server.once('listening', () => {
+      server.close();
+      resolve(true); // Port is available
+    });
+    
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+/**
+ * Compare two semantic versions
+ * @param ignorePatch If true, compare only major/minor components and ignore patch differences.
+ * @returns -1 if v1 < v2, 0 if v1 === v2, 1 if v1 > v2
+ */
+export function compareVersions(v1: string, v2: string, ignorePatch: boolean = false): number {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+
+    const maxParts = ignorePatch
+        ? 2
+        : Math.max(parts1.length, parts2.length);
+    
+    for (let i = 0; i < maxParts; i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        
+        if (p1 < p2) return -1;
+        if (p1 > p2) return 1;
+    }
+    
+    return 0;
 }
