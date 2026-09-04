@@ -26,6 +26,9 @@ import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
 import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
 import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
+import { TopicTreeDataProvider } from "./ros/topic-tree/topic-tree-provider";
+import { TopicTreeItem } from "./ros/topic-tree/topic-tree-item";
+import { TopicWebviewManager } from "./ros/ros2/topic-webview";
 
 import * as mcp from "./mcp";
 
@@ -52,6 +55,9 @@ export let outputChannel: vscode.OutputChannel;
 export let extensionContext: vscode.ExtensionContext | null = null;
 export let rosTestProvider: RosTestProvider | null = null;
 export let launchTreeProvider: LaunchTreeDataProvider | null = null;
+export let topicTreeProvider: TopicTreeDataProvider | null = null;
+export let topicWebviewManager: TopicWebviewManager | null = null;
+let topicTreeView: vscode.TreeView<TopicTreeItem> | null = null;
 
 let onEnvChanged = new vscode.EventEmitter<void>();
 
@@ -101,7 +107,26 @@ export enum Commands {
     LaunchTreeDebug = "ROS2.launchTree.debug",
     ColconToggleIgnore = "ROS2.colcon.toggleIgnore",
     ColconBuildPackageRelease = "ROS2.colcon.buildPackageRelease",
-    ColconBuildPackageDebug = "ROS2.colcon.buildPackageDebug"
+    ColconBuildPackageDebug = "ROS2.colcon.buildPackageDebug",
+    TopicTreeRefresh = "ROS2.topicTree.refresh",
+    TopicTreeStartWatcher = "ROS2.topicTree.startWatcher",
+    TopicTreePauseWatcher = "ROS2.topicTree.pauseWatcher",
+    TopicTreePauseAll = "ROS2.topicTree.pauseAll"
+}
+
+function syncTopicMonitoringState(): void {
+    const monitoringEnabled = topicTreeView?.visible === true
+        && topicTreeProvider?.isWatcherEnabled() === true;
+    topicWebviewManager?.setMonitoringEnabled(monitoringEnabled);
+}
+
+async function refreshVisibleTopicTree(): Promise<void> {
+    if (topicTreeView?.visible !== true) {
+        return;
+    }
+
+    await sourceRosAndWorkspace(false);
+    await topicTreeProvider?.refreshTopics();
 }
 
 /**
@@ -204,12 +229,60 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize Launch Tree Provider
     launchTreeProvider = new LaunchTreeDataProvider(context, outputChannel, extPath);
-    const launchTreeView = vscode.window.createTreeView('ros2LaunchTree', {
+    const launchTreeView = vscode.window.createTreeView('ranchhandrobotics.rde-ros-2.launchTree', {
         treeDataProvider: launchTreeProvider,
         showCollapseAll: true
     });
     context.subscriptions.push(launchTreeView);
     context.subscriptions.push(launchTreeProvider);
+
+    // Initialize Topic Webview Manager
+    topicWebviewManager = new TopicWebviewManager(context, (topicName) => {
+        topicTreeProvider?.markTopicMonitorClosed(topicName);
+    });
+    context.subscriptions.push(topicWebviewManager);
+
+    // Initialize Topic Tree Provider
+    topicTreeProvider = new TopicTreeDataProvider(
+        context,
+        outputChannel,
+        (topic, subscribe: boolean) => {
+            if (subscribe && topicWebviewManager) {
+                topicWebviewManager.openTopicMonitor(topic.name, topic.type);
+            } else if (!subscribe && topicWebviewManager) {
+                topicWebviewManager.closeTopicMonitor(topic.name);
+            }
+        }
+    );
+    topicTreeView = vscode.window.createTreeView('ranchhandrobotics.rde-ros-2.topicTree', {
+        treeDataProvider: topicTreeProvider,
+        showCollapseAll: true
+    });
+    topicTreeProvider.setViewVisible(topicTreeView.visible);
+    await vscode.commands.executeCommand("setContext", "ros2.topicWatcherEnabled", false);
+
+    // Query topics only after sourceRosAndWorkspace has atomically replaced env.
+    // This avoids the initial placeholder render consuming the refresh before ROS is ready.
+    context.subscriptions.push(onDidChangeEnv(() => {
+        if (topicTreeView?.visible === true) {
+            void topicTreeProvider?.refreshTopics();
+        }
+    }));
+    
+    // Handle checkbox changes
+    context.subscriptions.push(topicTreeView.onDidChangeCheckboxState((event) => {
+        void topicTreeProvider?.handleCheckboxChange([event]);
+    }));
+    context.subscriptions.push(topicTreeView.onDidChangeVisibility((event) => {
+        topicTreeProvider?.setViewVisible(event.visible);
+        syncTopicMonitoringState();
+        if (event.visible) {
+            void refreshVisibleTopicTree();
+        }
+    }));
+    
+    context.subscriptions.push(topicTreeView);
+    context.subscriptions.push(topicTreeProvider);
 
     // Source the environment, and re-source on config change.
     let config = vscode_utils.getExtensionConfiguration();
@@ -480,6 +553,39 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    // Register Topic Tree commands
+    vscode.commands.registerCommand(Commands.TopicTreeRefresh, () => {
+        ensureErrorMessageOnException(async () => {
+            await sourceRosAndWorkspace(false);
+            await topicTreeProvider?.refreshTopics();
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.TopicTreeStartWatcher, () => {
+        ensureErrorMessageOnException(async () => {
+            await sourceRosAndWorkspace(false);
+            topicTreeProvider?.setWatcherEnabled(true);
+            await topicTreeProvider?.refreshTopics();
+            syncTopicMonitoringState();
+            await vscode.commands.executeCommand("setContext", "ros2.topicWatcherEnabled", true);
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.TopicTreePauseWatcher, () => {
+        ensureErrorMessageOnException(async () => {
+            topicTreeProvider?.setWatcherEnabled(false);
+            syncTopicMonitoringState();
+            await vscode.commands.executeCommand("setContext", "ros2.topicWatcherEnabled", false);
+        });
+    });
+
+    vscode.commands.registerCommand(Commands.TopicTreePauseAll, () => {
+        ensureErrorMessageOnException(async () => {
+            await topicTreeProvider?.unsubscribeAll();
+            vscode.window.showInformationMessage("All topic monitors stopped");
+        });
+    });
+
     vscode.commands.registerCommand(Commands.LaunchTreeReveal, async (uri: vscode.Uri) => {
         ensureErrorMessageOnException(async () => {
             // TODO: Implement reveal logic
@@ -662,6 +768,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Activate the workspace environment if possible.
     await activateEnvironment(context);
+    await refreshVisibleTopicTree();
 
     // Show welcome walkthrough on first install or if ROS is not detected
     await showWelcomeIfNeeded(context);
@@ -861,7 +968,7 @@ export async function activateEnvironment(context: vscode.ExtensionContext) {
 /**
  * Loads the ROS environment, and prompts the user to select a distro if required.
  */
-async function sourceRosAndWorkspace(): Promise<void> {
+async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): Promise<void> {
 
     // Processing a new environment can take time which introduces a race condition. 
     // Wait to atomicly switch by composing a new environment block then switching at the end.
@@ -1002,7 +1109,9 @@ async function sourceRosAndWorkspace(): Promise<void> {
 
     env = newEnv;
 
-    // Notify listeners the environment has changed.
-    onEnvChanged.fire();
+    if (notifyEnvironmentChange) {
+        // Notify listeners only when a full environment-dependent extension refresh is required.
+        onEnvChanged.fire();
+    }
 }
 

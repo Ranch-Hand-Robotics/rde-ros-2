@@ -210,8 +210,65 @@
                 "command": "ROS2.colcon.buildPackageDebug",
                 "title": "Colcon Build (Debug)",
                 "category": "ROS2"
+            },
+            {
+                "command": "ROS2.topicTree.refresh",
+                "title": "Refresh Topic List",
+                "category": "ROS2",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "ROS2.topicTree.startWatcher",
+                "title": "Start Topic Watcher",
+                "category": "ROS2",
+                "icon": "$(play)"
+            },
+            {
+                "command": "ROS2.topicTree.pauseWatcher",
+                "title": "Pause Topic Watcher",
+                "category": "ROS2",
+                "icon": "$(debug-pause)"
+            },
+            {
+                "command": "ROS2.topicTree.pauseAll",
+                "title": "Stop All Topic Monitors",
+                "category": "ROS2",
+                "icon": "$(debug-pause)"
             }
         ],
+        "submenus": [
+            {
+                "id": "ROS2.explorer",
+                "label": "ROS 2"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "ros2-sidebar",
+                    "title": "ROS 2",
+                    "icon": "media/robot-icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "ros2-sidebar": [
+                {
+                    "id": "ranchhandrobotics.rde-ros-2.launchTree",
+                    "name": "ROS 2 Launch Files",
+                    "contextualTitle": "ROS 2 Launch Tree",
+                    "icon": "media/launch-tree-icon.svg",
+                    "visibility": "visible"
+                },
+                {
+                    "id": "ranchhandrobotics.rde-ros-2.topicTree",
+                    "name": "ROS 2 Topics",
+                    "contextualTitle": "ROS 2 Topic Monitor",
+                    "icon": "media/topic-tree-icon.svg",
+                    "visibility": "visible"
+                }
+            ]
+        },
         "menus": {
             "explorer/context": [
                 {
@@ -237,24 +294,39 @@
             "view/title": [
                 {
                     "command": "ROS2.launchTree.refresh",
-                    "when": "view == ros2LaunchTree",
+                    "when": "view == ranchhandrobotics.rde-ros-2.launchTree",
                     "group": "navigation"
+                },
+                {
+                    "command": "ROS2.topicTree.startWatcher",
+                    "when": "view == ranchhandrobotics.rde-ros-2.topicTree && !ros2.topicWatcherEnabled",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "ROS2.topicTree.pauseWatcher",
+                    "when": "view == ranchhandrobotics.rde-ros-2.topicTree && ros2.topicWatcherEnabled",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "ROS2.topicTree.refresh",
+                    "when": "view == ranchhandrobotics.rde-ros-2.topicTree",
+                    "group": "navigation@2"
                 }
             ],
             "view/item/context": [
                 {
                     "command": "ROS2.launchTree.run",
-                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "when": "view == ranchhandrobotics.rde-ros-2.launchTree && viewItem == launchFile",
                     "group": "1_run@1"
                 },
                 {
                     "command": "ROS2.launchTree.debug",
-                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "when": "view == ranchhandrobotics.rde-ros-2.launchTree && viewItem == launchFile",
                     "group": "1_run@2"
                 },
                 {
                     "command": "ROS2.launchTree.findUsages",
-                    "when": "view == ros2LaunchTree && viewItem == launchFile",
+                    "when": "view == ranchhandrobotics.rde-ros-2.launchTree && viewItem == launchFile",
                     "group": "2_navigation@1"
                 }
             ]

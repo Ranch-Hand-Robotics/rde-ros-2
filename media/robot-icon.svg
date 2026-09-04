@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns="http://www.w3.org/2000/svg"
+   viewBox="0 0 64 64"
+   role="img"
+   aria-label="Robot icon">
+  <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="14" y="16" width="36" height="30" rx="8" />
+    <path d="M32 16v-6" />
+    <circle cx="32" cy="8" r="2" fill="currentColor" stroke="none" />
+    <circle cx="24" cy="28" r="3" fill="currentColor" stroke="none" />
+    <circle cx="40" cy="28" r="3" fill="currentColor" stroke="none" />
+    <path d="M24 38h16" />
+    <path d="M20 52h24" />
+    <path d="M20 46h24" />
+    <path d="M18 22h28" opacity="0.8" />
+    <path d="M14 28H8" />
+    <path d="M50 28h6" />
+  </g>
+</svg>
