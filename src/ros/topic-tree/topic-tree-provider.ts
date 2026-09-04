@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import * as topicMonitor from '../ros2/topic-monitor';
 import { TopicInfo, TopicQoS } from '../ros2/topic-types';
 import { TopicTreeItem, TopicTreeItemType } from './topic-tree-item';
+import { TopicWatchState } from './topic-watch-state';
 
 export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<TopicTreeItem | undefined | void>();
@@ -19,8 +20,11 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
     updatedAt: number
   }>();
   private topicMetricsRequests = new Map<string, Promise<void>>();
+  private topics: TopicInfo[] | undefined;
+  private topicListRequest?: Promise<void>;
   private refreshInterval?: NodeJS.Timeout;
   private isWindowFocused = true;
+  private readonly watchState = new TopicWatchState();
   private readonly metricsCacheDurationMs = 15000;
 
   constructor(
@@ -28,10 +32,10 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
     private readonly outputChannel: vscode.OutputChannel,
     private readonly onTopicSubscriptionChanged: (topic: TopicInfo, subscribe: boolean) => void | Promise<void>
   ) {
-    // Auto-refresh every 5 seconds when window is focused
+    // Auto-refresh only while the visible topic view is explicitly playing.
     this.refreshInterval = setInterval(() => {
-      if (this.isWindowFocused) {
-        this.refresh();
+      if (this.watchState.shouldAutoRefresh(this.isWindowFocused)) {
+        void this.refreshTopics();
       }
     }, 5000);
 
@@ -48,6 +52,64 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
    */
   refresh(): void {
     this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Update whether the topic tree is currently visible.
+   */
+  public setViewVisible(visible: boolean): void {
+    this.watchState.setViewVisible(visible);
+    this.refresh();
+  }
+
+  /**
+   * Enable or pause automatic topic watching.
+   */
+  public setWatcherEnabled(enabled: boolean): void {
+    this.watchState.setWatcherEnabled(enabled);
+    if (enabled) {
+      void this.refreshTopics();
+    } else {
+      this.refresh();
+    }
+  }
+
+  public isWatcherEnabled(): boolean {
+    return this.watchState.isWatcherEnabled();
+  }
+
+  /**
+   * Request one topic refresh without enabling the periodic watcher.
+   */
+  public manualRefresh(): boolean {
+    if (!this.watchState.requestManualRefresh()) {
+      return false;
+    }
+
+    void this.refreshTopics();
+    return true;
+  }
+
+  /** Queries ROS immediately and caches results before requesting a tree redraw. */
+  public async refreshTopics(): Promise<void> {
+    if (this.topicListRequest) {
+      return this.topicListRequest;
+    }
+
+    this.topicListRequest = (async () => {
+      try {
+        this.topics = await topicMonitor.listTopics();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.outputChannel.appendLine(`Error getting topics: ${errorMessage}`);
+        this.topics = undefined;
+      } finally {
+        this.topicListRequest = undefined;
+        this.refresh();
+      }
+    })();
+
+    return this.topicListRequest;
   }
 
   /**
@@ -73,34 +135,36 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
       return [];
     }
 
-    try {
-      // Get all topics
-      const topics = await topicMonitor.listTopics();
+    if (!this.topics && !this.watchState.consumeQueryPermission()) {
+      return [TopicTreeItem.createEmptyStateItem('Topic watcher paused. Press Play or Refresh.')];
+    }
 
-      if (topics.length === 0) {
-        return [TopicTreeItem.createEmptyStateItem('No topics found. Make sure ROS 2 daemon is running.')];
-      }
+    if (!this.topics) {
+      await this.refreshTopics();
+    }
 
-      // Create tree items
-      const items = topics.map(topic => {
-        const isSubscribed = this.subscribedTopics.has(topic.name);
-        const item = TopicTreeItem.createTopicItem(topic, isSubscribed);
-        
-        // Update metrics cache asynchronously (don't block rendering)
-        void this.updateTopicMetrics(topic.name).catch(err => {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          this.outputChannel.appendLine(`Error updating metrics for ${topic.name}: ${errorMessage}`);
-        });
-        
-        return item;
-      });
-
-      return items;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.outputChannel.appendLine(`Error getting topics: ${errorMessage}`);
+    const topics = this.topics;
+    if (!topics) {
       return [TopicTreeItem.createErrorItem('Failed to retrieve topics')];
     }
+
+    if (topics.length === 0) {
+      return [TopicTreeItem.createEmptyStateItem('No topics found. Make sure ROS 2 daemon is running.')];
+    }
+
+    // Create tree items
+    return topics.map(topic => {
+      const isSubscribed = this.subscribedTopics.has(topic.name);
+      const item = TopicTreeItem.createTopicItem(topic, isSubscribed);
+
+      // Update metrics cache asynchronously (don't block rendering)
+      void this.updateTopicMetrics(topic.name).catch(err => {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.outputChannel.appendLine(`Error updating metrics for ${topic.name}: ${errorMessage}`);
+      });
+
+      return item;
+    });
   }
 
   /**
@@ -188,6 +252,16 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
     if (this.subscribedTopics.has(topicName)) {
       this.subscribedTopics.delete(topicName);
       await this.onTopicSubscriptionChanged(topic, false);
+      this.refresh();
+    }
+  }
+
+  /**
+   * Clears a subscription after its monitor pane was closed directly.
+   * The pane is already closed, so this intentionally does not invoke the subscription callback.
+   */
+  public markTopicMonitorClosed(topicName: string): void {
+    if (this.subscribedTopics.delete(topicName)) {
       this.refresh();
     }
   }

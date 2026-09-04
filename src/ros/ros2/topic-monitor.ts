@@ -170,6 +170,10 @@ export function parseTopicEchoMessage(message: string): unknown {
   return yaml.load(message);
 }
 
+export function createTopicEchoArguments(topicName: string): string[] {
+  return ["topic", "echo", topicName, "--full-length"];
+}
+
 /**
  * Topic echo process manager
  */
@@ -186,7 +190,7 @@ export class TopicEchoManager {
 
     const childProcess = child_process.spawn(
       "ros2",
-      ["topic", "echo", topicName],
+      createTopicEchoArguments(topicName),
       {
         env: extension.env,
         stdio: ["ignore", "pipe", "pipe"],
