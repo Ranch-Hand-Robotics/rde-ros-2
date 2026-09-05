@@ -9,10 +9,10 @@ import * as vscode from "vscode";
 
 import * as install_ros from "../../src/ros/installer/install-ros";
 
-suite("Install ROS Test Suite", () => {
+describe("Install ROS Test Suite", () => {
   let testWorkspaceFolder: string;
 
-  setup(async () => {
+  beforeEach(async () => {
     // Create a temporary test workspace in the system temp directory
     testWorkspaceFolder = path.join(os.tmpdir(), "test-workspace-install-" + Date.now());
     if (!fs.existsSync(testWorkspaceFolder)) {
@@ -20,14 +20,14 @@ suite("Install ROS Test Suite", () => {
     }
   });
 
-  teardown(async () => {
+  afterEach(async () => {
     // Clean up test workspace
     if (fs.existsSync(testWorkspaceFolder)) {
       fs.rmSync(testWorkspaceFolder, { recursive: true, force: true });
     }
   });
 
-  test("Should detect ROS workspace with package.xml in root", async () => {
+  it("Should detect ROS workspace with package.xml in root", async () => {
     // Create a package.xml file
     const packageXmlPath = path.join(testWorkspaceFolder, "package.xml");
     const packageXmlContent = `<?xml version="1.0"?>
@@ -59,7 +59,7 @@ suite("Install ROS Test Suite", () => {
     }
   });
 
-  test("Should detect ROS workspace with package.xml in src subdirectory", async () => {
+  it("Should detect ROS workspace with package.xml in src subdirectory", async () => {
     // Create a src directory and package.xml inside it
     const srcPath = path.join(testWorkspaceFolder, "src", "test_package");
     fs.mkdirSync(srcPath, { recursive: true });
@@ -94,7 +94,7 @@ suite("Install ROS Test Suite", () => {
     }
   });
 
-  test("Should not detect ROS workspace without package.xml", async () => {
+  it("Should not detect ROS workspace without package.xml", async () => {
     // Create an empty workspace
     // Mock workspace folders
     const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
@@ -115,7 +115,7 @@ suite("Install ROS Test Suite", () => {
     }
   });
 
-  test("Should not detect ROS workspace when no workspace is open", async () => {
+  it("Should not detect ROS workspace when no workspace is open", async () => {
     // Mock no workspace folders
     const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
     Object.defineProperty(vscode.workspace, "workspaceFolders", {
@@ -135,7 +135,7 @@ suite("Install ROS Test Suite", () => {
     }
   });
 
-  test("ROS2_DISTROS should contain LTS and non-LTS releases", () => {
+  it("ROS2_DISTROS should contain LTS and non-LTS releases", () => {
     const ltsDistros = install_ros.ROS2_DISTROS.filter((d) => d.isLTS);
     const nonLtsDistros = install_ros.ROS2_DISTROS.filter((d) => !d.isLTS);
 
@@ -143,19 +143,19 @@ suite("Install ROS Test Suite", () => {
     assert.ok(nonLtsDistros.length > 0, "Should have at least one non-LTS distro");
   });
 
-  test("ROS2_DISTROS should include Humble (LTS)", () => {
+  it("ROS2_DISTROS should include Humble (LTS)", () => {
     const humble = install_ros.ROS2_DISTROS.find((d) => d.name === "humble");
     assert.ok(humble, "Should include Humble distro");
     assert.strictEqual(humble?.isLTS, true, "Humble should be marked as LTS");
   });
 
-  test("ROS2_DISTROS should include Jazzy (LTS)", () => {
+  it("ROS2_DISTROS should include Jazzy (LTS)", () => {
     const jazzy = install_ros.ROS2_DISTROS.find((d) => d.name === "jazzy");
     assert.ok(jazzy, "Should include Jazzy distro");
     assert.strictEqual(jazzy?.isLTS, true, "Jazzy should be marked as LTS");
   });
 
-  test("ROS2_DISTROS should include non-LTS releases", () => {
+  it("ROS2_DISTROS should include non-LTS releases", () => {
     const iron = install_ros.ROS2_DISTROS.find((d) => d.name === "iron");
     const kilted = install_ros.ROS2_DISTROS.find((d) => d.name === "kilted");
 

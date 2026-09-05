@@ -107,6 +107,8 @@ export enum Commands {
     ColconBuildPackageRelease = "ROS2.colcon.buildPackageRelease",
     ColconBuildPackageDebug = "ROS2.colcon.buildPackageDebug",
     InstallRos = "ROS2.installRos",
+    CheckRosInstallation = "ROS2.checkInstallation",
+    ShowInstallationReport = "ROS2.showInstallationReport",
     FindRos = "ROS2.findRos",
     SetActiveDistro = "ROS2.setActiveDistro",
     RefreshDistributions = "ROS2.distributions.refresh"
@@ -333,11 +335,20 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     // Register Install ROS command
-    vscode.commands.registerCommand(Commands.InstallRos, () => {
-        ensureErrorMessageOnException(() => {
-            return install_ros.installRos();
-        });
-    });
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.InstallRos, () =>
+        ensureErrorMessageOnException(() => install_ros.installRos())
+    ));
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.CheckRosInstallation, async (target) => {
+        try {
+            return await install_ros.checkRosInstallation(target);
+        } catch (error) {
+            vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
+            throw error;
+        }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.ShowInstallationReport, () =>
+        ensureErrorMessageOnException(() => install_ros.showInstallationReport())
+    ));
 
     // Register Find ROS command
     vscode.commands.registerCommand(Commands.FindRos, async () => {
@@ -1159,4 +1170,3 @@ async function sourceRosAndWorkspace(): Promise<void> {
     // Notify listeners the environment has changed.
     onEnvChanged.fire();
 }
-

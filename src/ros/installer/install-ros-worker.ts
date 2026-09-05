@@ -7,6 +7,7 @@
 
 import { parentPort } from "worker_threads";
 import * as child_process from "child_process";
+import { runBootstrapProcess } from "./bootstrap-process";
 
 // ---------------------------------------------------------------------------
 // Shared message types (imported by install-ros.ts as well)
@@ -59,35 +60,35 @@ function send(response: WorkerResponse): void {
 
 function handleCheckPixi(): void {
   const cmd = process.platform === "win32" ? "where pixi" : "which pixi";
-  child_process.exec(cmd, (error) => {
+  child_process.exec(cmd, { timeout: 15000 }, (error) => {
+    if (error && (error.killed || error.signal)) {
+      send({ type: "error", message: `Pixi detection did not complete: ${error.message}` });
+      return;
+    }
     send({ type: "pixi_available", available: !error });
   });
 }
 
 function handleInstallPixi(platform: string): void {
-  let installCommand: string;
+  let command: string;
+  let args: string[];
   if (platform === "win32") {
-    installCommand = "winget install prefix-dev.pixi";
+    command = "winget.exe";
+    args = ["install", "--id", "prefix-dev.pixi", "--exact", "--accept-source-agreements", "--accept-package-agreements", "--disable-interactivity"];
   } else if (platform === "darwin") {
-    installCommand = "curl -fsSL https://pixi.sh/install.sh | sh";
+    command = "/bin/bash";
+    args = ["-o", "pipefail", "-c", "curl --connect-timeout 30 --max-time 120 -fsSL https://pixi.sh/install.sh | sh"];
   } else {
     send({ type: "error", message: "Pixi installation is only supported on Windows and macOS" });
     return;
   }
 
-  const proc = child_process.exec(installCommand, (error) => {
-    if (error) {
-      send({ type: "error", message: error.message });
-    } else {
+  runBootstrapProcess(command, args, (text) => send({ type: "log", text })).then(
+    () => {
       send({ type: "complete" });
+    },
+    (error: Error) => {
+      send({ type: "error", message: error.message });
     }
-  });
-
-  proc.stdout?.on("data", (data: Buffer) => {
-    send({ type: "log", text: data.toString() });
-  });
-
-  proc.stderr?.on("data", (data: Buffer) => {
-    send({ type: "log", text: data.toString() });
-  });
+  );
 }

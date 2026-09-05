@@ -113,6 +113,16 @@
                 "category": "ROS2"
             },
             {
+                "command": "ROS2.checkInstallation",
+                "title": "Check ROS 2 Installation Health",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.showInstallationReport",
+                "title": "Show ROS 2 Installation Report",
+                "category": "ROS2"
+            },
+            {
                 "command": "ROS2.findRos",
                 "title": "Find ROS Installation",
                 "category": "ROS2"

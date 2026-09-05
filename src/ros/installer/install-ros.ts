@@ -10,12 +10,10 @@ import { Worker } from "worker_threads";
 import * as vscode_utils from "../../vscode-utils";
 import * as extension from "../../extension";
 import type { WorkerRequest, WorkerResponse } from "./install-ros-worker";
-
-/**
- * Maximum length for environment variable values in diagnostic output
- */
-const MAX_ENV_VALUE_LENGTH = 500;
-const MAX_INSTALL_LOG_CHARS = 15000;
+import { HealthReport, HealthTarget, validateInstallation } from "./health-check";
+import { InstallDiagnostics, bashInstallScript, powershellInstallScript, installationManifest, ScriptStep } from "./install-diagnostics";
+import { preflightInstallation, runPreflightCommand } from "./install-preflight";
+import { PreflightCheck } from "./preflight-types";
 
 /**
  * ROS 2 distribution information
@@ -114,8 +112,7 @@ class InstallationManager {
 
   /**
    * Begin an installation. Rejects if one is already in progress.
-   * The caller is responsible for calling `markComplete` or `markFailed`
-   * when the installation terminal closes.
+   * The caller marks completion only after the terminal and runtime validation finish.
    */
   begin(): boolean {
     if (this._state === "installing") {
@@ -145,6 +142,7 @@ class InstallationManager {
  */
 class RosInstallWorker {
   private readonly _worker: Worker;
+  private _failure: Error | undefined;
 
   constructor() {
     // The worker bundle is placed beside extension.js in the dist/ folder.
@@ -153,25 +151,19 @@ class RosInstallWorker {
 
     // Propagate unhandled worker errors to the extension output channel.
     this._worker.on("error", (err) => {
+      this._failure = err;
       extension.outputChannel.appendLine(`[install-ros-worker] Unhandled error: ${err.message}`);
+    });
+    this._worker.on("exit", (code) => {
+      this._failure = this._failure ?? new Error(`Installer worker exited (code ${code}).`);
     });
   }
 
   /** Returns true when pixi is found on PATH. */
   checkPixi(): Promise<boolean> {
-    return new Promise<boolean>((resolve, reject) => {
-      const handler = (msg: WorkerResponse) => {
-        if (msg.type === "pixi_available") {
-          this._worker.off("message", handler);
-          resolve(msg.available);
-        } else if (msg.type === "error") {
-          this._worker.off("message", handler);
-          reject(new Error(msg.message));
-        }
-      };
-      this._worker.on("message", handler);
-      this._send({ type: "check_pixi" });
-    });
+    return this.request({ type: "check_pixi" }).then((response) =>
+      response.type === "pixi_available" && response.available
+    );
   }
 
   /**
@@ -179,20 +171,38 @@ class RosInstallWorker {
    * Streams stdout/stderr via `onLog` while running.
    */
   installPixi(platform: string, onLog: (text: string) => void): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
+    return this.request({ type: "install_pixi", platform }, onLog).then(() => undefined);
+  }
+
+  private request(request: WorkerRequest, onLog?: (text: string) => void): Promise<WorkerResponse> {
+    if (this._failure) {
+      return Promise.reject(this._failure);
+    }
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        this._worker.off("message", handler);
+        this._worker.off("error", failed);
+        this._worker.off("exit", exited);
+      };
+      const failed = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const exited = (code: number) => failed(new Error(`Installer worker exited before replying (code ${code}).`));
       const handler = (msg: WorkerResponse) => {
         if (msg.type === "log") {
-          onLog(msg.text);
-        } else if (msg.type === "complete") {
-          this._worker.off("message", handler);
-          resolve();
+          onLog?.(msg.text);
         } else if (msg.type === "error") {
-          this._worker.off("message", handler);
-          reject(new Error(msg.message));
+          failed(new Error(msg.message));
+        } else {
+          cleanup();
+          resolve(msg);
         }
       };
       this._worker.on("message", handler);
-      this._send({ type: "install_pixi", platform });
+      this._worker.once("error", failed);
+      this._worker.once("exit", exited);
+      this._send(request);
     });
   }
 
@@ -210,73 +220,65 @@ class RosInstallWorker {
 // ---------------------------------------------------------------------------
 
 /**
- * Writes `content` to a uniquely-named temp file and returns its path.
- * Uses a timestamp+random suffix to avoid collisions across concurrent calls.
- */
-async function writeInstallScript(content: string, extension: string): Promise<string> {
-  const name = `ros2-install-${Date.now()}-${Math.floor(Math.random() * 0xffff).toString(16)}${extension}`;
-  const scriptPath = path.join(os.tmpdir(), name);
-  await fs.promises.writeFile(scriptPath, content, { encoding: "utf-8", mode: 0o700 });
-  return scriptPath;
-}
-
-/** Creates a unique temp file path for installer logs. */
-function createInstallLogPath(scope: string): string {
-  const name = `ros2-install-${scope}-${Date.now()}-${Math.floor(Math.random() * 0xffff).toString(16)}.log`;
-  return path.join(os.tmpdir(), name);
-}
-
-/**
- * Reads a captured install log and returns a bounded snippet for Copilot help.
- */
-async function readInstallLogSnippet(installLogPath?: string): Promise<string> {
-  if (!installLogPath) {
-    return "No install log file was captured for this run.";
-  }
-
-  try {
-    const full = await fs.promises.readFile(installLogPath, "utf-8");
-    if (full.length <= MAX_INSTALL_LOG_CHARS) {
-      return full;
-    }
-
-    const tail = full.slice(-MAX_INSTALL_LOG_CHARS);
-    return `[Log truncated to last ${MAX_INSTALL_LOG_CHARS} characters]\n${tail}`;
-  } catch (err) {
-    return `Failed to read install log at ${installLogPath}: ${err}`;
-  }
-}
-
-/**
  * Generates a distro-specific pixi.toml in the given workspace directory from
  * the RoboStack template in assets/ros/robostack.toml.
  */
-async function createPixiManifest(distro: RosDistro, workspaceDir: string): Promise<string> {
+async function preparePixiManifest(distro: RosDistro, diagnostics: InstallDiagnostics): Promise<string> {
   const templatePath = path.join(extension.extPath, "assets", "ros", "robostack.toml");
-  let template = "";
+  const template = await fs.promises.readFile(templatePath, "utf-8");
+  const resolved = installationManifest(template, distro.name);
+  const staging = path.join(diagnostics.directory, "pixi-plan");
+  await fs.promises.mkdir(staging, { mode: 0o700 });
+  const manifestPath = path.join(staging, "pixi.toml");
+  await fs.promises.writeFile(manifestPath, resolved, { mode: 0o600, flag: "wx" });
+  return manifestPath;
+}
 
-  try {
-    template = await fs.promises.readFile(templatePath, "utf-8");
-  } catch (err) {
-    extension.outputChannel.appendLine(`Warning: failed to read RoboStack template (${templatePath}): ${err}`);
+export async function preflightPixiEnvironment(distro: RosDistro, diagnostics: InstallDiagnostics): Promise<string> {
+  const stagedManifest = await preparePixiManifest(distro, diagnostics);
+  await diagnostics.log("RDE_STEP_START:pixi-solver\n");
+  const plan = await runPreflightCommand("pixi", ["lock", "--manifest-path", stagedManifest], 120000);
+  await diagnostics.log(plan.stdout + "\n" + plan.stderr + "\n");
+  let solved = !plan.error && plan.exitCode === 0;
+  let error = plan.error || plan.stderr || plan.stdout;
+  if (solved) {
+    try {
+      const lock = await fs.promises.stat(path.join(path.dirname(stagedManifest), "pixi.lock"));
+      if (!lock.isFile() || lock.size === 0) {
+        throw new Error("Pixi did not produce a nonempty lockfile.");
+      }
+    } catch (failure) {
+      solved = false;
+      error = String(failure);
+    }
   }
-
-  if (!template.trim()) {
-    template = [
-      "[workspace]",
-      "name = \"ros2-workspace\"",
-      "channels = [\"conda-forge\", \"robostack-staging\"]",
-      "platforms = [\"win-64\", \"linux-64\", \"osx-64\", \"osx-arm64\"]",
-      "",
-      "[dependencies]",
-      "ros-__ROS_DISTRO__-desktop = \"*\"",
-      "",
-    ].join("\n");
+  const check: PreflightCheck = {
+    id: "pixi-solver", status: solved ? "passed" : "blocked",
+    detail: solved ? "Pixi resolved the requested distro for this host without installing packages."
+      : `Pixi could not solve the proposed environment: ${error}`,
+    remediation: solved ? undefined : "Resolve the reported channel, platform, network, system-requirement or dependency problem, then retry. The ROS workspace has not been written.",
+  };
+  diagnostics.report.preflight.checks.push(check);
+  diagnostics.report.preflight.ready = solved;
+  await diagnostics.log(solved ? "RDE_STEP_OK:pixi-solver\n" : "RDE_STEP_FAILED:pixi-solver:1\n");
+  await diagnostics.save();
+  if (!solved) {
+    diagnostics.report.status = "blocked";
+    throw new Error("Installation aborted: Pixi dependency preflight failed. No ROS environment was created; Pixi bootstrap or metadata caches may remain.");
   }
+  return stagedManifest;
+}
 
-  const resolved = template.replace(/__ROS_DISTRO__/g, distro.name);
-  const manifestPath = path.join(workspaceDir, "pixi.toml");
-  await fs.promises.writeFile(manifestPath, resolved, "utf-8");
+export async function createPixiTarget(stagedManifest: string, workspace: string): Promise<string> {
+  await fs.promises.mkdir(workspace, { recursive: true });
+  const target = await fs.promises.lstat(workspace);
+  if (target.isSymbolicLink() || !target.isDirectory() || (await fs.promises.readdir(workspace)).length > 0) {
+    throw new Error("The Pixi target changed after preflight: it must be an empty, non-symlink directory. No existing files were overwritten.");
+  }
+  const manifestPath = path.join(workspace, "pixi.toml");
+  await fs.promises.copyFile(stagedManifest, manifestPath, fs.constants.COPYFILE_EXCL);
+  await fs.promises.copyFile(path.join(path.dirname(stagedManifest), "pixi.lock"),
+    path.join(workspace, "pixi.lock"), fs.constants.COPYFILE_EXCL);
   return manifestPath;
 }
 
@@ -422,15 +424,19 @@ function validateDistroName(distro: RosDistro): boolean {
  * Guards against concurrent invocations via {@link InstallationManager}.
  */
 export async function installRos(): Promise<void> {
+  if (!vscode.workspace.isTrusted) {
+    throw new Error("Trust this workspace before installing ROS.");
+  }
   const manager = InstallationManager.getInstance();
 
   if (!manager.begin()) {
     vscode.window.showWarningMessage(
-      "A ROS 2 installation is already in progress. Please wait for it to complete."
+      "A ROS 2 installation or health check is already in progress. Please wait for it to complete."
     );
     return;
   }
 
+  let diagnostics: InstallDiagnostics | undefined;
   try {
     // Ask user to select a distro
     const distro = await selectRosDistro();
@@ -446,24 +452,59 @@ export async function installRos(): Promise<void> {
 
     extension.outputChannel.appendLine(`User selected ROS 2 distro: ${distro.name}`);
 
-    // Install based on platform.
-    // The manager state is updated to complete/failed from monitorTerminalForErrors
-    // once the installation terminal closes.
+    let target: HealthTarget;
     if (process.platform === "linux") {
-      await installRosLinux(distro, manager);
+      target = { kind: "setup", distro: distro.name, setupScript: `/opt/ros/${distro.name}/setup.bash` };
     } else if (process.platform === "win32" || process.platform === "darwin") {
-      await installRosPixi(distro, manager);
+      target = { kind: "pixi", distro: distro.name, workspace: path.join(getPixiRoot(), distro.name) };
     } else {
-      vscode.window.showErrorMessage(
-        `ROS 2 installation is not supported on platform: ${process.platform}`
-      );
+      throw new Error(`ROS 2 installation is not supported on platform: ${process.platform}`);
+    }
+    diagnostics = await createDiagnostics(target, "install");
+    const ready = await runPreflight(diagnostics);
+    if (!ready) {
       manager.markFailed();
+      return;
+    }
+    const exitCode = target.kind === "setup"
+      ? await installRosLinux(distro, diagnostics)
+      : await installRosPixi(distro, diagnostics, target.workspace);
+    diagnostics.report.exitCode = exitCode;
+    if (exitCode !== 0) {
+      if (exitCode === undefined) {
+        diagnostics.report.status = "interrupted";
+      }
+      throw new Error(exitCode === undefined
+        ? "Installation was interrupted or the terminal closed without an exit code."
+        : `Installer exited with code ${exitCode}.`);
+    }
+    const health = await runHealthChecks(diagnostics);
+    if (!health.healthy) {
+      throw new Error("Packages installed, but ROS runtime validation failed. The installation has not been rolled back.");
+    }
+    await diagnostics.finish("passed");
+    manager.markComplete();
+    extension.rosDistributionsProvider?.refresh();
+    const choice = await vscode.window.showInformationMessage(
+      "ROS 2 installation and runtime validation passed. Reload to detect the installation.",
+      "Reload Window", "View Report"
+    );
+    if (choice === "Reload Window") {
+      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+    } else if (choice === "View Report") {
+      await showReport(diagnostics);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     extension.outputChannel.appendLine(`Error during ROS installation: ${errorMessage}`);
-    vscode.window.showErrorMessage(`Failed to install ROS 2: ${errorMessage}`);
     manager.markFailed();
+    if (diagnostics) {
+      await diagnostics.finish(["interrupted", "blocked"].includes(diagnostics.report.status)
+        ? diagnostics.report.status : "failed", errorMessage);
+      await showFailure(diagnostics, errorMessage);
+    } else {
+      await vscode.window.showErrorMessage(`Failed to install ROS 2: ${errorMessage}`);
+    }
   }
 }
 
@@ -512,86 +553,89 @@ async function isPixiInstalled(worker: RosInstallWorker): Promise<boolean> {
 /**
  * Prompts the user and installs Pixi via the worker thread.
  * Streams subprocess output to the extension output channel.
- * @returns true if Pixi was successfully installed, false if the user declined.
+ * Fails explicitly if bootstrap is declined or Pixi remains unavailable.
  */
-async function installPixiViaWorker(worker: RosInstallWorker): Promise<boolean> {
+async function installPixiViaWorker(worker: RosInstallWorker, diagnostics: InstallDiagnostics): Promise<void> {
+  const method = process.platform === "win32" ? "Windows Package Manager (winget)" : "the installer from pixi.sh";
   const choice = await vscode.window.showWarningMessage(
     "Pixi package manager is required to install ROS 2 on this platform but is not currently installed. " +
-    "This will install Pixi using Windows Package Manager (winget). Would you like to proceed?",
+    `This will install Pixi using ${method}. ` +
+    (process.platform === "win32" ? "Proceeding accepts the winget source and package agreements. " : "") +
+    "Would you like to proceed?",
     { modal: true },
     "Yes",
     "No"
   );
 
   if (choice !== "Yes") {
-    return false;
+    throw new Error("Pixi installation was declined. No ROS installation was started.");
   }
 
   extension.outputChannel.appendLine("Installing Pixi...");
   extension.outputChannel.show();
 
+  let logWrites = Promise.resolve();
+  let logError: Error | undefined;
+  await diagnostics.log("RDE_STEP_START:pixi-bootstrap\n");
   try {
     await worker.installPixi(process.platform, (text) => {
       extension.outputChannel.append(text);
+      logWrites = logWrites.then(() => diagnostics.log(text)).catch((error: Error) => {
+        logError = error;
+      });
     });
-    extension.outputChannel.appendLine("Pixi installed successfully");
-    vscode.window.showInformationMessage(
-      "Pixi has been installed successfully. You may need to restart your terminal or VS Code for changes to take effect."
-    );
-    return true;
+    await logWrites;
+    if (logError) {
+      throw logError;
+    }
+    await diagnostics.log("\nRDE_STEP_OK:pixi-bootstrap\n");
+    if (!(await worker.checkPixi())) {
+      throw new Error("Pixi bootstrap completed but Pixi is not on the extension host PATH. Restart VS Code and retry.");
+    }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    extension.outputChannel.appendLine(`Failed to install Pixi: ${errorMessage}`);
-    vscode.window.showErrorMessage(`Failed to install Pixi: ${errorMessage}`);
-    return false;
+    await logWrites;
+    await diagnostics.log(`\nRDE_STEP_FAILED:pixi-bootstrap:1\n${String(error)}\n`);
+    throw error;
   }
 }
 
 /**
  * Installs ROS 2 on Linux using APT
  */
-async function installRosLinux(distro: RosDistro, manager: InstallationManager): Promise<void> {
+async function installRosLinux(distro: RosDistro, diagnostics: InstallDiagnostics): Promise<number | undefined> {
   extension.outputChannel.appendLine(`Installing ROS 2 ${distro.name} on Linux using APT...`);
   extension.outputChannel.show();
 
-  // Write a bash script so every step is fail-fast and the terminal exit code
-  // accurately reflects success or failure.
-  const scriptContent = [
-    "#!/bin/bash",
-    "set -euo pipefail",
-    "sudo apt update && sudo apt install -y locales",
-    "sudo locale-gen en_US en_US.UTF-8",
-    "sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8",
-    "export LANG=en_US.UTF-8",
-    "sudo apt install -y software-properties-common",
-    "sudo add-apt-repository universe",
-    "sudo apt update && sudo apt install -y curl",
-    "sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg",
-    `echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null`,
-    "sudo apt update",
-    `sudo apt install -y ros-${distro.name}-desktop`,
-    `echo "ROS 2 ${distro.displayName} installation complete!"`,
-    `echo "Please reload the window or restart VS Code to detect the new installation."`,
-  ].join("\n");
-
-  const scriptPath = await writeInstallScript(scriptContent, ".sh");
-  const installLogPath = createInstallLogPath(`linux-${distro.name}`);
-  extension.outputChannel.appendLine(`Linux install script: ${scriptPath}`);
-  extension.outputChannel.appendLine(`Linux install log: ${installLogPath}`);
-
-  // Pin the shell to /bin/bash so we always know the interpreter.
-  const terminal = vscode.window.createTerminal({
-    name: `ROS 2 ${distro.displayName} Installation`,
-    shellPath: "/bin/bash",
-  });
-
-  terminal.show();
-
-  // Run the script then immediately exit so the terminal exit code == script exit code.
-  terminal.sendText(`bash "${scriptPath}" 2>&1 | tee "${installLogPath}"; exit \${PIPESTATUS[0]}`);
-
-  // Monitor the terminal for completion
-  monitorTerminalForErrors(terminal, distro, manager, installLogPath);
+  const steps: ScriptStep[] = [
+    { id: "platform-preflight", commands: [
+      ". /etc/os-release",
+      `if [ "$ID" != ubuntu ]; then echo "APT installation requires Ubuntu, including Ubuntu in WSL or on Jetson."; false; fi`,
+      "printf 'Ubuntu=%s architecture=%s kernel=%s\\n' \"$VERSION_ID\" \"$(dpkg --print-architecture)\" \"$(uname -r)\"",
+      "df -h / /tmp",
+    ] },
+    { id: "locales", commands: [
+      "sudo apt-get update",
+      "sudo apt-get install --no-remove -y locales",
+      "sudo locale-gen en_US en_US.UTF-8",
+      "sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8",
+      "export LANG=en_US.UTF-8",
+    ] },
+    { id: "repository-prerequisites", commands: [
+      "sudo apt-get install --no-remove -y software-properties-common curl",
+      "sudo add-apt-repository -y universe",
+    ] },
+    { id: "ros-repository", commands: [
+      "sudo curl -fSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg",
+      `echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $UBUNTU_CODENAME main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null`,
+      "sudo apt-get update",
+    ] },
+    { id: "package-availability", commands: [
+      `apt-cache policy ros-${distro.name}-desktop`,
+      `apt-cache show ros-${distro.name}-desktop > /dev/null`,
+    ] },
+    { id: "ros-packages", commands: [`sudo apt-get install --no-remove -y ros-${distro.name}-desktop`] },
+  ];
+  return runInstallTerminal(distro, diagnostics, bashInstallScript(steps), false);
 }
 
 /**
@@ -599,259 +643,125 @@ async function installRosLinux(distro: RosDistro, manager: InstallationManager):
  * Subprocess operations (pixi detection and pixi self-install) run in a
  * dedicated worker thread so the extension host main thread is not blocked.
  */
-async function installRosPixi(distro: RosDistro, manager: InstallationManager): Promise<void> {
+async function installRosPixi(distro: RosDistro, diagnostics: InstallDiagnostics, distroWorkspace: string): Promise<number | undefined> {
   const worker = new RosInstallWorker();
   try {
     // Check if Pixi is installed (runs in worker thread)
+    await diagnostics.log("RDE_STEP_START:pixi-detection\n");
     const pixiInstalled = await isPixiInstalled(worker);
+    await diagnostics.log(`Pixi on PATH: ${pixiInstalled}\nRDE_STEP_OK:pixi-detection\n`);
 
     if (!pixiInstalled) {
-      const installed = await installPixiViaWorker(worker);
-      if (!installed) {
-        manager.markFailed();
-        return;
-      }
+      await installPixiViaWorker(worker, diagnostics);
     }
+
+    const stagedManifest = await preflightPixiEnvironment(distro, diagnostics);
 
     extension.outputChannel.appendLine(`Installing ROS 2 ${distro.name} using Pixi...`);
     extension.outputChannel.show();
 
-    // Get the Pixi base root from config; each distro gets its own subdirectory.
-    const config = vscode_utils.getExtensionConfiguration();
-    const defaultPixiRoot =
-      process.platform === "win32" ? "c:\\pixi_ws" : path.join(os.homedir(), "pixi_ws");
-    const pixiRoot = config.get<string>("pixiRoot", defaultPixiRoot);
-    const distroWorkspace = path.join(pixiRoot, distro.name);
-
-    // Ensure directories exist and generate the distro-specific manifest.
-    try {
-      await fs.promises.mkdir(pixiRoot, { recursive: true });
-      await fs.promises.mkdir(distroWorkspace, { recursive: true });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      extension.outputChannel.appendLine(`Failed to create Pixi root directory "${pixiRoot}": ${errorMessage}`);
-      throw err;
-    }
-
-    const manifestPath = await createPixiManifest(distro, distroWorkspace);
+    await diagnostics.log("RDE_STEP_START:pixi-manifest\n");
+    const manifestPath = await createPixiTarget(stagedManifest, distroWorkspace);
     extension.outputChannel.appendLine(`Pixi manifest: ${manifestPath}`);
 
-    // Build a fail-fast script appropriate for the platform, write it to a temp
-    // file, and execute it as a single command so the terminal exit code
-    // accurately reflects success or failure of every step.
-    let scriptPath: string;
-    let runCommand: string;
-    const installLogPath = createInstallLogPath(`pixi-${process.platform}-${distro.name}`);
+    await diagnostics.log("RDE_STEP_OK:pixi-manifest\n");
+    let script: string;
 
     if (process.platform === "win32") {
-      const script = [
-        "@echo off",
-        "setlocal enableextensions",
-        `cd /d "${distroWorkspace}"`,
-        "if errorlevel 1 exit 1",
-        "echo ==== PIXI PREFLIGHT ====",
-        `echo Target environment: ${distro.name}`,
-        "pixi --version",
-        "if errorlevel 1 exit 1",
-        "if not exist pixi.toml (echo ERROR: pixi.toml not found in workspace & exit 1)",
-        "type pixi.toml",
-        "echo ==== PIXI INSTALL ====",
-        `pixi install -e ${distro.name}`,
-        "if errorlevel 1 exit 1",
-        `echo ROS 2 ${distro.displayName} installation complete!`,
-        `echo Pixi workspace created at: ${distroWorkspace}`,
-      ].join("\r\n");
-      scriptPath = await writeInstallScript(script, ".bat");
-      // Stream output live while also capturing to log. PowerShell's
-      // Tee-Object gives us real-time output and a persisted log file.
-      const psScriptPath = scriptPath.replace(/'/g, "''");
-      const psLogPath = installLogPath.replace(/'/g, "''");
-      runCommand = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Continue'; & '${psScriptPath}' 2>&1 | Tee-Object -FilePath '${psLogPath}'; Write-Host 'Install log saved to: ${installLogPath}'; exit $LASTEXITCODE"`;
+      const quotedManifest = "'" + manifestPath.replace(/'/g, "''") + "'";
+      script = powershellInstallScript([
+        { id: "pixi-preflight", commands: [
+          "& pixi --version",
+          "if ($LASTEXITCODE -ne 0) { throw \"Pixi preflight exited $LASTEXITCODE\" }",
+          `Get-Content -LiteralPath ${quotedManifest}`,
+        ] },
+        { id: "ros-packages", commands: [
+          `& pixi install --locked --manifest-path ${quotedManifest} -e ${distro.name}`,
+          "if ($LASTEXITCODE -ne 0) { throw \"Pixi install exited $LASTEXITCODE\" }",
+        ] },
+      ], diagnostics.logPath);
     } else {
-      const script = [
-        "#!/bin/sh",
-        "set -eu",
-        `cd "${distroWorkspace}"`,
-        "echo '==== PIXI PREFLIGHT ===='",
-        `echo 'Target environment: ${distro.name}'`,
-        "pixi --version",
-        "test -f pixi.toml",
-        "cat pixi.toml",
-        "echo '==== PIXI INSTALL ===='",
-        `pixi install -e ${distro.name}`,
-        `echo "ROS 2 ${distro.displayName} installation complete!"`,
-        `echo "Pixi workspace created at: ${distroWorkspace}"`,
-      ].join("\n");
-      scriptPath = await writeInstallScript(script, ".sh");
-      runCommand = `bash "${scriptPath}" 2>&1 | tee "${installLogPath}"; exit \${PIPESTATUS[0]}`;
+      const quotedManifest = "'" + manifestPath.replace(/'/g, "'\\''") + "'";
+      script = bashInstallScript([
+        { id: "pixi-preflight", commands: ["pixi --version", `cat ${quotedManifest}`] },
+        { id: "ros-packages", commands: [`pixi install --locked --manifest-path ${quotedManifest} -e ${distro.name}`] },
+      ]);
     }
 
-    extension.outputChannel.appendLine(`Pixi install script: ${scriptPath}`);
-    extension.outputChannel.appendLine(`Pixi install log: ${installLogPath}`);
-
-    // Pin the shell explicitly so we always know the interpreter.
-    const shellPath = process.platform === "win32" ? "cmd.exe" : "/bin/bash";
-    const terminal = vscode.window.createTerminal({
-      name: `ROS 2 ${distro.displayName} Installation (Pixi)`,
-      shellPath,
-      cwd: pixiRoot,
-    });
-
-    terminal.show();
-    terminal.sendText(runCommand);
-
-    // Monitor for errors; terminal close handler updates manager state
-    monitorTerminalForErrors(terminal, distro, manager, installLogPath);
+    return await runInstallTerminal(distro, diagnostics, script, process.platform === "win32");
   } finally {
-    // Worker is only needed for pre-install subprocess checks; terminate it now
-    // that the installation terminal has been launched.
     worker.terminate();
   }
 }
 
-/**
- * Monitors a terminal for errors and offers Copilot help if errors are detected.
- * Updates the {@link InstallationManager} state when the terminal closes.
- */
-function monitorTerminalForErrors(
-  terminal: vscode.Terminal,
+export async function runInstallTerminal(
   distro: RosDistro,
-  manager: InstallationManager,
-  installLogPath?: string
-): void {
-  // Set up terminal exit handler
-  const disposable = vscode.window.onDidCloseTerminal((closedTerminal) => {
-    if (closedTerminal === terminal) {
-      disposable.dispose();
-
-      // Check if there were errors in the output
-      const exitCode = closedTerminal.exitStatus?.code;
-
-      if (exitCode === 0) {
-        manager.markComplete();
-        // Terminal exited successfully
-        vscode.window
-          .showInformationMessage(
-            "ROS 2 installation completed. Please reload the window to detect the new installation.",
-            "Reload Window"
-          )
-          .then((choice) => {
-            if (choice === "Reload Window") {
-              vscode.commands.executeCommand("workbench.action.reloadWindow");
-            }
-          });
-      } else {
-        manager.markFailed();
-        // Terminal did not report a successful exit; installation may have failed or been interrupted
-        const message =
-          exitCode !== undefined
-            ? `ROS 2 installation may have encountered errors (exit code: ${exitCode}). Would you like help diagnosing the issue?`
-            : "ROS 2 installation terminal was closed. The installation may not have completed successfully. Would you like help diagnosing potential issues?";
-
-        vscode.window
-          .showErrorMessage(message, "Get Copilot Help", "Dismiss")
-          .then((choice) => {
-            if (choice === "Get Copilot Help") {
-              offerCopilotHelp(distro, installLogPath);
-            }
-          });
-      }
-    }
+  diagnostics: InstallDiagnostics,
+  script: string,
+  windows: boolean
+): Promise<number | undefined> {
+  const scriptPath = path.join(diagnostics.directory, windows ? "install.ps1" : "install.sh");
+  // Windows PowerShell 5.1 otherwise reads non-ASCII paths using the system ANSI code page.
+  await fs.promises.writeFile(scriptPath, windows ? "\uFEFF" + script : script, { mode: 0o700 });
+  diagnostics.report.artifacts.script = scriptPath;
+  await diagnostics.save();
+  extension.outputChannel.appendLine(`Installer script: ${scriptPath}\nInstaller log: ${diagnostics.logPath}`);
+  // Run the script as the terminal process, not as input to a persistent shell.
+  // The Windows terminal now closes when PowerShell exits, rather than leaving cmd.exe running.
+  const terminal = vscode.window.createTerminal({
+    name: `ROS 2 ${distro.displayName} Installation`,
+    shellPath: windows ? "powershell.exe" : "/bin/bash",
+    shellArgs: windows
+      ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath]
+      : ["--noprofile", "--norc", "-c",
+        'bash "$1" 2>&1 | tee -a "$2"; codes=("${PIPESTATUS[@]}"); if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi; exit "${codes[1]}"',
+        "ros-install", scriptPath, diagnostics.logPath],
   });
+  const completion = new Promise<number | undefined>((resolve) => {
+    const disposable = vscode.window.onDidCloseTerminal((closed) => {
+      if (closed === terminal) {
+        disposable.dispose();
+        resolve(closed.exitStatus?.code);
+      }
+    });
+  });
+  terminal.show();
+  return completion;
 }
 
 /**
  * Offers Copilot help for diagnosing installation issues
  */
-async function offerCopilotHelp(distro: RosDistro, installLogPath?: string): Promise<void> {
+async function offerCopilotHelp(diagnostics: InstallDiagnostics): Promise<void> {
   try {
-    // Check if the LM API is available
-    if (!("lm" in vscode) || !vscode.lm) {
-      vscode.window.showWarningMessage(
-        "Copilot integration is not available in this version of VS Code. Please check the output channel for error details."
-      );
-      extension.outputChannel.show();
+    await diagnostics.readLog();
+    const selected = await vscode.window.showQuickPick([
+      { label: "Whole installation", id: undefined as string | undefined },
+      ...diagnostics.report.steps.map((step) => ({ label: `${step.id}: ${step.status}`, id: step.id })),
+      ...(diagnostics.report.preflight?.checks ?? []).map((check) => ({ label: `${check.id}: ${check.status}`, id: check.id })),
+      ...(diagnostics.report.health?.checks ?? []).map((check) => ({ label: `${check.id}: ${check.status}`, id: check.id })),
+    ], { placeHolder: "Choose an installation or health step to diagnose" });
+    if (!selected) {
       return;
     }
-
-    // Read the troubleshooting prompt
-    const promptPath = path.join(
-      extension.extPath,
-      "assets",
-      "prompts",
-      "ros-install-troubleshooting.md"
+    const prompt = await diagnostics.troubleshootingPrompt(selected.id);
+    const document = await vscode.workspace.openTextDocument({ language: "markdown", content: prompt });
+    await vscode.window.showTextDocument(document, { preview: false });
+    const choice = await vscode.window.showWarningMessage(
+      "Review and edit this diagnostic draft before sharing. It includes local paths and log output; automatic redaction is best-effort. Nothing has been sent to AI.",
+      "Copy Reviewed Draft", "Copy and Open Copilot"
     );
-
-    let systemPrompt = "";
-    try {
-      systemPrompt = await fs.promises.readFile(promptPath, "utf-8");
-    } catch (err) {
-      extension.outputChannel.appendLine(
-        `Warning: Could not load troubleshooting prompt from ${promptPath}: ${err}`
-      );
+    if (!choice) {
+      return;
     }
-
-    // Gather diagnostic information
-    const osInfo = `${process.platform} ${process.arch} (${os.release()})`;
-    const envInfo = JSON.stringify(
-      {
-        ROS_DISTRO: extension.env?.ROS_DISTRO,
-        ROS_VERSION: extension.env?.ROS_VERSION,
-        PATH: process.env.PATH?.substring(0, MAX_ENV_VALUE_LENGTH), // Truncate to avoid huge output
-        PYTHONPATH: process.env.PYTHONPATH,
-        CMAKE_PREFIX_PATH: extension.env?.CMAKE_PREFIX_PATH,
-      },
-      null,
-      2
-    );
-    const installLogSnippet = await readInstallLogSnippet(installLogPath);
-
-    // Build the user prompt with diagnostic information
-    const userPrompt = `I encountered an error while installing ROS 2 ${distro.displayName} (${distro.name}).
-
-**Operating System:**
-${osInfo}
-
-**ROS 2 Distribution:**
-${distro.name} (${distro.displayName})${distro.isLTS ? " - LTS" : ""}
-
-**Environment Variables:**
-\`\`\`json
-${envInfo}
-\`\`\`
-
-**Extension Context:**
-This issue occurred in the Robot Developer Extensions for ROS 2 VS Code extension while trying to install a ROS 2 distribution and configure it for workspace use.
-
-**Installation Method:**
-${process.platform === "linux" ? "APT package manager on Linux" : "Pixi package manager"}
-
-**Captured Install Log Path:**
-${installLogPath ?? "(none)"}
-
-**Captured Install Log:**
-\`\`\`
-${installLogSnippet}
-\`\`\`
-
-Can you help diagnose what went wrong and provide steps to fix the installation?`;
-
-    const fullPrompt = systemPrompt
-      ? `${systemPrompt}\n\n---\n\n${userPrompt}`
-      : userPrompt;
-
-    // Copy the prompt to the clipboard and open Copilot Chat.
-    // VS Code's "workbench.action.chat.open" command does not accept a "query" parameter,
-    // so users need to paste the copied prompt into the chat manually.
-    await vscode.env.clipboard.writeText(fullPrompt);
+    await vscode.env.clipboard.writeText(document.getText());
+    if (choice === "Copy Reviewed Draft") {
+      return;
+    }
     await vscode.commands.executeCommand("workbench.action.chat.open");
-    
     vscode.window.showInformationMessage(
-      "A ROS 2 installation troubleshooting prompt has been copied to your clipboard. Paste it into Copilot Chat to get help."
+      "Paste the reviewed diagnostic draft into Copilot Chat. No repair commands are executed automatically."
     );
-
-    extension.outputChannel.appendLine("Opened Copilot Chat for installation troubleshooting");
-    extension.outputChannel.appendLine("Troubleshooting prompt copied to clipboard");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     extension.outputChannel.appendLine(
@@ -861,5 +771,217 @@ Can you help diagnose what went wrong and provide steps to fix the installation?
       "Failed to open Copilot Chat. Please check the output channel for error details."
     );
     extension.outputChannel.show();
+  }
+}
+
+let latestDiagnostics: InstallDiagnostics | undefined;
+const LAST_REPORT_KEY = "rosInstallationReport";
+
+function getPixiRoot(): string {
+  const config = vscode_utils.getExtensionConfiguration();
+  const setting = config.inspect<string>("pixiRoot");
+  return setting?.workspaceFolderValue ?? setting?.workspaceValue ?? setting?.globalValue ??
+    (process.platform === "win32" ? "c:\\pixi_ws" : path.join(os.homedir(), "pixi_ws"));
+}
+
+async function createDiagnostics(target: HealthTarget, operation: "install" | "health"): Promise<InstallDiagnostics> {
+  if (!extension.extensionContext) {
+    throw new Error("The extension must be activated before running installation diagnostics.");
+  }
+  const diagnostics = await InstallDiagnostics.create(
+    extension.extensionContext.globalStorageUri.fsPath, target, operation, vscode.env.remoteName
+  );
+  latestDiagnostics = diagnostics;
+  await extension.extensionContext.globalState.update(LAST_REPORT_KEY, diagnostics.reportPath);
+  extension.outputChannel.appendLine(`ROS ${operation} report: ${diagnostics.reportPath}`);
+  return diagnostics;
+}
+
+async function runPreflight(diagnostics: InstallDiagnostics): Promise<boolean> {
+  await diagnostics.log("RDE_STEP_START:preflight\n");
+  const report = await vscode.window.withProgress({
+    location: vscode.ProgressLocation.Notification,
+    title: `Checking readiness to install ROS 2 ${diagnostics.report.target.distro}`,
+    cancellable: false,
+  }, () => preflightInstallation(diagnostics.report.target));
+  diagnostics.report.preflight = report;
+  for (const check of report.checks) {
+    const detail = `${check.id}: ${check.status}: ${check.detail}` +
+      (check.remediation ? `\nAction: ${check.remediation}` : "");
+    extension.outputChannel.appendLine(detail);
+    await diagnostics.log(detail + "\n");
+  }
+  await diagnostics.log(report.ready ? "RDE_STEP_OK:preflight\n" : "RDE_STEP_FAILED:preflight:1\n");
+  await diagnostics.save();
+  if (!report.ready) {
+    const blockers = report.checks.filter((check) => check.status === "blocked");
+    const message = `Installation aborted by preflight: ${blockers.map((check) => check.id).join(", ")}. Resolve the reported blockers and retry.`;
+    diagnostics.report.recovery = ["Preflight aborted before Pixi bootstrap, target writes, repository changes or package installation. No system repair was attempted."];
+    await diagnostics.finish("blocked", message);
+    await showFailure(diagnostics, message);
+    return false;
+  }
+  const warnings = report.checks.filter((check) => check.status === "warning");
+  if (warnings.length > 0) {
+    const choice = await vscode.window.showWarningMessage(
+      `Preflight found warnings: ${warnings.map((check) => check.id).join(", ")}. Review the Output channel or report before proceeding.`,
+      { modal: true }, "Proceed with Installation", "View Report"
+    );
+    if (choice !== "Proceed with Installation") {
+      diagnostics.report.recovery = ["Installation was not started. Preflight warnings were not accepted."];
+      await diagnostics.finish("blocked", "Installation cancelled before accepting preflight warnings.");
+      if (choice === "View Report") {
+        await showReport(diagnostics);
+      }
+      return false;
+    }
+  }
+  return true;
+}
+
+async function runHealthChecks(diagnostics: InstallDiagnostics): Promise<HealthReport> {
+  await diagnostics.log("RDE_STEP_START:runtime-validation\n");
+  const health = await vscode.window.withProgress({
+    location: vscode.ProgressLocation.Notification,
+    title: `Validating ROS 2 ${diagnostics.report.target.distro}`,
+    cancellable: false,
+  }, () => validateInstallation(
+    diagnostics.report.target, path.join(extension.extPath, "assets", "scripts", "ros_install_health.py")
+  ));
+  diagnostics.report.health = health;
+  for (const check of health.checks) {
+    const line = `${check.id}: ${check.status}: ${check.detail}`;
+    extension.outputChannel.appendLine(line);
+    await diagnostics.log(line + "\n");
+  }
+  await diagnostics.log(health.healthy ? "RDE_STEP_OK:runtime-validation\n" : "RDE_STEP_FAILED:runtime-validation:1\n");
+  return health;
+}
+
+async function showReport(diagnostics: InstallDiagnostics): Promise<void> {
+  await diagnostics.readLog();
+  await diagnostics.save();
+  await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(diagnostics.reportPath));
+}
+
+async function showFailure(diagnostics: InstallDiagnostics, message: string): Promise<void> {
+  const choice = await vscode.window.showErrorMessage(
+    `${message} Report saved. ${diagnostics.report.operation === "install"
+      ? "No automatic rollback was performed." : "No package repair was attempted."}`,
+    "View Report", "Diagnose Step"
+  );
+  if (choice === "View Report") {
+    await showReport(diagnostics);
+  } else if (choice === "Diagnose Step") {
+    await offerCopilotHelp(diagnostics);
+  }
+}
+
+/** Reopens diagnostics after an extension-host reload, without executing anything. */
+export async function showInstallationReport(): Promise<void> {
+  if (!latestDiagnostics) {
+    const reportPath = extension.extensionContext?.globalState.get<string>(LAST_REPORT_KEY);
+    if (!reportPath) {
+      await vscode.window.showInformationMessage("No ROS installation or health report has been recorded.");
+      return;
+    }
+    latestDiagnostics = await InstallDiagnostics.load(reportPath);
+  }
+  await showReport(latestDiagnostics);
+  const choice = await vscode.window.showInformationMessage(
+    latestDiagnostics.report.status === "running"
+      ? "This run has no recorded completion. It may still be running or may have been interrupted by a reload."
+      : "Installation diagnostics",
+    "Diagnose Step", "Open Log"
+  );
+  if (choice === "Diagnose Step") {
+    await offerCopilotHelp(latestDiagnostics);
+  } else if (choice === "Open Log") {
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(latestDiagnostics.logPath));
+  }
+}
+
+/** Command entrypoint; passing a target skips selection and returns the structured health result. */
+export async function checkRosInstallation(target?: HealthTarget): Promise<HealthReport | undefined> {
+  if (!vscode.workspace.isTrusted) {
+    throw new Error("Trust this workspace before executing ROS installation health checks.");
+  }
+  const manager = InstallationManager.getInstance();
+  if (!manager.begin()) {
+    throw new Error("Wait for the active ROS installation or health check to finish.");
+  }
+  try {
+    const report = await checkSelectedRosInstallation(target);
+    if (report?.healthy) {
+      manager.markComplete();
+    } else {
+      manager.markFailed();
+    }
+    return report;
+  } finally {
+    if (manager.isInstalling) {
+      manager.markFailed();
+    }
+  }
+}
+
+async function checkSelectedRosInstallation(target?: HealthTarget): Promise<HealthReport | undefined> {
+  const interactive = target === undefined;
+  if (!target) {
+    const distro = await selectRosDistro();
+    if (!distro) {
+      return undefined;
+    }
+    const configured = vscode_utils.getRosSetupScript();
+    const choices: { label: string; value: string }[] = [
+      { label: "Installer default location", value: "default" },
+      { label: "Choose a Pixi manifest (pixi.toml)", value: "pixi" },
+      { label: "Choose a ROS setup script", value: "setup" },
+    ];
+    if (configured) {
+      choices.unshift({ label: `Configured setup: ${configured}`, value: "configured" });
+    }
+    const choice = await vscode.window.showQuickPick(choices, { placeHolder: "Choose the installation to check" });
+    if (!choice) {
+      return undefined;
+    }
+    if (choice.value === "default") {
+      target = process.platform === "linux"
+        ? { kind: "setup", distro: distro.name, setupScript: `/opt/ros/${distro.name}/setup.bash` }
+        : { kind: "pixi", distro: distro.name, workspace: path.join(getPixiRoot(), distro.name) };
+    } else if (choice.value === "configured") {
+      target = { kind: "setup", distro: distro.name, setupScript: configured };
+    } else {
+      const selected = await vscode.window.showOpenDialog({
+        canSelectMany: false, canSelectFiles: true, canSelectFolders: false,
+        title: choice.value === "pixi" ? "Select pixi.toml" : "Select ROS setup script",
+      });
+      if (!selected?.length) {
+        return undefined;
+      }
+      if (choice.value === "pixi" && path.basename(selected[0].fsPath) !== "pixi.toml") {
+        throw new Error("Select a file named pixi.toml.");
+      }
+      target = choice.value === "pixi"
+        ? { kind: "pixi", distro: distro.name, workspace: path.dirname(selected[0].fsPath) }
+        : { kind: "setup", distro: distro.name, setupScript: selected[0].fsPath };
+    }
+  }
+  const diagnostics = await createDiagnostics(target, "health");
+  try {
+    const health = await runHealthChecks(diagnostics);
+    await diagnostics.finish(health.healthy ? "passed" : "failed");
+    if (health.healthy && interactive) {
+      const choice = await vscode.window.showInformationMessage("ROS 2 runtime health checks passed.", "View Report");
+      if (choice === "View Report") {
+        await showReport(diagnostics);
+      }
+    } else if (!health.healthy && interactive) {
+      await showFailure(diagnostics, "ROS 2 runtime health checks failed.");
+    }
+    return health;
+  } catch (error) {
+    await diagnostics.finish("failed", String(error));
+    throw error;
   }
 }

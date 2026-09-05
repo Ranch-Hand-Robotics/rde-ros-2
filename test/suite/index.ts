@@ -30,7 +30,10 @@ export function run(): Promise<void> {
 
     return new Promise(async (c, e) => {
         try {
-            const files = await glob('**/**.test.js', { cwd: testsRoot });
+            const files = await glob(process.env.RDE_TEST_FILES || '**/**.test.js', { cwd: testsRoot });
+            if (files.length === 0) {
+                throw new Error("No test files matched RDE_TEST_FILES.");
+            }
             
             // Add files to the test suite
             files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
