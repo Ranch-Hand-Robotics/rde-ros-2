@@ -65,6 +65,45 @@ With the MCP server running, your AI assistant can:
 
 **First Time Setup**: On the first run, the extension will create a Python virtual environment inside the extension directory. You may be prompted for your super user password to install dependencies.
 
+## ROS 2 Agents and Skills
+
+In VS Code 1.110 or newer with Copilot Chat, select **ROS 2 Expert** from the
+Chat agent picker. It can delegate to specialists for Core, Networking (DDS/RMW),
+Packaging, Testing, MoveIt 2, Navigation (Nav2), Hardware, Drones (MAVROS/PX4/ArduPilot),
+Simulation, and operating systems (Windows, macOS, Ubuntu, and NVIDIA Jetson). All ten
+specialists are hidden from the agent picker and invoked through the top-level
+**ROS 2 Expert** orchestration agent: eleven agents in total.
+
+Type `/ros2-` in Chat to discover sixteen workflows, including shared development
+guidance (`/ros2-development`) and installation diagnostics
+(`/ros2-install-troubleshooting`), meaningful testing (`/ros2-test`), plus build, packaging,
+actions/services/lifecycle, networking, debugging, perception, manipulation,
+navigation, launch, performance, Gazebo, Omniverse Isaac Sim, and MuJoCo.
+Relevant skills can also load automatically. No workspace copying
+or MCP server is required for static development help; runtime inspection needs
+available ROS tooling. These VS Code contributions may not be supported by Cursor.
+
+**ROS 2 Core** owns general launch orchestration with `/ros2-launch` and uses
+`/ros2-performance` for measurement-driven optimization. **ROS 2 Simulation**
+handles simulator-specific integration with those shared skills and `/ros2-test`:
+
+- `/ros2-gazebo` distinguishes modern Gazebo (`gz`, `ros_gz`) from legacy Gazebo
+  Classic (`gazebo`, `gazebo_ros`); plugins and APIs are not interchangeable.
+- `/ros2-omniverse` targets NVIDIA Omniverse Isaac Sim and its compatible ROS 2 bridge.
+- `/ros2-mujoco` requires an explicit ROS adapter; MuJoCo alone does not expose
+  ROS topics, services, TF, or a simulation clock.
+
+Testing focuses on intended behavior and realistic defects, not mirroring code.
+Discovered bugs are captured as permanent regression tests; blocked coverage is
+reported explicitly.
+
+Try: "Inspect this workspace and help me implement a cancellable action server
+with lifecycle-managed resources. Validate using mocks, not the physical robot."
+
+The agents default to simulation/static checks and require explicit approval for
+live hardware state changes. Review proposed commands and keep tool confirmations
+enabled; instructions are not a physical safety interlock.
+
 ## AI Completions
 
 Smart code completions leverage AI to provide contextual suggestions for:

@@ -3,7 +3,7 @@
     "version": "1.3.0",
     "publisher": "Ranch-Hand-Robotics",
     "engines": {
-        "vscode": "^1.101.0"
+        "vscode": "^1.110.0"
     },
     "author": {
         "name": "Ranchhand Robotics"
@@ -54,6 +54,37 @@
         "onDebugDynamicConfigurations:ros2"
     ],
     "contributes": {
+        "chatAgents": [
+            { "path": "./assets/agents/ros2-expert.agent.md" },
+            { "path": "./assets/agents/ros2-core.agent.md" },
+            { "path": "./assets/agents/ros2-networking.agent.md" },
+            { "path": "./assets/agents/ros2-packaging.agent.md" },
+            { "path": "./assets/agents/ros2-moveit.agent.md" },
+            { "path": "./assets/agents/ros2-navigation.agent.md" },
+            { "path": "./assets/agents/ros2-hardware.agent.md" },
+            { "path": "./assets/agents/ros2-drones.agent.md" },
+            { "path": "./assets/agents/ros2-os.agent.md" },
+            { "path": "./assets/agents/ros2-test.agent.md" },
+            { "path": "./assets/agents/ros2-simulation.agent.md" }
+        ],
+        "chatSkills": [
+            { "path": "./assets/skills/ros2-development/SKILL.md" },
+            { "path": "./assets/skills/ros2-install-troubleshooting/SKILL.md" },
+            { "path": "./assets/skills/ros2-build/SKILL.md" },
+            { "path": "./assets/skills/ros2-test/SKILL.md" },
+            { "path": "./assets/skills/ros2-packaging/SKILL.md" },
+            { "path": "./assets/skills/ros2-actions-services-lifecycle/SKILL.md" },
+            { "path": "./assets/skills/ros2-networking/SKILL.md" },
+            { "path": "./assets/skills/ros2-debugging/SKILL.md" },
+            { "path": "./assets/skills/ros2-perception/SKILL.md" },
+            { "path": "./assets/skills/ros2-manipulation/SKILL.md" },
+            { "path": "./assets/skills/ros2-navigation/SKILL.md" },
+            { "path": "./assets/skills/ros2-gazebo/SKILL.md" },
+            { "path": "./assets/skills/ros2-omniverse/SKILL.md" },
+            { "path": "./assets/skills/ros2-mujoco/SKILL.md" },
+            { "path": "./assets/skills/ros2-launch/SKILL.md" },
+            { "path": "./assets/skills/ros2-performance/SKILL.md" }
+        ],
         "commands": [
             {
                 "command": "ROS2.createTerminal",

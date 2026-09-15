@@ -5,6 +5,9 @@ This is a Visual Studio Code Extension that  provides debugging support for [Rob
 
 ## Features
 
+* **Automated ROS 2 Installation** with integrated installer for Linux (APT), Windows (Pixi), and macOS (Pixi)
+* AI-powered troubleshooting with GitHub Copilot integration for installation issues
+* Bundled [ROS 2 AI agents and skills](docs/ai-agents-and-skills.md) for core development, networking, packaging, MoveIt 2, Nav2, hardware, drones, and cross-platform setup (VS Code 1.110+ with Copilot Chat).
 * Automatic ROS environment configuration.
 * Allows starting, stopping and viewing the ROS core status.
 * Automatically create `colcon` build and test tasks.
