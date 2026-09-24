@@ -9,6 +9,7 @@ import * as vscode from "vscode";
 import * as extension from "../extension";
 import * as telemetry from "../telemetry-helper";
 import * as vscode_utils from "../vscode-utils";
+import { sourceBashEnvironment } from "./installer/pixi";
 
 // Re-export common shell utilities
 export { 
@@ -28,6 +29,9 @@ import {
  * This wraps the common sourceSetupFile with ROS-specific logging.
  */
 export function sourceSetupFile(filename: string, env?: any): Promise<any> {
+    if (process.platform === "darwin" && path.extname(filename) === ".bash") {
+        return sourceBashEnvironment(filename, env, vscode.workspace.rootPath);
+    }
     const config = vscode_utils.getExtensionConfiguration();
     const pixiRoot = config.get("pixiRoot", "c:\\pixi_ws");
     

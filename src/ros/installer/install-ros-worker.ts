@@ -7,6 +7,7 @@
 
 import { parentPort } from "worker_threads";
 import * as child_process from "child_process";
+import { findPixi } from "./pixi";
 
 // ---------------------------------------------------------------------------
 // Shared message types (imported by install-ros.ts as well)
@@ -19,7 +20,7 @@ export type WorkerRequest =
 
 /** Messages sent FROM this worker TO the main thread. */
 export type WorkerResponse =
-  | { type: "pixi_available"; available: boolean }
+  | { type: "pixi_available"; available: boolean; executable?: string }
   | { type: "log"; text: string }
   | { type: "complete" }
   | { type: "error"; message: string };
@@ -57,11 +58,9 @@ function send(response: WorkerResponse): void {
 // Handlers
 // ---------------------------------------------------------------------------
 
-function handleCheckPixi(): void {
-  const cmd = process.platform === "win32" ? "where pixi" : "which pixi";
-  child_process.exec(cmd, (error) => {
-    send({ type: "pixi_available", available: !error });
-  });
+async function handleCheckPixi(): Promise<void> {
+  const executable = await findPixi();
+  send({ type: "pixi_available", available: !!executable, executable });
 }
 
 function handleInstallPixi(platform: string): void {
@@ -69,13 +68,17 @@ function handleInstallPixi(platform: string): void {
   if (platform === "win32") {
     installCommand = "winget install prefix-dev.pixi";
   } else if (platform === "darwin") {
-    installCommand = "curl -fsSL https://pixi.sh/install.sh | sh";
+    installCommand = "set -o pipefail; curl --fail --show-error --silent --location --connect-timeout 30 --max-time 300 https://pixi.sh/install.sh | sh";
   } else {
     send({ type: "error", message: "Pixi installation is only supported on Windows and macOS" });
     return;
   }
 
-  const proc = child_process.exec(installCommand, (error) => {
+  const proc = child_process.exec(installCommand, {
+    shell: platform === "darwin" ? "/bin/bash" : undefined,
+    timeout: 600000,
+    maxBuffer: 10 * 1024 * 1024,
+  }, (error) => {
     if (error) {
       send({ type: "error", message: error.message });
     } else {

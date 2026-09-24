@@ -110,7 +110,8 @@
             {
                 "command": "ROS2.installRos",
                 "title": "Install ROS 2",
-                "category": "ROS2"
+                "category": "ROS2",
+                "icon": "$(add)"
             },
             {
                 "command": "ROS2.findRos",
@@ -127,6 +128,12 @@
                 "title": "Refresh ROS Distributions",
                 "category": "ROS2",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "ROS2.distributions.remove",
+                "title": "Remove ROS Distribution",
+                "category": "ROS2",
+                "icon": "$(trash)"
             },
             {
                 "command": "ROS2.doctor",
@@ -293,6 +300,12 @@
             ]
         },
         "menus": {
+            "commandPalette": [
+                {
+                    "command": "ROS2.distributions.remove",
+                    "when": "false"
+                }
+            ],
             "explorer/context": [
                 {
                     "submenu": "ROS2.explorer",
@@ -338,10 +351,20 @@
                 {
                     "command": "ROS2.distributions.refresh",
                     "when": "view == ros2Distributions",
-                    "group": "navigation"
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "ROS2.installRos",
+                    "when": "view == ros2Distributions",
+                    "group": "navigation@1"
                 }
             ],
             "view/item/context": [
+                {
+                    "command": "ROS2.distributions.remove",
+                    "when": "view == ros2Distributions && viewItem == rosDistribution",
+                    "group": "inline"
+                },
                 {
                     "command": "ROS2.launchTree.run",
                     "when": "view == ranchhandrobotics.rde-ros-2.launchTree && viewItem == launchFile",
@@ -437,8 +460,8 @@
                 },
                 "ROS2.pixiRoot": {
                     "type": "string",
-                    "default": "c:\\pixi_ws",
-                    "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
+                    "default": "",
+                    "description": "Absolute root directory for Pixi workspaces. The installer defaults to C:\\pixi_ws on Windows and ~/pixi_ws on macOS."
                 },
                 "ROS2.showROS2WelcomeOnStartup": {
                     "type": "boolean",
@@ -800,6 +823,8 @@
         "package:dev": "vsce package -o rde-ros-2-dev.vsix",
         "build": "npm run package",
         "build:openvsx": "node scripts/build-openvsx.js",
+        "reset:ros:macos": "node scripts/reset-ros-macos.js",
+        "test:installer": "npm run test-compile && node --test test/pixi-installer.test.js test/reset-ros-macos.test.js",
         "lint": "eslint -p ./",
         "pretest": "npm run test-compile",
         "test": "node ./out/test/runTest.js",
@@ -850,6 +875,7 @@
         "@vscode/dts": "^0.4.1",
         "@vscode/test-electron": "^2.5.2",
         "glob": "^13.0.0",
+        "jsonc-parser": "^3.3.1",
         "mocha": "^11.7.5",
         "mocha-junit-reporter": "^2.2.1",
         "ts-loader": "^9.5.4",

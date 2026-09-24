@@ -3,7 +3,10 @@
 
 import * as path from "path";
 import * as vscode from "vscode";
-import * as xmlrpc from "xmlrpc";
+import * as http from "http";
+import { PassThrough } from "stream";
+import Serializer = require("xmlrpc/lib/serializer");
+import Deserializer = require("xmlrpc/lib/deserializer");
 
 import * as extension from "../../extension";
 import * as telemetry from "../../telemetry-helper";
@@ -13,14 +16,10 @@ import * as lifecycle from "./lifecycle";
 let existingPanel: vscode.WebviewPanel | undefined;
 let isDaemonRunning: boolean = false;
 
-function getDaemonPort() {
-    let basePort: number = 11511;
-    basePort += Number(process.env.ROS_DOMAIN_ID) || 0
-    return basePort;
-}
-
-function getDaemonUri() {
-    return `http://localhost:${getDaemonPort()}/ros2cli/`;
+export function getDaemonUri() {
+    const rosEnv = extension.env ?? process.env;
+    const port = 11511 + (Number(rosEnv.ROS_DOMAIN_ID) || 0);
+    return `http://127.0.0.1:${port}/ros2cli/`;
 }
 
 async function startRos2Daemon(panel: vscode.WebviewPanel) {
@@ -349,12 +348,6 @@ function getCoreStatusWebviewContent(stylesheet: vscode.Uri, script: vscode.Uri)
  * ros2cli xmlrpc interfaces.
  */
 export class XmlRpcApi {
-    private client: xmlrpc.Client;
-
-    public constructor() {
-        this.client = xmlrpc.createClient(getDaemonUri());
-    }
-
     public check() : Promise<boolean> {
         // the ROS2 CLI doesn't have an API which returns detailed status, 
         // so we're just using another endpoint to verify it is running
@@ -375,13 +368,26 @@ export class XmlRpcApi {
 
     private methodCall(method: string, ...args: any[]): Promise<any> {
         return new Promise((resolve, reject) => {
-            this.client.methodCall(method, [...args], (err, val) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(val);
+            const body = Serializer.serializeMethodCall(method, args, "utf8");
+            const request = http.request(getDaemonUri(), {
+                method: "POST",
+                headers: { "Content-Type": "text/xml", "Content-Length": Buffer.byteLength(body) },
+            }, response => {
+                response.on("error", reject);
+                if (response.statusCode !== 200) {
+                    response.resume();
+                    reject(new Error(`ROS daemon returned HTTP ${response.statusCode}`));
+                    return;
                 }
+                const parserStream = new PassThrough();
+                new Deserializer("utf8").deserializeMethodResponse(parserStream, (error: Error | undefined, value: any) => {
+                    if (error) { reject(error); } else { resolve(value); }
+                });
+                response.pipe(parserStream);
             });
+            request.setTimeout(5000, () => request.destroy(new Error("ROS daemon request timed out")));
+            request.on("error", reject);
+            request.end(body);
         });
     }
 }

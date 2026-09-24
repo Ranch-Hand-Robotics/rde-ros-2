@@ -1,6 +1,120 @@
 import * as assert from "assert";
+import * as vscode from "vscode";
 
-import { compareVersions } from "../../src/vscode-utils";
+import { compareVersions, setRosSetupScript } from "../../src/vscode-utils";
+import { RosDistributionItem } from "../../src/ros/ros-distributions-provider";
+
+describe("ROS setup selection settings scope", () => {
+    const script = "/test/ros/setup.bash";
+    let restore: (() => void)[];
+    let updates: unknown[][];
+    let commands: string[];
+    let prompts: number;
+    let choice: string | undefined;
+
+    function replaceProperty(object: object, key: string, value: unknown): void {
+        const descriptor = Object.getOwnPropertyDescriptor(object, key)!;
+        Object.defineProperty(object, key, { configurable: true, value });
+        restore.push(() => Object.defineProperty(object, key, descriptor));
+    }
+
+    beforeEach(() => {
+        restore = [];
+        updates = [];
+        commands = [];
+        prompts = 0;
+        choice = undefined;
+        replaceProperty(vscode.workspace, "workspaceFolders", undefined);
+        replaceProperty(vscode.workspace, "workspaceFile", undefined);
+        replaceProperty(vscode.workspace, "getConfiguration", () => ({
+            update: async (...args: unknown[]) => { updates.push(args); },
+        }));
+        replaceProperty(vscode.window, "showInformationMessage", async () => {
+            prompts++;
+            return choice;
+        });
+        replaceProperty(vscode.commands, "executeCommand", async (command: string) => { commands.push(command); });
+    });
+
+    afterEach(() => {
+        restore.reverse().forEach(restoreProperty => restoreProperty());
+    });
+
+    it("writes a global default only after explicit consent in an empty window", async () => {
+        choice = "Set Global Default";
+        assert.strictEqual(await setRosSetupScript(script), true);
+        assert.deepStrictEqual(updates, [["rosSetupScript", script, vscode.ConfigurationTarget.Global]]);
+        assert.strictEqual(prompts, 1);
+    });
+
+    it("does not write settings when the prompt is dismissed", async () => {
+        assert.strictEqual(await setRosSetupScript(script), false);
+        assert.deepStrictEqual(updates, []);
+        assert.deepStrictEqual(commands, []);
+    });
+
+    for (const [label, command] of [
+        ["Open Folder", "workbench.action.files.openFolder"],
+        ["Open Workspace", "workbench.action.openWorkspace"],
+    ]) {
+        it(`offers ${label} without changing settings`, async () => {
+            choice = label;
+            assert.strictEqual(await setRosSetupScript(script), false);
+            assert.deepStrictEqual(updates, []);
+            assert.deepStrictEqual(commands, [command]);
+        });
+    }
+
+    it("keeps settings workspace-scoped when a folder is open", async () => {
+        replaceProperty(vscode.workspace, "workspaceFolders", [{ uri: vscode.Uri.file("/test/workspace") }]);
+        assert.strictEqual(await setRosSetupScript(script), true);
+        assert.deepStrictEqual(updates, [["rosSetupScript", script, vscode.ConfigurationTarget.Workspace]]);
+        assert.strictEqual(prompts, 0);
+    });
+
+    it("supports an empty saved multi-root workspace without prompting", async () => {
+        replaceProperty(vscode.workspace, "workspaceFolders", []);
+        replaceProperty(vscode.workspace, "workspaceFile", vscode.Uri.file("/test/empty.code-workspace"));
+        assert.strictEqual(await setRosSetupScript(script), true);
+        assert.deepStrictEqual(updates, [["rosSetupScript", script, vscode.ConfigurationTarget.Workspace]]);
+        assert.strictEqual(prompts, 0);
+    });
+
+    for (const [label, distro] of [["rolling (pixi)", "rolling"], ["jazzy", "jazzy"]]) {
+        it(`saves the canonical ${distro} name with its setup script`, async () => {
+            replaceProperty(vscode.workspace, "workspaceFolders", [{ uri: vscode.Uri.file("/test/workspace") }]);
+            const item = new RosDistributionItem(label, script, false);
+            assert.deepStrictEqual(item.command.arguments, [script, distro]);
+            assert.strictEqual(await setRosSetupScript(item.command.arguments[0], item.command.arguments[1]), true);
+            assert.deepStrictEqual(updates, [
+                ["rosSetupScript", script, vscode.ConfigurationTarget.Workspace],
+                ["distro", distro, vscode.ConfigurationTarget.Workspace],
+            ]);
+        });
+    }
+
+    it("updates both global defaults after consent without a workspace", async () => {
+        choice = "Set Global Default";
+        assert.strictEqual(await setRosSetupScript(script, "rolling"), true);
+        assert.deepStrictEqual(updates, [
+            ["rosSetupScript", script, vscode.ConfigurationTarget.Global],
+            ["distro", "rolling", vscode.ConfigurationTarget.Global],
+        ]);
+    });
+
+    for (const selection of [undefined, "Open Folder", "Open Workspace"]) {
+        it(`leaves both settings unchanged for ${selection ?? "cancellation"}`, async () => {
+            choice = selection;
+            assert.strictEqual(await setRosSetupScript(script, "rolling"), false);
+            assert.deepStrictEqual(updates, []);
+        });
+    }
+
+    it("does not treat the legacy Windows layout name as a ROS distro", () => {
+        const item = new RosDistributionItem("ros2-windows (pixi)", script, false);
+        assert.deepStrictEqual(item.command.arguments, [script, undefined]);
+    });
+});
 
 describe("VS Code Utils - Version Comparison", () => {
     describe("compareVersions", () => {

@@ -25,7 +25,7 @@ export class RosDistributionItem extends vscode.TreeItem {
         this.command = {
             command: "ROS2.setActiveDistro",
             title: "Set as Active Distribution",
-            arguments: [setupScript],
+            arguments: [setupScript, distroName === "ros2-windows (pixi)" ? undefined : distroName.replace(/ \(pixi\)$/, "")],
         };
     }
 }
@@ -131,6 +131,22 @@ async function detectInstalledDistros(): Promise<{ name: string; setupScript: st
             // C:\opt\ros doesn't exist
         }
     } else {
+        if (os.platform() === "darwin") {
+            const configuredRoot = vscode.workspace.getConfiguration("ROS2").get<string>("pixiRoot");
+            const roots = new Set([configuredRoot, path.join(os.homedir(), "pixi_ws")].filter(Boolean));
+            for (const root of roots) {
+                try {
+                    const entries = await fsPromises.readdir(root!, { withFileTypes: true });
+                    for (const entry of entries) {
+                        if (entry.isDirectory()) {
+                            await pushIfExists(`${entry.name} (pixi)`, path.join(root!, entry.name, "setup.bash"));
+                        }
+                    }
+                } catch {
+                    continue;
+                }
+            }
+        }
         // Linux/macOS: standard /opt/ros/<distro>
         const rosBase = "/opt/ros";
         try {
@@ -175,8 +191,122 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     private cachedItems: RosDistributionItem[] | undefined;
+    private removing = false;
 
     constructor() {}
+
+    private async removableDirectory(setupScript: string): Promise<string | undefined> {
+        if (!path.isAbsolute(setupScript)) {
+            return undefined;
+        }
+        const configuredRoot = vscode.workspace.getConfiguration("ROS2").get<string>("pixiRoot");
+        const defaultRoot = os.platform() === "win32" ? "c:\\pixi_ws" : path.join(os.homedir(), "pixi_ws");
+        for (const root of new Set([configuredRoot, defaultRoot].filter(Boolean))) {
+            if (!path.isAbsolute(root!)) {
+                continue;
+            }
+            const relative = path.relative(root!, setupScript);
+            const parts = relative.split(path.sep);
+            if (path.isAbsolute(relative) || parts.length < 2 || parts[0] === ".." || !parts[0]) {
+                continue;
+            }
+            const directory = path.join(root!, parts[0]);
+            const allowedScripts = [
+                "setup.bash", "local_setup.bat", path.join("install", "setup.bat"),
+                path.join(".pixi", "envs", parts[0], "Library", "local_setup.bat"),
+                path.join(".pixi", "envs", parts[0], "Library", "setup.bat"),
+            ];
+            if (!allowedScripts.includes(path.relative(directory, setupScript))) {
+                continue;
+            }
+            try {
+                const realRoot = await fsPromises.realpath(root!);
+                const realDirectory = await fsPromises.realpath(directory);
+                if (realDirectory !== path.join(realRoot, parts[0]) || !(await fsPromises.lstat(directory)).isDirectory()) {
+                    continue;
+                }
+                const protectedPaths = [os.homedir(), ...(vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath)];
+                let protectedDirectory = false;
+                for (const protectedPath of protectedPaths) {
+                    const realProtectedPath = await fsPromises.realpath(protectedPath);
+                    const relativeProtectedPath = path.relative(realDirectory, realProtectedPath);
+                    if (!relativeProtectedPath || (!path.isAbsolute(relativeProtectedPath) && relativeProtectedPath.split(path.sep)[0] !== "..")) {
+                        protectedDirectory = true;
+                        break;
+                    }
+                }
+                if (protectedDirectory || !(await fsPromises.lstat(path.join(directory, "pixi.toml"))).isFile()
+                    || !(await fsPromises.lstat(path.join(directory, ".pixi"))).isDirectory()) {
+                    continue;
+                }
+                const realScript = await fsPromises.realpath(setupScript);
+                const relativeScript = path.relative(realDirectory, realScript);
+                if (path.isAbsolute(relativeScript) || relativeScript.split(path.sep)[0] === ".."
+                    || !(await fsPromises.stat(realScript)).isFile()) {
+                    continue;
+                }
+                return directory;
+            } catch {
+                continue;
+            }
+        }
+        return undefined;
+    }
+
+    async remove(item?: RosDistributionItem): Promise<void> {
+        if (!(item instanceof RosDistributionItem) || this.removing) {
+            return;
+        }
+        this.removing = true;
+        let offerReload = false;
+        try {
+            const directory = await this.removableDirectory(item.setupScript);
+            if (!directory) {
+                void vscode.window.showWarningMessage("This installation cannot be safely removed automatically. Use its package manager or original uninstall procedure, then refresh Distributions.");
+                return;
+            }
+            const config = vscode.workspace.getConfiguration("ROS2");
+            const wasActive = config.get<string>("rosSetupScript") === item.setupScript;
+            const confirmed = await vscode.window.showWarningMessage(
+                `Remove ROS 2 ${item.distroName}?`,
+                { modal: true, detail: `Move this entire Pixi installation to the Trash:\n${directory}\n\nStop any running ROS nodes, debugging sessions, and terminals using it first. Other workspaces using it will need another distribution.${wasActive ? "\n\nThis is your active distribution. Reload the window after removal." : ""}` },
+                "Move to Trash"
+            );
+            if (confirmed !== "Move to Trash") {
+                return;
+            }
+            if (await this.removableDirectory(item.setupScript) !== directory) {
+                throw new Error("The installation changed while confirming removal. Refresh Distributions and try again.");
+            }
+            await vscode.workspace.fs.delete(vscode.Uri.file(directory), { recursive: true, useTrash: true });
+            try {
+                const scopes: [vscode.WorkspaceConfiguration, vscode.ConfigurationTarget, "globalValue" | "workspaceValue" | "workspaceFolderValue"][] = [
+                    [config, vscode.ConfigurationTarget.Global, "globalValue"],
+                    [config, vscode.ConfigurationTarget.Workspace, "workspaceValue"],
+                    ...(vscode.workspace.workspaceFolders ?? []).map(folder => [
+                        vscode.workspace.getConfiguration("ROS2", folder.uri), vscode.ConfigurationTarget.WorkspaceFolder, "workspaceFolderValue",
+                    ] as [vscode.WorkspaceConfiguration, vscode.ConfigurationTarget, "workspaceFolderValue"]),
+                ];
+                for (const [scope, target, value] of scopes) {
+                    if (scope.inspect<string>("rosSetupScript")?.[value] === item.setupScript) {
+                        await scope.update("distro", undefined, target);
+                        await scope.update("rosSetupScript", undefined, target);
+                    }
+                }
+            } finally {
+                this.refresh();
+            }
+            offerReload = wasActive;
+        } finally {
+            this.removing = false;
+        }
+        if (offerReload) {
+            const action = await vscode.window.showInformationMessage("Distribution removed. Reload the window to clear the old ROS environment.", "Reload Window");
+            if (action === "Reload Window") {
+                await vscode.commands.executeCommand("workbench.action.reloadWindow");
+            }
+        }
+    }
 
     private async updateDistributionContext(hasDistributions: boolean, searchComplete: boolean): Promise<void> {
         await Promise.all([

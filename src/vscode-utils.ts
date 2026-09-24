@@ -31,6 +31,33 @@ export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
     return vscode.workspace.getConfiguration(rosConfigurationName);
 }
 
+export async function setRosSetupScript(scriptPath: string, distro?: string): Promise<boolean> {
+    let target = vscode.ConfigurationTarget.Workspace;
+    if (!vscode.workspace.workspaceFolders?.length && !vscode.workspace.workspaceFile) {
+        const choice = await vscode.window.showInformationMessage(
+            "No workspace is open. Set this ROS installation as your global default, or open a folder or workspace?",
+            { modal: true, detail: "A global default applies wherever workspace settings do not override it. If you open a folder or workspace, select the ROS installation again afterward." },
+            "Set Global Default", "Open Folder", "Open Workspace"
+        );
+        if (choice === "Set Global Default") {
+            target = vscode.ConfigurationTarget.Global;
+        } else {
+            if (choice === "Open Folder") {
+                await vscode.commands.executeCommand("workbench.action.files.openFolder");
+            } else if (choice === "Open Workspace") {
+                await vscode.commands.executeCommand("workbench.action.openWorkspace");
+            }
+            return false;
+        }
+    }
+    const config = getExtensionConfiguration();
+    await config.update("rosSetupScript", scriptPath, target);
+    if (distro) {
+        await config.update("distro", distro, target);
+    }
+    return true;
+}
+
 /**
  * Gets the workspace folder that contains the given path.
  * Returns the workspace folder path or null if not in a workspace.
@@ -78,7 +105,7 @@ export function getRosSetupScript(): string {
     // If still empty after substitution, check for pixiRoot default
     if (!rosSetupScript) {
         // If pixiRoot is configured, use it on any platform
-        const pixiRoot = config.get("pixiRoot", "");
+        const pixiRoot = config.get("pixiRoot", "") || (process.platform === "win32" ? "c:\\pixi_ws" : "");
         
         if (pixiRoot) {
             const shellInfo = ros_utils.detectUserShell();

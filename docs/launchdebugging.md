@@ -4,6 +4,12 @@
 
 The Visual Studio Code extension for ROS supports launch debugging for ROS 2 nodes, written in Python and C++. The ROS node or nodes to be debugged must be placed in a ROS launch file with the extension `.xml` or `.py`. 
 
+### C++ Debugger Selection
+
+On macOS, install CodeLLDB (`vadimcn.vscode-lldb`) for C++ debugging. ROS 2 launch and attach configurations prefer CodeLLDB when it is installed, even alongside Microsoft C/C++. Installing the command-line LLDB or LLVM's LLDB DAP extension alone does not provide this integration.
+
+On Linux and Windows, Microsoft C/C++ remains preferred, with CodeLLDB used when Microsoft C/C++ is absent. On macOS, Microsoft C/C++ is used if CodeLLDB is absent. Keep `type: "ros2"` in your ROS 2 configuration; the extension selects the native debugger automatically. ROS 2 launch options `stopOnEntry` and `sourceFileMap` are translated to the selected adapter's settings.
+
 ### Automatic creation of a launch.json with ROS Launch support
 `.vscode/launch.json` is a file which defines a debug launch configuration within VS Code. 
 

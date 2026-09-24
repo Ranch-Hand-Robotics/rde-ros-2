@@ -35,6 +35,29 @@ python3 assets/scripts/ros2_launch_dumper.py test/launch/simple_lifecycle_launch
 python3 assets/scripts/ros2_launch_dumper.py test/launch/test_mixed_nodes.launch.py --output-format json
 ```
 
+## Extension Debugger Startup
+
+On the macOS VS Code build using Node 24.18.1 and js-debug 1.117.0, extension-host
+debugging can abort before activation in
+`node::inspector::Agent::ToggleNetworkTracking`. Set
+`"debug.javascript.enableNetworkView": false` in local workspace settings to
+avoid that inspector request. Normal breakpoints and stepping remain enabled.
+Do not commit local `.vscode/settings.json`.
+
+The opt-in regression exercises an attached debugger, empty-window ROS activation,
+Start Daemon, Show Status, and terminal creation. It requires an installed ROS
+environment and retains the debugger trace in the printed temporary directory.
+Run it in the isolated test profile, not your normal development window:
+
+```bash
+npm run test-compile
+RDE_TEST_DEBUG_LAUNCH=1 RDE_TEST_ROS_DAEMON_SETUP="$HOME/pixi_ws/lyrical/setup.bash" \
+node -e 'const path = require("path"); require("@vscode/test-electron").runTests({ vscodeExecutablePath: "/Applications/Visual Studio Code.app/Contents/MacOS/Code", extensionDevelopmentPath: process.cwd(), extensionTestsPath: path.resolve("out/test/emptyWindow"), launchArgs: ["--new-window", "--disable-extensions", "--disable-workspace-trust"] }).catch(error => { console.error(error); process.exitCode = 1; });'
+```
+
+Set `RDE_TEST_DEBUG_NETWORK_VIEW=1` as well to reproduce the unmitigated startup
+path; the affected runtime can abort intermittently.
+
 ## Test Coverage
 
 These launch files test:
