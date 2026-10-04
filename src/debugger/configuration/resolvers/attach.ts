@@ -18,6 +18,7 @@ import * as utils from "../../utils";
 import * as vscode_utils from "../../../vscode-utils";
 
 const promisifiedExec = util.promisify(child_process.exec);
+const promisifiedExecFile = util.promisify(child_process.execFile);
 const promisifiedSudoExec = util.promisify(
     (command: any, options: any, cb: any) =>
         sudo.exec(command, options,
@@ -27,6 +28,13 @@ export interface IResolvedAttachRequest extends requests.IAttachRequest {
     runtime: string;
     processId: number;
     commandLine: string;
+}
+
+interface ILldbAttachConfiguration {
+    name: string;
+    type: "lldb";
+    request: "attach";
+    pid: number | string;
 }
 
 export class AttachResolver implements vscode.DebugConfigurationProvider {
@@ -41,10 +49,9 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
 
         await this.resolveRuntimeIfNeeded(this.supportedRuntimeTypes, config);
         await this.resolveProcessIdIfNeeded(config);
-        await this.resolveCommandLineIfNeeded(config);
 
         // propagate debug configuration to Python or C++ debugger depending on the chosen runtime type
-        this.launchAttachSession(config as IResolvedAttachRequest);
+        await this.launchAttachSession(config as IResolvedAttachRequest);
 
         // Return null as we have spawned new debug session
         return null;
@@ -55,14 +62,14 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
             return;
         }
 
-        let debugConfig: ICppvsdbgAttachConfiguration | ICppdbgAttachConfiguration | IPythonAttachConfiguration | any;
+        let debugConfig: ICppvsdbgAttachConfiguration | ICppdbgAttachConfiguration | IPythonAttachConfiguration | ILldbAttachConfiguration;
         if (config.runtime === "C++") {
             const isCppToolsInstalled = vscode_utils.isCppToolsExtensionInstalled();
             const isLldbInstalled = vscode_utils.isLldbExtensionInstalled();
             const isCursor = vscode_utils.isCursorEditor();
 
-            if (isCppToolsInstalled) {
-                // Prefer Microsoft C/C++ tools if available
+            if (isCppToolsInstalled && !(os.platform() === "darwin" && isLldbInstalled)) {
+                await this.resolveCommandLineIfNeeded(config);
                 if (os.platform() === "win32") {
                     const cppvsdbgAttachConfig: ICppvsdbgAttachConfiguration = {
                         name: `C++: ${config.processId}`,
@@ -89,12 +96,11 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
                     debugConfig = cppdbgAttachConfig;
                 }
             } else if (isLldbInstalled) {
-                // Fall back to LLDB if cpptools not available
-                const lldbAttachConfig: any = {
+                const lldbAttachConfig: ILldbAttachConfiguration = {
                     name: `C++: ${config.processId}`,
                     type: "lldb",
                     request: "attach",
-                    processId: config.processId,
+                    pid: config.processId,
                 };
                 debugConfig = lldbAttachConfig;
             } else {
@@ -192,7 +198,6 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
     }
 
     private async resolveCommandLineIfNeeded(config: requests.IAttachRequest) {
-        // this step is only needed on Ubuntu when user has specified PID of C++ executable to attach to
         if (os.platform() === "win32" || config.commandLine || config.runtime !== "C++") {
             return;
         }
@@ -201,6 +206,14 @@ export class AttachResolver implements vscode.DebugConfigurationProvider {
             throw (new Error("No PID specified!"));
         }
         try {
+            if (os.platform() === "darwin") {
+                const result = await promisifiedExecFile("ps", ["-p", String(config.processId), "-o", "comm="]);
+                config.commandLine = result.stdout.trim();
+                if (!config.commandLine) {
+                    throw new Error("Process executable not found");
+                }
+                return;
+            }
             const result = await promisifiedExec(`ls -l /proc/${config.processId}/exe`);
 
             // contains a space

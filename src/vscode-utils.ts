@@ -11,6 +11,7 @@ import * as net from 'net';
 import * as ros_utils from "./ros/utils";
 import * as extension from "./extension";
 import * as mcp from "./mcp";
+import { getPixiInstallRoot } from "./ros/installer/pixi-location";
 
 import { 
     checkExternallyManagedEnvironment,
@@ -29,6 +30,33 @@ export type IPackageInfo = CommonIPackageInfo;
 export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
     const rosConfigurationName: string = "ROS2";
     return vscode.workspace.getConfiguration(rosConfigurationName);
+}
+
+export async function setRosSetupScript(scriptPath: string, distro?: string): Promise<boolean> {
+    let target = vscode.ConfigurationTarget.Workspace;
+    if (!vscode.workspace.workspaceFolders?.length && !vscode.workspace.workspaceFile) {
+        const choice = await vscode.window.showInformationMessage(
+            "No workspace is open. Set this ROS installation as your global default, or open a folder or workspace?",
+            { modal: true, detail: "A global default applies wherever workspace settings do not override it. If you open a folder or workspace, select the ROS installation again afterward." },
+            "Set Global Default", "Open Folder", "Open Workspace"
+        );
+        if (choice === "Set Global Default") {
+            target = vscode.ConfigurationTarget.Global;
+        } else {
+            if (choice === "Open Folder") {
+                await vscode.commands.executeCommand("workbench.action.files.openFolder");
+            } else if (choice === "Open Workspace") {
+                await vscode.commands.executeCommand("workbench.action.openWorkspace");
+            }
+            return false;
+        }
+    }
+    const config = getExtensionConfiguration();
+    await config.update("rosSetupScript", scriptPath, target);
+    if (distro) {
+        await config.update("distro", distro, target);
+    }
+    return true;
 }
 
 /**
@@ -62,6 +90,18 @@ export function getWorkspaceFolder(dirPath: string): string | null {
 export function getRosSetupScript(): string {
     const config = getExtensionConfiguration();
     let rosSetupScript = config.get("rosSetupScript", "");
+    const machineLocations = config.inspect<Record<string, string>>("pixiInstallLocationsByMachine")?.globalValue ?? {};
+    const isWithin = (root: string, filename: string): boolean => {
+        if (!path.isAbsolute(root) || !filename) { return false; }
+        const relative = path.relative(path.resolve(root), path.resolve(filename));
+        return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
+    };
+    const currentRoot = getPixiInstallRoot();
+    const configuredRootIsFromAnotherMachine = Object.values(machineLocations).some((root) => isWithin(root, rosSetupScript)) &&
+        !isWithin(currentRoot, rosSetupScript);
+    if (configuredRootIsFromAnotherMachine) {
+        rosSetupScript = "";
+    }
     
     // First, handle workspace folder variable substitution if present
     const regex = /\$\{workspaceFolder\}/g;
@@ -78,7 +118,7 @@ export function getRosSetupScript(): string {
     // If still empty after substitution, check for pixiRoot default
     if (!rosSetupScript) {
         // If pixiRoot is configured, use it on any platform
-        const pixiRoot = config.get("pixiRoot", "");
+        const pixiRoot = getPixiInstallRoot();
         
         if (pixiRoot) {
             const shellInfo = ros_utils.detectUserShell();

@@ -134,7 +134,7 @@ export interface ILldbLaunchConfiguration {
     breakpointMode?: "path" | "file";
     sourceLanguages?: string[]; 
     reverseDebugging?: boolean;
-    stopAtEntry?: boolean;
+    stopOnEntry?: boolean;
     pid?: number;
 }
 
@@ -581,7 +581,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             vscode.window.showErrorMessage(message);
             throw new Error(message);
         }
-        if (isCppToolsInstalled) {
+        if (isCppToolsInstalled && !(os.platform() === "darwin" && isLldbInstalled)) {
             if (os.platform() === "win32") {
                 const cppvsdbgLaunchConfig: ICppvsdbgLaunchConfiguration = {
                     name: request.nodeName,
@@ -627,7 +627,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 args: request.arguments,
                 cwd: ".",
                 env: request.env,
-                stopAtEntry: stopOnEntry
+                stopOnEntry: stopOnEntry,
+                sourceMap: request.sourceFileMap
             };
             return lldbLaunchConfig;
         } else {

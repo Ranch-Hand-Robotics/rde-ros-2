@@ -106,6 +106,44 @@
                 "category": "ROS2"
             },
             {
+                "command": "ROS2.installRos",
+                "title": "Install ROS 2",
+                "category": "ROS2",
+                "icon": "$(add)"
+            },
+            {
+                "command": "ROS2.checkInstallation",
+                "title": "Check ROS 2 Installation Health",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.showInstallationReport",
+                "title": "Show ROS 2 Installation Report",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.findRos",
+                "title": "Find ROS Installation",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.setActiveDistro",
+                "title": "Set as Active Distribution",
+                "category": "ROS2"
+            },
+            {
+                "command": "ROS2.distributions.refresh",
+                "title": "Refresh ROS Distributions",
+                "category": "ROS2",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "ROS2.distributions.remove",
+                "title": "Remove ROS Distribution",
+                "category": "ROS2",
+                "icon": "$(trash)"
+            },
+            {
                 "command": "ROS2.doctor",
                 "title": "Runs ROS 2 Doctor for diagnosing ROS 2 issues",
                 "category": "ROS2"
@@ -266,10 +304,21 @@
                     "contextualTitle": "ROS 2 Topic Monitor",
                     "icon": "media/topic-tree-icon.svg",
                     "visibility": "visible"
+                },
+                {
+                    "id": "ros2Distributions",
+                    "name": "Distributions",
+                    "visibility": "visible"
                 }
             ]
         },
         "menus": {
+            "commandPalette": [
+                {
+                    "command": "ROS2.distributions.remove",
+                    "when": "false"
+                }
+            ],
             "explorer/context": [
                 {
                     "submenu": "ROS2.explorer",
@@ -311,9 +360,24 @@
                     "command": "ROS2.topicTree.refresh",
                     "when": "view == ranchhandrobotics.rde-ros-2.topicTree",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "ROS2.distributions.refresh",
+                    "when": "view == ros2Distributions",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "ROS2.installRos",
+                    "when": "view == ros2Distributions",
+                    "group": "navigation@1"
                 }
             ],
             "view/item/context": [
+                {
+                    "command": "ROS2.distributions.remove",
+                    "when": "view == ros2Distributions && viewItem == rosDistribution",
+                    "group": "inline"
+                },
                 {
                     "command": "ROS2.launchTree.run",
                     "when": "view == ranchhandrobotics.rde-ros-2.launchTree && viewItem == launchFile",
@@ -331,23 +395,13 @@
                 }
             ]
         },
-        "submenus": [
+        "viewsWelcome": [
             {
-                "id": "ROS2.explorer",
-                "label": "ROS 2"
+                "view": "ros2Distributions",
+                "when": "ros2.distributionSearchComplete && !ros2.hasDistributions",
+                "contents": "The Robot Developer Extensions work best when associated with a ROS 2 distribution.\n\nNone were found on this system.\n\nWould you like to:\n\n[Find ROS 2 to use in this workspace](command:ROS2.findRos)\n\n[Install ROS 2 on this system](command:ROS2.installRos)\n\n[Create ROS 2 devcontainer for this workspace](command:ROS2.installRosContainer)"
             }
         ],
-        "views": {
-            "explorer": [
-                {
-                    "id": "ros2LaunchTree",
-                    "name": "ROS 2 Launch Files",
-                    "contextualTitle": "ROS 2 Launch Tree",
-                    "visibility": "visible",
-                    "when": "ros2.hasPackageXml"
-                }
-            ]
-        },
         "mcpServerDefinitionProviders": [
             {
                 "id": "ROS 2",
@@ -388,8 +442,17 @@
                 },
                 "ROS2.pixiRoot": {
                     "type": "string",
-                    "default": "c:\\pixi_ws",
-                    "description": "Root directory for Pixi workspace. When set, enables Pixi environment setup on all platforms and is used for constructing default ROS setup script paths."
+                    "default": "",
+                    "scope": "machine",
+                    "description": "Optional Pixi workspace root override for this computer. If empty, the extension uses its per-machine cached location or the platform default. This setting is not synchronized."
+                },
+                "ROS2.pixiInstallLocationsByMachine": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Pixi install roots keyed by VS Code machine ID. The extension caches each computer's location here so synced settings do not make computers reuse another system's path.",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "ROS2.showROS2WelcomeOnStartup": {
                     "type": "boolean",
@@ -417,6 +480,11 @@
                     "items": {
                         "type": "string"
                     }
+                },
+                "ROS2.neverInstallRos": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Never prompt to install ROS 2 for this workspace, even if not detected."
                 }
             }
         },
@@ -746,8 +814,10 @@
         "package:dev": "vsce package -o rde-ros-2-dev.vsix",
         "build": "npm run package",
         "build:openvsx": "node scripts/build-openvsx.js",
+        "reset:ros:macos": "node scripts/reset-ros-macos.js",
+        "test:installer": "npm run test-compile && node --test test/pixi-installer.test.js test/reset-ros-macos.test.js",
         "lint": "eslint -p ./",
-        "pretest": "npm run test-compile",
+        "pretest": "npm run build && npm run test-compile",
         "test": "node ./out/test/runTest.js",
         "headless-test": "xvfb-run -a npm test",
         "vscode:prepublish": "npm run package",
@@ -796,6 +866,7 @@
         "@vscode/dts": "^0.4.1",
         "@vscode/test-electron": "^2.5.2",
         "glob": "^13.0.0",
+        "jsonc-parser": "^3.3.1",
         "mocha": "^11.7.5",
         "mocha-junit-reporter": "^2.2.1",
         "ts-loader": "^9.5.4",

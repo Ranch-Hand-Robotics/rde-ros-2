@@ -3,6 +3,7 @@
 
 import * as path from "path";
 import { promises as fsPromises } from "fs";
+import * as os from "os";
 import * as vscode from "vscode";
 import * as child_process from "child_process";
 
@@ -19,16 +20,19 @@ import { rosApi, selectROSApi } from "./ros/ros";
 import * as lifecycle from "./ros/ros2/lifecycle";
 import { registerRosMessageProviders } from "./ros/ros-msg-providers";
 import { registerLaunchLinkProvider } from "./ros/launch-link-provider";
+import * as install_ros from "./ros/installer/install-ros";
 
 import * as debug_manager from "./debugger/manager";
 import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
 import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
+import { RosDistributionsProvider } from "./ros/ros-distributions-provider";
 import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
 import { TopicTreeDataProvider } from "./ros/topic-tree/topic-tree-provider";
 import { TopicTreeItem } from "./ros/topic-tree/topic-tree-item";
 import { TopicWebviewManager } from "./ros/ros2/topic-webview";
+import { getPixiInstallRoot } from "./ros/installer/pixi-location";
 
 import * as mcp from "./mcp";
 
@@ -49,6 +53,7 @@ async function exists(filePath: string): Promise<boolean> {
  */
 export let env: any;
 export let processingWorkspace = false;
+let environmentActivation: Promise<void> | undefined;
 
 export let extPath: string;
 export let outputChannel: vscode.OutputChannel;
@@ -58,6 +63,7 @@ export let launchTreeProvider: LaunchTreeDataProvider | null = null;
 export let topicTreeProvider: TopicTreeDataProvider | null = null;
 export let topicWebviewManager: TopicWebviewManager | null = null;
 let topicTreeView: vscode.TreeView<TopicTreeItem> | null = null;
+export let rosDistributionsProvider: RosDistributionsProvider | null = null;
 
 let onEnvChanged = new vscode.EventEmitter<void>();
 
@@ -68,7 +74,7 @@ export let onDidChangeEnv = onEnvChanged.event;
 
 export async function resolvedEnv() {
     if (env === undefined) { // Env reload in progress
-        await debug_utils.oneTimePromiseFromEvent(onDidChangeEnv, () => env !== undefined);
+        await debug_utils.oneTimePromiseFromEvent(onDidChangeEnv);
     }
     return env
 }
@@ -111,7 +117,14 @@ export enum Commands {
     TopicTreeRefresh = "ROS2.topicTree.refresh",
     TopicTreeStartWatcher = "ROS2.topicTree.startWatcher",
     TopicTreePauseWatcher = "ROS2.topicTree.pauseWatcher",
-    TopicTreePauseAll = "ROS2.topicTree.pauseAll"
+    TopicTreePauseAll = "ROS2.topicTree.pauseAll",
+    InstallRos = "ROS2.installRos",
+    CheckRosInstallation = "ROS2.checkInstallation",
+    ShowInstallationReport = "ROS2.showInstallationReport",
+    FindRos = "ROS2.findRos",
+    SetActiveDistro = "ROS2.setActiveDistro",
+    RefreshDistributions = "ROS2.distributions.refresh",
+    RemoveDistribution = "ROS2.distributions.remove"
 }
 
 function syncTopicMonitoringState(): void {
@@ -168,6 +181,8 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.commands.executeCommand("setContext", "ros2.isLinuxHost", isLinuxHost),
             vscode.commands.executeCommand("setContext", "ros2.isWindowsHost", isWindowsHost),
             vscode.commands.executeCommand("setContext", "ros2.isMacHost", isMacHost),
+            vscode.commands.executeCommand("setContext", "ros2.hasDistributions", false),
+            vscode.commands.executeCommand("setContext", "ros2.distributionSearchComplete", false),
         ]);
 
         // Log extension activation
@@ -226,6 +241,15 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize ROS 2 test provider (once during extension activation, not on environment changes)
     rosTestProvider = new RosTestProvider(context);
     context.subscriptions.push(rosTestProvider);
+
+    // Initialize ROS Distributions Provider
+    rosDistributionsProvider = new RosDistributionsProvider();
+    const distributionsView = vscode.window.createTreeView('ros2Distributions', {
+        treeDataProvider: rosDistributionsProvider,
+        showCollapseAll: false
+    });
+    context.subscriptions.push(distributionsView);
+    context.subscriptions.push(rosDistributionsProvider);
 
     // Initialize Launch Tree Provider
     launchTreeProvider = new LaunchTreeDataProvider(context, outputChannel, extPath);
@@ -300,13 +324,11 @@ export async function activate(context: vscode.ExtensionContext) {
     };
     updateDecorationRegistration(config.enableFileDecorations === true);
 
-    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(() => {
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         const updatedConfig = vscode_utils.getExtensionConfiguration();
-        const fields = Object.keys(config).filter(k => !(config[k] instanceof Function));
-        const changed = fields.some(key => updatedConfig[key] !== config[key]);
-
-        if (changed) {
-            sourceRosAndWorkspace();
+        if (event.affectsConfiguration("ROS2.rosSetupScript") || event.affectsConfiguration("ROS2.distro") ||
+            event.affectsConfiguration("ROS2.pixiRoot")) {
+            void ensureErrorMessageOnException(() => activateEnvironment(context));
         }
 
         updateDecorationRegistration(updatedConfig.enableFileDecorations === true);
@@ -315,9 +337,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }));
 
     vscode.commands.registerCommand(Commands.CreateTerminal, () => {
-        ensureErrorMessageOnException(() => {
-            ros_utils.createTerminal(context);
-        });
+        return ensureErrorMessageOnException(() => withRosEnvironment(context, () => ros_utils.createTerminal(context)));
     });
 
     vscode.commands.registerCommand(Commands.GetDebugSettings, () => {
@@ -327,21 +347,15 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     vscode.commands.registerCommand(Commands.ShowCoreStatus, () => {
-        ensureErrorMessageOnException(() => {
-            rosApi.showCoreMonitor();
-        });
+        return ensureErrorMessageOnException(() => withRosEnvironment(context, () => rosApi.showCoreMonitor()));
     });
 
     vscode.commands.registerCommand(Commands.StartRosCore, () => {
-        ensureErrorMessageOnException(() => {
-            rosApi.startCore();
-        });
+        return ensureErrorMessageOnException(() => withRosEnvironment(context, () => rosApi.startCore()));
     });
 
     vscode.commands.registerCommand(Commands.TerminateRosCore, () => {
-        ensureErrorMessageOnException(() => {
-            rosApi.stopCore();
-        });
+        return ensureErrorMessageOnException(() => withRosEnvironment(context, () => rosApi.stopCore()));
     });
 
     vscode.commands.registerCommand(Commands.UpdateCppProperties, () => {
@@ -357,15 +371,11 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     vscode.commands.registerCommand(Commands.Rosrun, () => {
-        ensureErrorMessageOnException(() => {
-            return ros_cli.rosrun(context);
-        });
+        return ensureErrorMessageOnException(() => withRosEnvironment(context, () => ros_cli.rosrun(context)));
     });
 
     vscode.commands.registerCommand(Commands.Roslaunch, () => {
-        ensureErrorMessageOnException(() => {
-            return ros_cli.roslaunch(context);
-        });
+        return ensureErrorMessageOnException(() => withRosEnvironment(context, () => ros_cli.roslaunch(context)));
     });
 
     vscode.commands.registerCommand(Commands.Rostest, () => {
@@ -381,9 +391,155 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     vscode.commands.registerCommand(Commands.Doctor, () => {
-        ensureErrorMessageOnException(() => {
-            rosApi.doctor();
+        return ensureErrorMessageOnException(() => withRosEnvironment(context, () => rosApi.doctor()));
+    });
+
+    // Register Install ROS command
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.InstallRos, () =>
+        ensureErrorMessageOnException(() => install_ros.installRos())
+    ));
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.CheckRosInstallation, async (target) => {
+        try {
+            return await install_ros.checkRosInstallation(target);
+        } catch (error) {
+            vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
+            throw error;
+        }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.ShowInstallationReport, () =>
+        ensureErrorMessageOnException(() => install_ros.showInstallationReport())
+    ));
+
+    // Register Find ROS command
+    vscode.commands.registerCommand(Commands.FindRos, async () => {
+        const pickAndSetRosSetupScript = async (scriptPath: string): Promise<void> => {
+            if (!await vscode_utils.setRosSetupScript(scriptPath)) {
+                return;
+            }
+            vscode.window.showInformationMessage(`ROS setup script set to: ${scriptPath}`);
+            if (rosDistributionsProvider) {
+                rosDistributionsProvider.refresh();
+            }
+        };
+
+        // Fast-path: look in configured/default Pixi roots for known setup scripts.
+        const config = vscode.workspace.getConfiguration("ROS2");
+        const configuredPixiRoot = getPixiInstallRoot();
+        const defaultPixiRoot = process.platform === "win32"
+            ? "c:\\pixi_ws"
+            : path.join(os.homedir(), "pixi_ws");
+        const pixiRoots = Array.from(new Set([configuredPixiRoot, defaultPixiRoot].filter(Boolean)));
+
+        const candidates: string[] = [];
+        for (const root of pixiRoots) {
+            if (process.platform === "win32") {
+                candidates.push(path.join(root, "ros2-windows", "local_setup.bat"));
+                try {
+                    const entries = await fsPromises.readdir(root, { withFileTypes: true });
+                    for (const entry of entries) {
+                        if (!entry.isDirectory()) {
+                            continue;
+                        }
+                        candidates.push(path.join(root, entry.name, "install", "setup.bat"));
+                        candidates.push(path.join(root, entry.name, "local_setup.bat"));
+                        candidates.push(path.join(root, entry.name, ".pixi", "envs", entry.name, "Library", "local_setup.bat"));
+                        candidates.push(path.join(root, entry.name, ".pixi", "envs", entry.name, "Library", "setup.bat"));
+                    }
+                } catch {
+                    // ignore missing roots
+                }
+            } else {
+                candidates.push(path.join(root, "install", "setup.bash"));
+                candidates.push(path.join(root, "local_setup.bash"));
+                candidates.push(path.join(root, "local_setup.sh"));
+                try {
+                    const entries = await fsPromises.readdir(root, { withFileTypes: true });
+                    for (const entry of entries) {
+                        if (!entry.isDirectory()) {
+                            continue;
+                        }
+                        candidates.push(path.join(root, entry.name, "install", "setup.bash"));
+                        candidates.push(path.join(root, entry.name, "setup.bash"));
+                        candidates.push(path.join(root, entry.name, "local_setup.bash"));
+                        candidates.push(path.join(root, entry.name, "local_setup.sh"));
+                    }
+                } catch {
+                    // ignore missing roots
+                }
+            }
+        }
+
+        const existingCandidates: string[] = [];
+        const seen = new Set<string>();
+        for (const candidate of candidates) {
+            const normalized = path.normalize(candidate);
+            if (seen.has(normalized)) {
+                continue;
+            }
+            seen.add(normalized);
+            if (await exists(normalized)) {
+                existingCandidates.push(normalized);
+            }
+        }
+
+        if (existingCandidates.length === 1) {
+            await pickAndSetRosSetupScript(existingCandidates[0]);
+            return;
+        }
+
+        if (existingCandidates.length > 1) {
+            const selected = await vscode.window.showQuickPick(
+                existingCandidates.map((p) => ({ label: path.basename(p), description: p, path: p })),
+                {
+                    placeHolder: "Select a discovered ROS setup script from Pixi roots",
+                    ignoreFocusOut: true,
+                }
+            );
+            if (selected?.path) {
+                await pickAndSetRosSetupScript(selected.path);
+                return;
+            }
+        }
+
+        // Fall back to manual browse if quick discovery didn't find anything.
+        const isWindows = process.platform === "win32";
+        const filters: Record<string, string[]> = isWindows
+            ? { "ROS Setup Script": ["bat"] }
+            : { "ROS Setup Script": ["bash", "sh"] };
+
+        const uris = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            openLabel: "Select ROS Setup Script",
+            filters,
         });
+
+        if (uris && uris.length > 0) {
+            await pickAndSetRosSetupScript(uris[0].fsPath);
+        }
+    });
+
+    // Register Set Active Distro command
+    vscode.commands.registerCommand(Commands.SetActiveDistro, async (setupScript: string, distro?: string) => {
+        if (!await vscode_utils.setRosSetupScript(setupScript, distro)) {
+            return;
+        }
+        vscode.window.showInformationMessage(`Active ROS distribution set.`);
+        if (rosDistributionsProvider) {
+            rosDistributionsProvider.refresh();
+        }
+    });
+
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.RemoveDistribution, (item) => {
+        return ensureErrorMessageOnException(() => rosDistributionsProvider?.remove(item));
+    }));
+
+    // Register Refresh Distributions command
+    vscode.commands.registerCommand(Commands.RefreshDistributions, () => {
+        if (rosDistributionsProvider) {
+            rosDistributionsProvider.refresh();
+        }
     });
 
     // Register Test commands
@@ -887,14 +1043,36 @@ async function ensureErrorMessageOnException(callback: (...args: any[]) => any) 
     try {
         await callback();
     } catch (err) {
-        vscode.window.showErrorMessage(err.message);
+        vscode.window.showErrorMessage(err instanceof Error ? err.message : String(err));
     }
 }
 
 /**
  * Activates components which require a ROS env.
  */
-export async function activateEnvironment(context: vscode.ExtensionContext) {
+async function withRosEnvironment(context: vscode.ExtensionContext, callback: () => any): Promise<any> {
+    if (environmentActivation) {
+        await environmentActivation;
+    } else if (env?.ROS_VERSION !== "2") {
+        await activateEnvironment(context);
+    }
+    if (env?.ROS_VERSION !== "2") {
+        throw new Error("No ROS 2 environment is configured. Use ROS2: Find ROS or select an installed distribution. No workspace is required; choose Set Global Default in an empty window.");
+    }
+    return callback();
+}
+
+export function activateEnvironment(context: vscode.ExtensionContext): Promise<void> {
+    if (!environmentActivation) {
+        environmentActivation = activateEnvironmentImpl(context).finally(() => {
+            processingWorkspace = false;
+            environmentActivation = undefined;
+        });
+    }
+    return environmentActivation;
+}
+
+async function activateEnvironmentImpl(context: vscode.ExtensionContext) {
 
     if (processingWorkspace) {
         return;
@@ -904,13 +1082,14 @@ export async function activateEnvironment(context: vscode.ExtensionContext) {
 
     // Clear existing disposables.
     while (subscriptions.length > 0) {
-        subscriptions.pop().dispose();
+        subscriptions.pop()?.dispose();
     }
 
     await sourceRosAndWorkspace();
 
-    if (!env || typeof env.ROS_DISTRO === "undefined") {
-        outputChannel.appendLine("ROS environment not detected. ROS 2 features will be limited. Please install ROS 2 or configure a ROS setup script.");
+    if (typeof env?.ROS_DISTRO === "undefined") {
+        // ROS is not detected, check if we should prompt for installation
+        await install_ros.promptInstallRosIfNeeded();
         processingWorkspace = false;
         return;
     }
@@ -924,7 +1103,7 @@ export async function activateEnvironment(context: vscode.ExtensionContext) {
     outputChannel.appendLine(`Determining build tool for workspace: ${vscode.workspace.rootPath}`);
 
     // Determine if we're in a ROS workspace.
-    let buildToolDetected = await buildtool.determineBuildTool(vscode.workspace.rootPath);
+    let buildToolDetected = await buildtool.determineBuildTool(vscode.workspace.rootPath ?? "");
 
     // http://www.ros.org/reps/rep-0149.html#environment-variables
     // Learn more about ROS_VERSION definition.
@@ -972,7 +1151,7 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
 
     // Processing a new environment can take time which introduces a race condition. 
     // Wait to atomicly switch by composing a new environment block then switching at the end.
-    let newEnv = undefined;
+    let newEnv: Record<string, string | undefined> | undefined = undefined;
 
     outputChannel.appendLine("Sourcing ROS and Workspace");
 
@@ -980,12 +1159,7 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
 
     const config = vscode_utils.getExtensionConfiguration();
 
-    let rosSetupScript = config.get("rosSetupScript", "");
-
-    // If no setup script is configured, try to get one from the workspace (e.g., via pixi if configured)
-    if (!rosSetupScript) {
-        rosSetupScript = vscode_utils.getRosSetupScript();
-    }
+    let rosSetupScript = vscode_utils.getRosSetupScript();
 
     // If the workspace setup script is not set, try to find the ROS setup script in the environment
     let attemptWorkspaceDiscovery = true;
@@ -994,9 +1168,9 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
         // Regular expression to match '${workspaceFolder}'
         const regex = "\$\{workspaceFolder\}";
         if (rosSetupScript.includes(regex)) {
-            if (vscode.workspace.workspaceFolders.length === 1) {
+            if ((vscode.workspace.workspaceFolders?.length ?? 0) === 1) {
                 // Replace all occurrences of '${workspaceFolder}' with the workspace string
-                rosSetupScript = rosSetupScript.replace(regex, vscode.workspace.workspaceFolders[0].uri.fsPath);
+                rosSetupScript = rosSetupScript.replace(regex, vscode.workspace.workspaceFolders![0].uri.fsPath);
             } else {
                 outputChannel.appendLine(`Multiple or no workspaces found, but the ROS setup script setting \"ROS2.rosSetupScript\" is configured with '${rosSetupScript}'`);
             }
@@ -1054,7 +1228,7 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
         }
 
         if (distro) {
-            let setupScript: string;
+            let setupScript: string = "";
             try {
                 let globalInstallPath: string;
                 if (process.platform === "win32") {
@@ -1074,16 +1248,16 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
                 await vscode.window.setStatusBarMessage(`Could not source ROS setup script at "${setupScript}".`);
             }
         } else if (process.env.ROS_DISTRO) {
-            newEnv = process.env;
+            newEnv = { ...process.env };
         }
     }
 
     let workspaceOverlayPath: string = "";
     // Source the workspace setup over the top.
 
-    if (newEnv && newEnv.ROS_VERSION === "1") {
+    if (newEnv && (newEnv as Record<string, string>).ROS_VERSION === "1") {
         outputChannel.appendLine(`RDE ROS 2 does not support ROS 1`);
-    } else if (newEnv) {    // FUTURE: Revisit if ROS_VERSION changes - not clear it will be called 3
+    } else if (newEnv && vscode.workspace.rootPath) {    // FUTURE: Revisit if ROS_VERSION changes - not clear it will be called 3
         if (!await exists(workspaceOverlayPath)) {
             workspaceOverlayPath = path.join(`${vscode.workspace.rootPath}`, "install");
         }
@@ -1095,7 +1269,7 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
         ext: ros_utils.getSetupScriptExtension(),
     });
 
-    if (await exists(wsSetupScript)) {
+    if (workspaceOverlayPath && await exists(wsSetupScript)) {
         outputChannel.appendLine(`Workspace overlay path: ${wsSetupScript}`);
 
         try {
@@ -1103,7 +1277,7 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
         } catch (_err) {
             vscode.window.showErrorMessage("Failed to source the workspace setup file.");
         }
-    } else {
+    } else if (workspaceOverlayPath) {
         outputChannel.appendLine(`Not sourcing workspace does not exist yet: ${wsSetupScript}. Need to build workspace.`);
     }
 
@@ -1114,4 +1288,3 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
         onEnvChanged.fire();
     }
 }
-

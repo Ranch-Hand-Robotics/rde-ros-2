@@ -7,28 +7,34 @@ import * as vscode from "vscode";
 
 import * as extension from "../../extension";
 import * as ros2_monitor from "./ros2-monitor"
-import { env } from "../../extension";
+
+async function runDaemonCommand(action: "start" | "stop"): Promise<void> {
+    const command = `ros2 daemon ${action}`;
+    const exec = util.promisify(child_process.exec);
+    extension.outputChannel.appendLine(`Running ${command} (ROS_DISTRO=${extension.env?.ROS_DISTRO || "unset"}, ROS_DOMAIN_ID=${extension.env?.ROS_DOMAIN_ID || "0"})`);
+    try {
+        const { stdout, stderr } = await exec(command, { env: extension.env, timeout: 30000 });
+        if (stdout.trim()) { extension.outputChannel.appendLine(stdout.trim()); }
+        if (stderr.trim()) { extension.outputChannel.appendLine(stderr.trim()); }
+        extension.outputChannel.appendLine(`Daemon ${action} command completed`);
+    } catch (error) {
+        extension.outputChannel.appendLine(`Daemon ${action} failed: ${error.message}`);
+        throw error;
+    }
+}
 
 /**
  * start the ROS2 daemon.
  */
 export async function startDaemon() {
-    const command: string = "ros2 daemon start";
-    const exec = util.promisify(child_process.exec);
-    extension.outputChannel.appendLine("Attempting to start daemon with " + command);
-    await exec(command, { env: env });
-    extension.outputChannel.appendLine("Daemon start command completed");
+    await runDaemonCommand("start");
 }
 
 /**
  * stop the ROS2 daemon.
  */
 export async function stopDaemon() {
-    const command: string = "ros2 daemon stop";
-    const exec = util.promisify(child_process.exec);
-    extension.outputChannel.appendLine("Attempting to stop daemon with " + command);
-    await exec(command, { env: env });
-    extension.outputChannel.appendLine("Daemon stop command completed");
+    await runDaemonCommand("stop");
 }
 
 /**
@@ -38,6 +44,7 @@ export class StatusBarItem {
     private item: vscode.StatusBarItem;
     private timeout: NodeJS.Timeout;
     private ros2cli: ros2_monitor.XmlRpcApi;
+    private disposed = false;
 
     public constructor() {
         this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 200);
@@ -50,16 +57,19 @@ export class StatusBarItem {
     }
 
     public activate() {
+        if (this.disposed) { return; }
         this.item.show();
         this.timeout = setTimeout(() => this.update(), 200);
     }
 
     public dispose() {
+        this.disposed = true;
         clearTimeout(this.timeout);
         this.item.dispose();
     }
 
     private async update() {
+        if (this.disposed) { return; }
         let status: boolean = false;
         try {
             const result = await this.ros2cli.getNodeNamesAndNamespaces();
@@ -67,6 +77,7 @@ export class StatusBarItem {
         } catch (error) {
             // Do nothing
         } finally {
+            if (this.disposed) { return; }
             const statusIcon = status ? "$(check)" : "$(x)";
             let ros = "ROS";
 
@@ -74,7 +85,7 @@ export class StatusBarItem {
             // https://github.com/ros/ros_environment
             const rosVersionChecker = "ROS_VERSION";
             const rosDistroChecker = "ROS_DISTRO";
-            if (rosVersionChecker in extension.env && rosDistroChecker in extension.env) {
+            if (extension.env && rosVersionChecker in extension.env && rosDistroChecker in extension.env) {
                 const rosVersion: string = extension.env[rosVersionChecker];
                 const rosDistro: string = extension.env[rosDistroChecker];
                 ros += `${rosVersion}.${rosDistro}`;
