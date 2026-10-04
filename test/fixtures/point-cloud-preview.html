@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PointCloud2 WebGPU smoke fixture</title>
+  <link rel="stylesheet" href="point-cloud-preview.css">
+  <link rel="stylesheet" href="../../assets/ros/topic-monitor/point-cloud.css">
+</head>
+<body>
+  <h1>/demo/points</h1>
+  <p>Synthetic PointCloud2 browser fixture — no ROS installation required. Build first, then open this file in a WebGPU-capable browser.</p>
+  <section id="preview" class="point-cloud" aria-label="Point cloud preview"></section>
+  <script src="../../dist/point-cloud-viewer.js"></script>
+  <script>
+    // Colored sphere above a rippling surface, with known XYZ and packed RGB.
+    const points = [];
+    for (let y = -100; y <= 100; y++) {
+      for (let x = -100; x <= 100; x++) {
+        const px = x / 35, py = y / 35;
+        points.push([px, py, Math.sin(px * 2) * Math.cos(py * 2) * 0.15 - 1,
+          ((x + 100) / 200 * 255) << 16 | ((y + 100) / 200 * 255) << 8 | 180]);
+      }
+    }
+    for (let i = 0; i < 180; i++) {
+      for (let j = 1; j < 90; j++) {
+        const az = i * Math.PI / 90, el = j * Math.PI / 90;
+        points.push([Math.cos(az) * Math.sin(el), Math.sin(az) * Math.sin(el), Math.cos(el) + 0.7,
+          0xff4000 | Math.round(j / 90 * 255)]);
+      }
+    }
+    const bytes = new Uint8Array(points.length * 16);
+    const view = new DataView(bytes.buffer);
+    points.forEach((point, index) => {
+      for (let axis = 0; axis < 3; axis++) view.setFloat32(index * 16 + axis * 4, point[axis], true);
+      view.setUint32(index * 16 + 12, point[3], true);
+    });
+    window.fixtureCloud = {
+      width: points.length, height: 1, point_step: 16, row_step: bytes.length,
+      is_bigendian: false, header: { frame_id: "demo_lidar" }, data: bytes,
+      fields: ["x", "y", "z", "rgb"].map((name, index) => ({ name, offset: index * 4, datatype: index === 3 ? 6 : 7, count: 1 }))
+    };
+    window.preview = window.createPointCloudViewer(document.getElementById("preview"));
+    window.preview.update(window.fixtureCloud);
+  </script>
+</body>
+</html>

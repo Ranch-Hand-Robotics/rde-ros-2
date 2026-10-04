@@ -10,6 +10,7 @@ The ROS 2 Topic Monitor feature provides an RQT-like interface for monitoring to
 - **Message Display**: 
   - Generic messages shown as formatted JSON
   - Raw and compressed image topics displayed as images
+  - PointCloud2 topics displayed as interactive 3D point clouds using raw WebGPU
 - **Metrics**: View publisher count, subscriber count, and QoS details in tooltips
 - **Play/Pause Controls**: Pause and resume topic monitoring per topic or all at once
 
@@ -85,6 +86,48 @@ Most ROS 2 message types are displayed as formatted JSON with syntax highlightin
 Raw `sensor_msgs/msg/Image` and compressed `sensor_msgs/msg/CompressedImage` topics are rendered in the webview. Raw previews support common RGB/BGR and monochrome encodings, including 16-bit depth images, with row stride and endianness preserved.
 
 Image monitoring uses a direct `rclpy` subscription in the selected ROS/Pixi Python environment, rather than converting every image byte to YAML through `ros2 topic echo`. The subscriber uses best-effort, volatile QoS with a depth-one queue and throttles before base64 encoding. The refresh slider controls this source-side preview rate without restarting the subscription. Pausing or closing the monitor stops its subscriber process.
+
+### PointCloud2 preview
+
+Subscribe to a `sensor_msgs/msg/PointCloud2` topic to open the WebGPU preview:
+
+- **Orbit:** drag with the left mouse button, or focus the canvas and use arrow keys.
+- **Zoom:** scroll, or use `+` / `-`. **Fit view** (or `F`) fits the latest cloud.
+  Zoom can move inside the cloud for millimeter and submillimeter close-ups around
+  its center. Camera clipping follows the zoom distance; only a one-micrometer
+  minimum camera-to-center distance remains. Detail is limited by the source
+  point spacing and coordinate precision, not the cloud's overall size.
+- **Frame rotation:** enter X, Y, and Z angles in degrees, applied in that order.
+  These fields also update when dragging or using the arrow keys, so they describe
+  the current preview orientation. The initial view uses ROS's +Z-up convention.
+  **Reset** restores the initial view and zeroes all three angles; **Fit view** and
+  zoom do not change them. These are preview rotations, not ROS TF transforms.
+- **Color:** choose **Depth**, **RGB**, or **RGB + depth**. The blend slider mixes
+  embedded color with a depth ramp. Without RGB fields, depth is used automatically.
+- **Depth:** distance in meters from the message's sensor-frame origin (not the
+  orbit camera). Auto depth uses the rendered cloud's range; turn it off and set
+  Near/Far to keep the same color scale across messages. Far must exceed Near.
+- **Point size:** adjust screen-space point diameter. The depth buffer hides points
+  behind closer points. Optional RGB frame axes are drawn at the cloud center as
+  an orientation aid, not a TF origin marker.
+
+The preview supports numeric XYZ fields, packed FLOAT32/UINT32 `rgb` or `rgba`,
+and separate `r`, `g`, `b` channels (integer 0–255 or floating-point 0–1).
+Endianness, field offsets, and organized-cloud row padding are respected.
+Invalid XYZ points are skipped. The latest cloud replaces the previous one;
+the default refresh is 5 Hz and can be adjusted. Camera orientation is retained
+as messages arrive; use **Fit view** when the scene bounds change.
+
+To bound preview memory and GPU work, payloads are limited to 32 MiB and clouds
+over 200,000 points are evenly sampled. Counts and sampling are shown below the
+canvas. This is a lightweight preview: it does not resolve TF transforms, accumulate
+cloud history, or reproduce all RViz display features. Topic transport still uses
+`ros2 topic echo`, so reduce the publisher's rate/size for very large clouds.
+
+WebGPU requires a compatible GPU/driver and a recent VS Code with hardware
+acceleration. An explicit notice is shown when WebGPU is unavailable or the GPU
+device is lost; close and reopen the topic after correcting the issue. There is
+no WebGL fallback or external rendering-library dependency.
 
 ## Tips
 

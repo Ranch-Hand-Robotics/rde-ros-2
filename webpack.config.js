@@ -84,4 +84,15 @@ const ros2_webview_config = {
 };
 
 
-module.exports = [extensionConfig, ros2_webview_config, installRosWorkerConfig];
+/** @type WebpackConfig */
+const pointCloudConfig = {
+  ...baseConfig,
+  target: ["web", "es2022"],
+  entry: "./src/ros/ros2/webview/point-cloud-viewer.ts",
+  output: {
+    path: path.resolve(__dirname, "dist"),
+    filename: "point-cloud-viewer.js",
+  },
+};
+
+module.exports = [extensionConfig, ros2_webview_config, installRosWorkerConfig, pointCloudConfig];

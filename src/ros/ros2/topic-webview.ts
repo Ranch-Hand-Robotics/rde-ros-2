@@ -5,7 +5,8 @@ import * as crypto from "crypto";
 import * as vscode from "vscode";
 
 import * as topicMonitor from "./topic-monitor";
-import { isImageType, TopicMessage } from "./topic-types";
+import { isImageType, isPointCloudType, TopicMessage } from "./topic-types";
+import { MAX_POINT_CLOUD_BYTES } from "./webview/point-cloud-data";
 
 interface TopicWebviewMessage {
   command?: string;
@@ -67,10 +68,22 @@ export function prepareTopicMessage(message: TopicMessage, topicType: string): T
     return message;
   }
 
+  if (!isImageType(topicType) && !isPointCloudType(topicType)) {
+    return message;
+  }
+  if (isPointCloudType(topicType)) {
+    const payload = message.data.data;
+    const length = typeof payload === "string" ? payload.length * 3 / 4 - (payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0)
+      : Array.isArray(payload) || payload instanceof Uint8Array ? payload.length
+      : isRecord(payload) && Array.isArray(payload.data) ? payload.data.length : 0;
+    if (length > MAX_POINT_CLOUD_BYTES) {
+      return { ...message, data: { previewError: "PointCloud2 exceeds the 32 MiB preview limit. Reduce the cloud at the publisher." } };
+    }
+  }
   const encodedData = imageDataToBase64(message.data.data);
-  if (!encodedData) return message;
+  if (encodedData === undefined) return message;
 
-  if (topicType === "sensor_msgs/msg/CompressedImage") {
+  if (isPointCloudType(topicType) || topicType === "sensor_msgs/msg/CompressedImage") {
     return {
       ...message,
       data: {
@@ -140,13 +153,15 @@ export function createTopicMonitorHtml(
   topicName: string,
   topicType: string,
   maxMessages: number = 100,
-  nonce: string = crypto.randomBytes(16).toString("base64")
+  nonce: string = crypto.randomBytes(16).toString("base64"),
+  resources?: { pointCloudScript: string; pointCloudStyle: string }
 ): string {
   const escapedTopicName = escapeHtml(topicName);
   const escapedTopicType = escapeHtml(topicType);
   const isImageTopic = isImageType(topicType);
   const isConsoleStream = isConsoleTopic(topicType);
   const isCompressedImage = topicType === "sensor_msgs/msg/CompressedImage";
+  const isPointCloudTopic = isPointCloudType(topicType);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -155,6 +170,7 @@ export function createTopicMonitorHtml(
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Topic Monitor: ${escapedTopicName}</title>
+  ${isPointCloudTopic && resources ? `<link rel="stylesheet" href="${escapeHtml(resources.pointCloudStyle)}">` : ""}
   <style>
     :root {
       color-scheme: light dark;
@@ -610,7 +626,7 @@ export function createTopicMonitorHtml(
     }
   </style>
 </head>
-<body data-image-topic="${isImageTopic}" data-console-stream="${isConsoleStream}" data-compressed-image="${isCompressedImage}">
+<body data-image-topic="${isImageTopic}" data-console-stream="${isConsoleStream}" data-compressed-image="${isCompressedImage}" data-point-cloud-topic="${isPointCloudTopic}">
   <main class="shell">
     <header class="hero" id="hero">
       <div class="eyebrow"><span class="status-dot" aria-hidden="true"></span><span id="statusText">Live stream</span></div>
@@ -640,13 +656,21 @@ export function createTopicMonitorHtml(
       </div>
     </div>
 
+    ${isPointCloudTopic ? '<section class="point-cloud" id="pointCloud" aria-label="Point cloud preview">Loading PointCloud2 preview…</section>' : ""}
     <section class="messages" id="messageContainer" aria-live="polite" aria-label="Topic messages"></section>
   </main>
 
+  ${isPointCloudTopic && resources ? `<script nonce="${nonce}" src="${escapeHtml(resources.pointCloudScript)}"></script>` : ""}
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     let maxMessages = ${maxMessages};
     const isImageTopic = document.body.dataset.imageTopic === "true";
+    const isPointCloudTopic = document.body.dataset.pointCloudTopic === "true";
+    const pointCloudViewer = isPointCloudTopic && window.createPointCloudViewer
+      ? window.createPointCloudViewer(document.getElementById("pointCloud")) : undefined;
+    if (isPointCloudTopic && !pointCloudViewer) {
+      document.getElementById("pointCloud").textContent = "Point cloud renderer could not be loaded. Rebuild or reinstall the extension.";
+    }
     const isCompressedImage = document.body.dataset.compressedImage === "true";
     const hero = document.getElementById("hero");
     const statusText = document.getElementById("statusText");
@@ -946,6 +970,13 @@ export function createTopicMonitorHtml(
       messageCount.textContent = String(messages.length);
       bufferUsage.textContent = String(messages.length) + " / " + String(maxMessages);
 
+      if (isPointCloudTopic) {
+        const latest = orderedMessages().slice(-1)[0];
+        lastUpdate.textContent = latest ? formatTimestamp(latest.timestamp) : "Waiting";
+        if (latest) pointCloudViewer?.update(latest.data);
+        else pointCloudViewer?.clear();
+        return;
+      }
       if (messages.length === 0) {
         latestImage = undefined;
         messageContainer.replaceChildren();
@@ -1070,24 +1101,32 @@ export class TopicWebviewManager implements vscode.Disposable {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: []
+        localResourceRoots: isPointCloudType(topicType) ? [
+          vscode.Uri.joinPath(this.context.extensionUri, "dist"),
+          vscode.Uri.joinPath(this.context.extensionUri, "assets", "ros", "topic-monitor")
+        ] : []
       }
     );
 
     this.panels.set(topicName, panel);
-    const messageLimit = isImageType(topicType)
+    const messageLimit = isImageType(topicType) || isPointCloudType(topicType)
       ? this.maxMessagesPerImageTopic
       : this.maxMessagesPerTopic;
     this.messageBuffers.set(topicName, new TopicMessageRingBuffer(messageLimit));
     this.topicTypes.set(topicName, topicType);
-    if (isImageType(topicType) || isConsoleTopic(topicType)) {
+    if (isImageType(topicType) || isPointCloudType(topicType) || isConsoleTopic(topicType)) {
       this.refreshIntervals.set(topicName, this.defaultImagePreviewIntervalMs);
     }
     panel.webview.html = createTopicMonitorHtml(
       panel.webview.cspSource,
       topicName,
       topicType,
-      messageLimit
+      messageLimit,
+      undefined,
+      isPointCloudType(topicType) ? {
+        pointCloudScript: panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "dist", "point-cloud-viewer.js")).toString(),
+        pointCloudStyle: panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "assets", "ros", "topic-monitor", "point-cloud.css")).toString()
+      } : undefined
     );
 
     panel.webview.onDidReceiveMessage(
@@ -1163,7 +1202,7 @@ export class TopicWebviewManager implements vscode.Disposable {
 
       const topicType = this.topicTypes.get(topicName) ?? "";
       // Images are throttled before encoding in the subscriber, not after IPC.
-      if (isConsoleTopic(topicType)) {
+      if (isPointCloudType(topicType) || isConsoleTopic(topicType)) {
         const now = Date.now();
         const lastDelivery = this.lastImageDelivery.get(topicName) ?? 0;
         const interval = this.refreshIntervals.get(topicName) ?? this.defaultImagePreviewIntervalMs;
@@ -1207,7 +1246,8 @@ export class TopicWebviewManager implements vscode.Disposable {
         break;
       case "setBufferLength":
         if (typeof message.maxMessages === "number" && Number.isInteger(message.maxMessages)) {
-          this.messageBuffers.get(topicName)?.resize(Math.min(500, Math.max(1, message.maxMessages)));
+          const limit = isPointCloudType(this.topicTypes.get(topicName) ?? "") ? 1 : 500;
+          this.messageBuffers.get(topicName)?.resize(Math.min(limit, Math.max(1, message.maxMessages)));
         }
         break;
       case "getHistory":
