@@ -49,7 +49,15 @@ describe("Distribution view actions", () => {
     replaceProperty(vscode.workspace, "workspaceFolders", undefined);
     replaceProperty(vscode.workspace, "getConfiguration", (_section: string, resource?: vscode.Uri) => ({
       get: (key: string) => key === "pixiRoot" ? root : activeScript,
-      inspect: () => ({ globalValue: globalScript, workspaceValue: workspaceScript, workspaceFolderValue: resource ? folderScript : undefined }),
+      inspect: (key: string) => {
+        if (key === "pixiInstallLocationsByMachine") {
+          return { globalValue: { [vscode.env.machineId]: root } };
+        }
+        if (key === "pixiRoot") {
+          return undefined;
+        }
+        return { globalValue: globalScript, workspaceValue: workspaceScript, workspaceFolderValue: resource ? folderScript : undefined };
+      },
       update: async (...args: unknown[]) => { updates.push(args); },
     }));
     replaceProperty(vscode.workspace, "fs", {

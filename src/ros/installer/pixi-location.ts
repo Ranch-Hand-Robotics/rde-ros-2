@@ -21,31 +21,32 @@ function defaultPixiRoot(platform: NodeJS.Platform, home: string): string {
     return "c:\\pixi_ws";
   }
   if (platform === "darwin") {
-    return path.join(home, "pixi_ws");
+    return path.posix.join(home, "pixi_ws");
   }
   return "";
 }
 
-function absoluteLocation(location: string | undefined): string | undefined {
+function absoluteLocation(location: string | undefined, platform = process.platform): string | undefined {
   const trimmed = location?.trim();
-  return trimmed && path.isAbsolute(trimmed) ? trimmed : undefined;
+  const platformPath = platform === "win32" ? path.win32 : path.posix;
+  return trimmed && platformPath.isAbsolute(trimmed) ? trimmed : undefined;
 }
 
 /** Resolve the per-machine Pixi root, migrating the legacy setting only before a machine map exists. */
 export function resolvePixiInstallRoot(options: PixiLocationOptions): string {
-  const machineOverride = absoluteLocation(options.machineOverride);
+  const machineOverride = absoluteLocation(options.machineOverride, options.platform);
   if (machineOverride) {
     return machineOverride;
   }
 
-  const machineLocation = absoluteLocation(options.locations[options.machineId]);
+  const machineLocation = absoluteLocation(options.locations[options.machineId], options.platform);
   if (machineLocation) {
     return machineLocation;
   }
 
   const hasMachineEntries = Object.keys(options.locations).length > 0;
   if (!hasMachineEntries) {
-    const legacyLocation = absoluteLocation(options.legacyRoot);
+    const legacyLocation = absoluteLocation(options.legacyRoot, options.platform);
     if (legacyLocation) {
       return legacyLocation;
     }

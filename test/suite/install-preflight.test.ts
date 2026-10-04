@@ -19,7 +19,7 @@ describe("ROS installation preflight", () => {
   function prepareIncompleteWindowsTarget(entries = ["pixi.lock", "pixi.toml"]): void {
     services.platform = "win32";
     services.arch = "x64";
-    target = { kind: "pixi", distro: "jazzy", workspace: path.join("C:\\pixi_ws", "jazzy") };
+    target = { kind: "pixi", distro: "jazzy", workspace: path.join(os.tmpdir(), "pixi_ws", "jazzy") };
     const manifestPath = path.join(target.workspace, "pixi.toml");
     const lockPath = path.join(target.workspace, "pixi.lock");
     const manifest = pixiManifest("jazzy", "win-64");
@@ -243,7 +243,7 @@ describe("ROS installation preflight", () => {
 
   it("allows Pixi preflight to continue with a warning for queued Windows file operations", async () => {
     services.platform = "win32";
-    target = { kind: "pixi", distro: "jazzy", workspace: "C:\\pixi_ws\\jazzy" };
+    target = { kind: "pixi", distro: "jazzy", workspace: path.join(os.tmpdir(), "pixi_ws", "jazzy") };
     services.run = async (command) => {
       if (command === "cmd.exe") {
         return { exitCode: 0, stdout: "Microsoft Windows [Version 10.0.19045]", stderr: "" };

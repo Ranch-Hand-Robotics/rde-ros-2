@@ -426,6 +426,13 @@ describe("ROS installation completion and validation", () => {
 });
 
 describe("Registered ROS installation health command", () => {
+  before(async () => {
+    const packagedExtension = vscode.extensions.getExtension("Ranch-Hand-Robotics.rde-ros-2");
+    assert.ok(packagedExtension, "The extension under test must be available");
+    await packagedExtension.activate();
+    assert.ok((await vscode.commands.getCommands(true)).includes("ROS2.checkInstallation"));
+  });
+
   it("returns a structured failure from the packaged command for an absent installation", async () => {
     const result = await vscode.commands.executeCommand<health.HealthReport>("ROS2.checkInstallation", {
       kind: "setup", distro: "jazzy",

@@ -817,7 +817,7 @@
         "reset:ros:macos": "node scripts/reset-ros-macos.js",
         "test:installer": "npm run test-compile && node --test test/pixi-installer.test.js test/reset-ros-macos.test.js",
         "lint": "eslint -p ./",
-        "pretest": "npm run test-compile",
+        "pretest": "npm run build && npm run test-compile",
         "test": "node ./out/test/runTest.js",
         "headless-test": "xvfb-run -a npm test",
         "vscode:prepublish": "npm run package",

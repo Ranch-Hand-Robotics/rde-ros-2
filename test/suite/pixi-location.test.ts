@@ -45,8 +45,8 @@ describe("per-machine Pixi install locations", () => {
       machineOverride: "E:\\local", platform: "win32", home,
     }), "E:\\local");
     assert.strictEqual(resolvePixiInstallRoot({
-      machineId: "machine-a", locations: {}, platform: "darwin", home,
-    }), path.join(home, "pixi_ws"));
+      machineId: "machine-a", locations: {}, platform: "darwin", home: "/Users/tester",
+    }), "/Users/tester/pixi_ws");
     assert.strictEqual(resolvePixiInstallRoot({
       machineId: "machine-a", locations: {}, platform: "linux", home,
     }), "");
@@ -66,8 +66,33 @@ describe("per-machine Pixi install locations", () => {
       },
     } as unknown as vscode.WorkspaceConfiguration;
 
-    await cachePixiInstallRoot("D:\\ros\\pixi", config, "machine-a");
-    assert.deepStrictEqual(persisted, { "machine-a": "D:\\ros\\pixi", "machine-b": "E:\\existing" });
+    const root = path.resolve("pixi-location-fixture");
+    await cachePixiInstallRoot(root, config, "machine-a");
+    assert.deepStrictEqual(persisted, { "machine-a": root, "machine-b": "E:\\existing" });
     assert.strictEqual(target, vscode.ConfigurationTarget.Global);
+  });
+
+  it("rejects relative roots on every target platform and Windows roots on POSIX", () => {
+    for (const platform of ["win32", "darwin", "linux"] as const) {
+      const options = { machineId: "machine-a", locations: {}, platform, home: "/Users/tester" };
+      const fallback = resolvePixiInstallRoot(options);
+      assert.strictEqual(resolvePixiInstallRoot({
+        ...options, machineOverride: "relative/pixi", legacyRoot: "relative/legacy",
+        locations: { "machine-a": "relative/cache" },
+      }), fallback);
+      if (platform !== "win32") {
+        assert.strictEqual(resolvePixiInstallRoot({
+          ...options, machineOverride: "D:\\pixi", legacyRoot: "D:\\legacy",
+          locations: { "machine-a": "D:\\cache" },
+        }), fallback);
+      }
+    }
+  });
+
+  it("does not persist a relative install root", async () => {
+    const config = {
+      update: async () => assert.fail("Invalid roots must not be persisted"),
+    } as unknown as vscode.WorkspaceConfiguration;
+    await assert.rejects(cachePixiInstallRoot("relative/pixi", config, "machine-a"), /absolute path/);
   });
 });
