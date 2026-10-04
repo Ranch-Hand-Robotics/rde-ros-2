@@ -9,7 +9,16 @@ import * as vscode from "vscode";
 import * as extension from "../../src/extension";
 import * as health from "../../src/ros/installer/health-check";
 import * as preflight from "../../src/ros/installer/install-preflight";
-import { installRos, checkRosInstallation, runInstallTerminal, preflightPixiEnvironment, createPixiTarget, ROS2_DISTROS } from "../../src/ros/installer/install-ros";
+import * as vscodeUtils from "../../src/vscode-utils";
+import * as rosUtils from "../../src/ros/utils";
+import * as rosBuildUtils from "../../src/ros/build-env-utils";
+import * as ros from "../../src/ros/ros";
+import * as buildTool from "../../src/build-tool/build-tool";
+import * as rosShell from "../../src/build-tool/ros-shell";
+import * as debugManager from "../../src/debugger/manager";
+import * as installer from "../../src/ros/installer/install-ros";
+import * as pixiLocation from "../../src/ros/installer/pixi-location";
+import { installRos, checkRosInstallation, runInstallTerminal, preflightPixiEnvironment, createPixiTarget, confirmPixiBootstrap, ROS2_DISTROS } from "../../src/ros/installer/install-ros";
 import { InstallDiagnostics } from "../../src/ros/installer/install-diagnostics";
 
 // Real orchestration with a nonexecuting terminal and deterministic health results.
@@ -25,6 +34,8 @@ describe("ROS installation completion and validation", () => {
   let infoMessages: string[];
   let terminalCount: number;
   let expectedShell: string;
+  let generatedScript: Buffer;
+  let configurationUpdates: unknown[][];
 
   function replace(object: object, key: string, value: unknown): void {
     const descriptor = Object.getOwnPropertyDescriptor(object, key);
@@ -49,11 +60,16 @@ describe("ROS installation completion and validation", () => {
     infoMessages = [];
     terminalCount = 0;
     expectedShell = "/bin/bash";
+    configurationUpdates = [];
     replace(process, "platform", "linux");
     replace(vscode.workspace, "isTrusted", true);
     replace(extension, "outputChannel", { appendLine: () => undefined, show: () => undefined });
     replace(extension, "extPath", path.resolve(__dirname, "../../.."));
     replace(extension, "rosDistributionsProvider", null);
+    replace(extension, "activateEnvironment", async (_context: vscode.ExtensionContext) => {});
+    replace(vscodeUtils, "getExtensionConfiguration", () => ({
+      update: async (...args: unknown[]) => { configurationUpdates.push(args); },
+    }));
     replace(preflight, "preflightInstallation", async () => ({ ready: true, checks: [] }));
     replace(extension, "extensionContext", {
       globalStorageUri: vscode.Uri.file(directory),
@@ -66,23 +82,28 @@ describe("ROS installation completion and validation", () => {
     replace(vscode.window, "showErrorMessage", async (message: string) => { errorMessages.push(message); });
     replace(vscode.window, "showWarningMessage", async () => undefined);
     replace(vscode.window, "withProgress", async (_options: unknown, task: () => Promise<unknown>) => task());
-    let close: ((terminal: unknown) => void) | undefined;
-    replace(vscode.window, "onDidCloseTerminal", (listener: typeof close) => {
-      close = listener;
-      return { dispose: () => { close = undefined; } };
+    let ended: ((event: vscode.TaskProcessEndEvent) => void) | undefined;
+    replace(vscode.tasks, "onDidEndTaskProcess", (listener: typeof ended) => {
+      ended = listener;
+      return { dispose: () => { ended = undefined; } };
     });
-    replace(vscode.window, "createTerminal", (options: vscode.TerminalOptions) => {
+    replace(vscode.tasks, "onDidEndTask", () => ({ dispose: () => {} }));
+    replace(vscode.tasks, "executeTask", async (task: vscode.Task) => {
       terminalCount++;
-      assert.strictEqual(options.shellPath, expectedShell);
+      const options = (task.execution as vscode.ShellExecution).options;
+      assert.strictEqual(options.executable, expectedShell);
       assert.ok(Array.isArray(options.shellArgs));
-      const terminal = {
-        exitStatus: terminalExit === undefined ? undefined : { code: terminalExit },
-        show: () => {
-          assert.ok(close, "Must subscribe before showing/running the terminal");
-          close(terminal);
-        },
-      };
-      return terminal;
+      assert.strictEqual(task.presentationOptions.close, false);
+      if (!vscode.workspace.workspaceFolders?.length) {
+        assert.strictEqual(task.scope, vscode.TaskScope.Global);
+        assert.strictEqual(options.cwd, os.homedir());
+      }
+      const report = JSON.parse(await fs.promises.readFile(reportPath, "utf8"));
+      generatedScript = await fs.promises.readFile(report.artifacts.script);
+      const execution = { task, terminate: () => {} };
+      assert.ok(ended, "Must subscribe before starting the task");
+      ended({ execution, exitCode: terminalExit });
+      return execution;
     });
     replace(health, "validateInstallation", async (target: health.HealthTarget): Promise<health.HealthReport> => {
       healthCalls++;
@@ -128,16 +149,162 @@ describe("ROS installation completion and validation", () => {
     assert.strictEqual(terminalCount, 1, "A repaired system must be rescanned and permitted on retry");
   });
 
-  it("does not continue when preflight warnings are not accepted", async () => {
+  it("continues through preflight warnings and records them in the install log", async () => {
     replace(preflight, "preflightInstallation", async () => ({
       ready: true,
-      checks: [{ id: "held-packages", status: "warning", detail: "Intentional package holds" }],
+      checks: [{ id: "held-packages", status: "warning", detail: "Intentional package holds", remediation: "Review held packages." }],
     }));
     await installRos();
+    assert.strictEqual(terminalCount, 1);
+    assert.strictEqual(healthCalls, 1);
+    const report = JSON.parse(await fs.promises.readFile(reportPath, "utf8"));
+    assert.strictEqual(report.status, "passed");
+    assert.strictEqual(report.preflight.checks[0].status, "warning");
+    const log = await fs.promises.readFile(report.artifacts.log, "utf8");
+    assert.match(log, /held-packages: warning: Intentional package holds/);
+    assert.match(log, /Action: Review held packages\./);
+  });
+
+  it("lets the user stop when recommended Windows settings are disabled", async () => {
+    replace(preflight, "preflightInstallation", async () => ({
+      ready: true,
+      checks: [
+        { id: "windows-developer-mode", status: "warning", detail: "Developer Mode is disabled." },
+        { id: "windows-long-paths", status: "warning", detail: "Long paths are disabled." },
+      ],
+    }));
+    let prompt: unknown[] = [];
+    replace(vscode.window, "showWarningMessage", async (...args: unknown[]) => {
+      prompt = args;
+      return "Stop";
+    });
+
+    await installRos();
+    assert.deepStrictEqual(prompt.slice(2), ["Continue Now", "Stop"]);
     assert.strictEqual(terminalCount, 0);
-    assert.strictEqual(healthCalls, 0);
     const report = JSON.parse(await fs.promises.readFile(reportPath, "utf8"));
     assert.strictEqual(report.status, "blocked");
+    assert.match(await fs.promises.readFile(report.artifacts.log, "utf8"), /Windows settings recommendation choice: Stop/);
+  });
+
+  it("continues when the user accepts the Windows settings recommendation", async () => {
+    replace(preflight, "preflightInstallation", async () => ({
+      ready: true,
+      checks: [{ id: "windows-developer-mode", status: "warning", detail: "Developer Mode is disabled." }],
+    }));
+    let prompt: unknown[] = [];
+    replace(vscode.window, "showWarningMessage", async (...args: unknown[]) => {
+      prompt = args;
+      return "Continue Now";
+    });
+
+    await installRos();
+    assert.deepStrictEqual(prompt.slice(2), ["Continue Now", "Stop"]);
+    assert.strictEqual(terminalCount, 1);
+    const report = JSON.parse(await fs.promises.readFile(reportPath, "utf8"));
+    assert.strictEqual(report.status, "passed");
+    assert.match(await fs.promises.readFile(report.artifacts.log, "utf8"), /Windows settings recommendation choice: Continue Now/);
+  });
+
+  it("asks for a Pixi install folder and uses and caches the selected root", async () => {
+    replace(process, "platform", "win32");
+    const selectedRoot = path.join(directory, "custom-pixi-root");
+    let dialog: vscode.OpenDialogOptions | undefined;
+    let cachedRoot: string | undefined;
+    replace(vscode.window, "showOpenDialog", async (options: vscode.OpenDialogOptions) => {
+      dialog = options;
+      return [vscode.Uri.file(selectedRoot)];
+    });
+    replace(pixiLocation, "cachePixiInstallRoot", async (root: string) => { cachedRoot = root; });
+    replace(preflight, "preflightInstallation", async target => {
+      assert.strictEqual(target.kind, "pixi");
+      assert.strictEqual(target.workspace, path.join(selectedRoot, "jazzy"));
+      return { ready: false, checks: [{ id: "test-stop", status: "blocked", detail: "Stop before install." }] };
+    });
+
+    await installRos();
+    assert.strictEqual(dialog?.canSelectFolders, true);
+    assert.strictEqual(dialog?.canSelectFiles, false);
+    assert.match(dialog?.title ?? "", /ROS 2 jazzy/);
+    assert.strictEqual(path.normalize(cachedRoot ?? "").toLowerCase(), path.normalize(selectedRoot).toLowerCase());
+    assert.strictEqual(terminalCount, 0);
+  });
+
+  it("cancels before preflight when no Pixi install folder is selected", async () => {
+    replace(process, "platform", "win32");
+    reportPath = "not-created";
+    let preflightCalled = false;
+    replace(vscode.window, "showOpenDialog", async () => undefined);
+    replace(preflight, "preflightInstallation", async () => {
+      preflightCalled = true;
+      return { ready: true, checks: [] };
+    });
+
+    await installRos();
+    assert.strictEqual(preflightCalled, false);
+    assert.strictEqual(reportPath, "not-created");
+    assert.strictEqual(terminalCount, 0);
+  });
+
+  it("asks before removing a recognized incomplete Pixi target and leaves it intact on Stop", async () => {
+    replace(process, "platform", "win32");
+    replace(vscode.window, "showOpenDialog", async () => [vscode.Uri.file(directory)]);
+    replace(pixiLocation, "cachePixiInstallRoot", async () => {});
+    replace(vscodeUtils, "getExtensionConfiguration", () => ({
+      inspect: () => ({ globalValue: directory }),
+      update: async (...args: unknown[]) => { configurationUpdates.push(args); },
+    }));
+    replace(preflight, "preflightInstallation", async () => ({
+      ready: true,
+      checks: [{ id: "target", status: "warning", detail: "The installation target appears incomplete." }],
+    }));
+    const workspace = path.join(directory, "jazzy");
+    await fs.promises.mkdir(workspace);
+    let prompt: unknown[] = [];
+    replace(vscode.window, "showWarningMessage", async (...args: unknown[]) => {
+      prompt = args;
+      return "Stop";
+    });
+
+    await installRos();
+    assert.deepStrictEqual(prompt.slice(2), ["Remove and Start Over", "Stop"]);
+    assert.match(prompt[0] as string, /appears to be incomplete/);
+    assert.strictEqual(fs.existsSync(workspace), true);
+    assert.strictEqual(terminalCount, 0);
+  });
+
+  it("installs ROS in an empty window using a global task rooted at the user home", async () => {
+    replace(vscode.workspace, "workspaceFolders", undefined);
+    replace(vscode.workspace, "workspaceFile", undefined);
+    await installRos();
+    const report = JSON.parse(await fs.promises.readFile(reportPath, "utf8"));
+    assert.strictEqual(report.status, "passed");
+    assert.strictEqual(terminalCount, 1);
+    assert.strictEqual(healthCalls, 1);
+    assert.deepStrictEqual(configurationUpdates.map(update => update[2]), [
+      vscode.ConfigurationTarget.Global, vscode.ConfigurationTarget.Global,
+    ]);
+  });
+
+  it("offers to open Prefix.dev from the Pixi installation prompt and asks for consent again", async () => {
+    replace(process, "platform", "win32");
+    const promptCalls: unknown[][] = [];
+    const choices = ["Visit Prefix.dev", "Yes"];
+    let openedUrl: string | undefined;
+    replace(vscode.window, "showWarningMessage", async (...args: unknown[]) => {
+      promptCalls.push(args);
+      return choices.shift();
+    });
+    replace(vscode.env, "openExternal", async (uri: vscode.Uri) => {
+      openedUrl = uri.toString();
+      return true;
+    });
+
+    assert.strictEqual(await confirmPixiBootstrap(), true);
+    assert.strictEqual(openedUrl, "https://prefix.dev/");
+    assert.strictEqual(promptCalls.length, 2);
+    assert.match(promptCalls[0][0] as string, /Pixi, the package manager by Prefix\.dev/);
+    assert.deepStrictEqual(promptCalls[0].slice(2), ["Yes", "No", "Visit Prefix.dev"]);
   });
 
   it("keeps Pixi solver failures in diagnostic staging without creating the ROS target", async () => {
@@ -251,10 +418,10 @@ describe("ROS installation completion and validation", () => {
     const diagnostics = await InstallDiagnostics.create(directory, {
       kind: "pixi", distro: "jazzy", workspace: directory,
     }, "install");
+    reportPath = diagnostics.reportPath;
     const distro = ROS2_DISTROS.find((entry) => entry.name === "jazzy");
     assert.strictEqual(await runInstallTerminal(distro, diagnostics, "exit 0\r\n", true), 0);
-    const script = await fs.promises.readFile(diagnostics.report.artifacts.script);
-    assert.deepStrictEqual([...script.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+    assert.deepStrictEqual([...generatedScript.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
   });
 });
 

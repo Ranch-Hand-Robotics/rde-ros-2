@@ -2,9 +2,12 @@
 // Licensed under the MIT License.
 
 import * as assert from "assert";
+import * as fs from "fs";
 import * as os from "os";
-import { preflightInstallation, PreflightServices, PathReadiness, parseOsRelease } from "../../src/ros/installer/install-preflight";
+import * as path from "path";
+import { preflightInstallation, PreflightServices, PathReadiness, parseOsRelease, removeIncompletePixiTarget } from "../../src/ros/installer/install-preflight";
 import { HealthTarget } from "../../src/ros/installer/health-check";
+import { pixiManifest } from "../../src/ros/installer/pixi";
 
 describe("ROS installation preflight", () => {
   let services: PreflightServices;
@@ -12,6 +15,32 @@ describe("ROS installation preflight", () => {
   let files: Record<string, string>;
   let paths: Record<string, Partial<PathReadiness>>;
   let commands: string[];
+
+  function prepareIncompleteWindowsTarget(entries = ["pixi.lock", "pixi.toml"]): void {
+    services.platform = "win32";
+    services.arch = "x64";
+    target = { kind: "pixi", distro: "jazzy", workspace: path.join("C:\\pixi_ws", "jazzy") };
+    const manifestPath = path.join(target.workspace, "pixi.toml");
+    const lockPath = path.join(target.workspace, "pixi.lock");
+    const manifest = pixiManifest("jazzy", "win-64");
+    files[manifestPath] = manifest;
+    paths[target.workspace] = { exists: true, directory: true, symbolicLink: false, entries };
+    paths[manifestPath] = { exists: true, directory: false, symbolicLink: false, size: Buffer.byteLength(manifest) };
+    paths[lockPath] = { exists: true, directory: false, symbolicLink: false, size: 16 };
+    services.run = async (command, args) => {
+      commands.push([command, ...args].join(" "));
+      if (command === "cmd.exe") {
+        return { exitCode: 0, stdout: "Microsoft Windows [Version 10.0.19045]", stderr: "" };
+      }
+      if (command === "powershell.exe") {
+        return { exitCode: 0, stderr: "", stdout: JSON.stringify({
+          cbsRebootPending: false, wuRebootRequired: false, pendingFileRenames: false, installerInProgress: false,
+          developerModeEnabled: true, developerModeKnown: true, longPathsEnabled: true, longPathsKnown: true,
+        }) };
+      }
+      return { exitCode: 0, stdout: "pixi 0.81.0", stderr: "" };
+    };
+  }
 
   beforeEach(() => {
     target = { kind: "setup", distro: "jazzy", setupScript: "/opt/ros/jazzy/setup.bash" };
@@ -197,6 +226,7 @@ describe("ROS installation preflight", () => {
       if (command === "powershell.exe") {
         return { exitCode: 0, stderr: "", stdout: JSON.stringify({
           cbsRebootPending: false, wuRebootRequired: true, pendingFileRenames: false, installerInProgress: false,
+          developerModeEnabled: true, developerModeKnown: true, longPathsEnabled: true, longPathsKnown: true,
         }) };
       }
       if (command === "pixi") {
@@ -209,6 +239,63 @@ describe("ROS installation preflight", () => {
     assert.strictEqual(report.checks.find((check) => check.id === "windows-reboot").status, "blocked");
     assert.strictEqual(report.checks.find((check) => check.id === "pixi-bootstrap").status, "warning");
     assert.ok(!commands.some((command) => command.includes("install")));
+  });
+
+  it("allows Pixi preflight to continue with a warning for queued Windows file operations", async () => {
+    services.platform = "win32";
+    target = { kind: "pixi", distro: "jazzy", workspace: "C:\\pixi_ws\\jazzy" };
+    services.run = async (command) => {
+      if (command === "cmd.exe") {
+        return { exitCode: 0, stdout: "Microsoft Windows [Version 10.0.19045]", stderr: "" };
+      }
+      if (command === "powershell.exe") {
+        return { exitCode: 0, stderr: "", stdout: JSON.stringify({
+          cbsRebootPending: false, wuRebootRequired: false, pendingFileRenames: true, installerInProgress: false,
+          developerModeEnabled: true, developerModeKnown: true, longPathsEnabled: true, longPathsKnown: true,
+        }) };
+      }
+      if (command === "pixi") {
+        return { exitCode: null, stdout: "", stderr: "", error: "ENOENT" };
+      }
+      return { exitCode: 0, stdout: "version", stderr: "" };
+    };
+    const report = await preflightInstallation(target, services);
+    assert.strictEqual(report.ready, true, JSON.stringify(report));
+    assert.strictEqual(report.checks.find((check) => check.id === "windows-reboot").status, "warning");
+  });
+
+  it("recognizes only the generated manifest and lockfile as an incomplete Windows Pixi target", async () => {
+    prepareIncompleteWindowsTarget();
+    const report = await preflightInstallation(target, services);
+    assert.strictEqual(report.ready, true, JSON.stringify(report));
+    assert.strictEqual(report.checks.find((check) => check.id === "target").status, "warning");
+    assert.match(report.checks.find((check) => check.id === "target").detail, /appears incomplete/);
+  });
+
+  it("keeps an incomplete-looking target blocked when it contains unrelated files", async () => {
+    prepareIncompleteWindowsTarget(["pixi.lock", "pixi.toml", "notes.txt"]);
+    const report = await preflightInstallation(target, services);
+    assert.strictEqual(report.ready, false);
+    assert.strictEqual(report.checks.find((check) => check.id === "target").status, "blocked");
+  });
+
+  it("removes a confirmed incomplete target but refuses unrelated contents", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "incomplete-pixi-"));
+    const targetDirectory = path.join(directory, "jazzy");
+    await fs.promises.mkdir(targetDirectory);
+    await fs.promises.writeFile(path.join(targetDirectory, "pixi.toml"), pixiManifest("jazzy", "win-64"));
+    await fs.promises.writeFile(path.join(targetDirectory, "pixi.lock"), "generated lock");
+    await removeIncompletePixiTarget(targetDirectory, "jazzy", "win32", "x64");
+    assert.strictEqual(fs.existsSync(targetDirectory), false);
+
+    const protectedTarget = path.join(directory, "protected");
+    await fs.promises.mkdir(protectedTarget);
+    await fs.promises.writeFile(path.join(protectedTarget, "pixi.toml"), pixiManifest("jazzy", "win-64"));
+    await fs.promises.writeFile(path.join(protectedTarget, "pixi.lock"), "generated lock");
+    await fs.promises.writeFile(path.join(protectedTarget, "notes.txt"), "keep me");
+    await assert.rejects(removeIncompletePixiTarget(protectedTarget, "jazzy", "win32", "x64"), /no files were removed/);
+    assert.strictEqual(await fs.promises.readFile(path.join(protectedTarget, "notes.txt"), "utf8"), "keep me");
+    await fs.promises.rm(directory, { recursive: true, force: true });
   });
 
   it("blocks a broken Pixi executable rather than attempting to bootstrap over it", async () => {

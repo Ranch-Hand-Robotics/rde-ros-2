@@ -5,9 +5,9 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import * as vscode_utils from "../vscode-utils";
 import * as extension from "../extension";
 import * as pixi from "./install-ros-pixi";
+import { cachePixiInstallRoot, selectPixiInstallRoot } from "./installer/pixi-location";
 import { RosDistro } from "./install-ros";
 import { monitorTerminalForErrors } from "./install-ros-terminal";
 
@@ -59,6 +59,13 @@ async function createPixiManifest(distro: RosDistro, workspaceDir: string): Prom
  * Installs ROS 2 on Windows using Pixi
  */
 export async function installRosWindows(distro: RosDistro): Promise<void> {
+  const pixiRoot = await selectPixiInstallRoot(distro.name);
+  if (!pixiRoot) {
+    extension.outputChannel.appendLine("Pixi install location selection was cancelled; no installation was started.");
+    return;
+  }
+  await cachePixiInstallRoot(pixiRoot);
+
   // Check if Pixi is installed
   const pixiInstalled = await pixi.isPixiInstalled();
 
@@ -73,10 +80,6 @@ export async function installRosWindows(distro: RosDistro): Promise<void> {
   extension.outputChannel.show();
 
   // Get or create pixi workspace directory with Windows default
-  const config = vscode_utils.getExtensionConfiguration();
-  const defaultPixiRoot = "c:\\pixi_ws";
-  const pixiRoot = config.get<string>("pixiRoot", defaultPixiRoot);
-
   // Create the directory (and any missing parents) if it doesn't exist
   try {
     await fs.promises.mkdir(pixiRoot, { recursive: true });

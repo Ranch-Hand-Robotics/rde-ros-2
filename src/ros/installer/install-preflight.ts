@@ -8,6 +8,7 @@ import * as yaml from "js-yaml";
 import { HealthTarget, runHealthProcess } from "./health-check";
 import { nativePreflight } from "./native-preflight";
 import { PreflightCheck, PreflightReport, PreflightRunner } from "./preflight-types";
+import { findPixi, pixiManifest, pixiPlatform } from "./pixi";
 
 const gib = 1024 ** 3;
 
@@ -16,6 +17,7 @@ export interface PathReadiness {
   directory: boolean;
   symbolicLink: boolean;
   entries: string[];
+  size?: number;
   freeBytes: number;
   freeInodes?: number;
   writable: boolean;
@@ -69,6 +71,7 @@ async function inspectPath(filename: string): Promise<PathReadiness> {
     directory: stat.isDirectory(),
     symbolicLink: stat.isSymbolicLink(),
     entries: existing === filename && stat.isDirectory() ? await fs.promises.readdir(existing) : [],
+    size: stat.size,
     freeBytes: disk.bavail * disk.bsize,
     freeInodes: disk.files > 0 ? disk.ffree : undefined,
     writable,
@@ -109,6 +112,68 @@ const defaults: PreflightServices = {
   readFile: readOptionalFile, inspectPath, ubuntuPlatforms,
 };
 
+const MAX_INCOMPLETE_PIXI_LOCK_BYTES = 10 * 1024 * 1024;
+
+async function isIncompletePixiTarget(
+  targetDirectory: string,
+  distro: string,
+  platform: NodeJS.Platform,
+  arch: string,
+  services: Pick<PreflightServices, "inspectPath" | "readFile">
+): Promise<boolean> {
+  if (platform !== "win32" || arch !== "x64") {
+    return false;
+  }
+  const directory = await services.inspectPath(targetDirectory);
+  const expectedEntries = ["pixi.lock", "pixi.toml"];
+  if (!directory.exists || !directory.directory || directory.symbolicLink ||
+      directory.entries.slice().sort().join("\0") !== expectedEntries.join("\0")) {
+    return false;
+  }
+
+  const manifestPath = path.join(targetDirectory, "pixi.toml");
+  const lockPath = path.join(targetDirectory, "pixi.lock");
+  const [manifest, lock] = await Promise.all([
+    services.inspectPath(manifestPath), services.inspectPath(lockPath),
+  ]);
+  if (!manifest.exists || manifest.directory || manifest.symbolicLink ||
+      manifest.size !== Buffer.byteLength(pixiManifest(distro, pixiPlatform("win32", "x64"))) ||
+      !lock.exists || lock.directory || lock.symbolicLink ||
+      !lock.size || lock.size > MAX_INCOMPLETE_PIXI_LOCK_BYTES) {
+    return false;
+  }
+  return (await services.readFile(manifestPath)) === pixiManifest(distro, pixiPlatform("win32", "x64"));
+}
+
+/** Remove only a recognized, incomplete Windows Pixi target after explicit user confirmation. */
+export async function removeIncompletePixiTarget(
+  targetDirectory: string,
+  distro: string,
+  platform = process.platform,
+  arch = process.arch
+): Promise<void> {
+  if (!await isIncompletePixiTarget(targetDirectory, distro, platform, arch, { inspectPath, readFile: readOptionalFile })) {
+    throw new Error("The target no longer matches the recognized incomplete Pixi layout; no files were removed.");
+  }
+
+  const quarantine = path.join(path.dirname(targetDirectory),
+    `.${path.basename(targetDirectory)}.incomplete-${process.pid}-${Date.now()}`);
+  await fs.promises.rename(targetDirectory, quarantine);
+  try {
+    if (!await isIncompletePixiTarget(quarantine, distro, platform, arch, { inspectPath, readFile: readOptionalFile })) {
+      throw new Error("The target changed while recovery was starting; no quarantined files were removed.");
+    }
+    await fs.promises.rm(quarantine, { recursive: true, force: false });
+  } catch (error) {
+    try {
+      await fs.promises.rename(quarantine, targetDirectory);
+    } catch (restoreError) {
+      throw new Error(`Could not safely remove the incomplete target. Its files remain at ${quarantine}; restore failed: ${String(restoreError)}`);
+    }
+    throw error;
+  }
+}
+
 export function parseOsRelease(text: string): Record<string, string> {
   const values: Record<string, string> = {};
   for (const line of text.split(/\r?\n/)) {
@@ -145,8 +210,16 @@ export async function preflightInstallation(
   await guarded("target", async () => {
     const current = await services.inspectPath(targetDirectory);
     if (current.exists && (current.symbolicLink || !current.directory || current.entries.length > 0)) {
-      add("target", "blocked", `The installation target already contains files or is a link: ${targetDirectory}`,
-        "Run Check ROS 2 Installation Health for an existing installation. For Pixi, choose a different root. Back up and resolve partial/unrelated targets manually; the installer will not overwrite them.");
+      if (target.kind === "pixi" && await isIncompletePixiTarget(
+        targetDirectory, target.distro, services.platform, services.arch, services
+      )) {
+        add("target", "warning",
+          `The installation target appears incomplete and contains only the generated pixi.toml and pixi.lock: ${targetDirectory}`,
+          "Choose Remove and Start Over to remove these generated files and retry, or Stop to keep them.");
+      } else {
+        add("target", "blocked", `The installation target already contains files or is a link: ${targetDirectory}`,
+          "Run Check ROS 2 Installation Health for an existing installation. For Pixi, choose a different root. Back up and resolve partial/unrelated targets manually; the installer will not overwrite them.");
+      }
     } else {
       add("target", "passed", `Unused target: ${targetDirectory}`);
     }

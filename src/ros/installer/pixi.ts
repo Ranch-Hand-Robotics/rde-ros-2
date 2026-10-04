@@ -25,21 +25,33 @@ export async function requestMacCommandLineTools(): Promise<void> {
   await execFile("/usr/bin/xcode-select", ["--install"], { timeout: 10000 });
 }
 
+export function pixiExecutableCandidates(
+  platform = process.platform,
+  home = os.homedir(),
+  env = process.env,
+  systemCandidates = platform === "darwin" ? ["/opt/homebrew/bin/pixi", "/usr/local/bin/pixi"] : []
+): string[] {
+  const executable = platform === "win32" ? "pixi.exe" : "pixi";
+  return [
+    ...(env.PIXI_BIN_DIR ? [path.join(env.PIXI_BIN_DIR, executable)] : []),
+    path.join(env.PIXI_HOME || path.join(home, ".pixi"), "bin", executable),
+    ...(platform === "win32" && env.LOCALAPPDATA
+      ? [
+        path.join(env.LOCALAPPDATA, "Microsoft", "WinGet", "Links", executable),
+        path.join(env.LOCALAPPDATA, "pixi", "bin", executable),
+      ] : []),
+    ...(env.PATH || "").split(path.delimiter).filter(Boolean).map(directory => path.join(directory, executable)),
+    ...systemCandidates,
+  ];
+}
+
 export async function findPixi(
   platform = process.platform,
   home = os.homedir(),
   env = process.env,
   systemCandidates = platform === "darwin" ? ["/opt/homebrew/bin/pixi", "/usr/local/bin/pixi"] : []
 ): Promise<string | undefined> {
-  const executable = platform === "win32" ? "pixi.exe" : "pixi";
-  const candidates = [
-    ...(env.PIXI_BIN_DIR ? [path.join(env.PIXI_BIN_DIR, executable)] : []),
-    path.join(env.PIXI_HOME || path.join(home, ".pixi"), "bin", executable),
-    ...(platform === "win32" && env.LOCALAPPDATA
-      ? [path.join(env.LOCALAPPDATA, "Microsoft", "WinGet", "Links", executable)] : []),
-    ...(env.PATH || "").split(path.delimiter).filter(Boolean).map(directory => path.join(directory, executable)),
-    ...systemCandidates,
-  ];
+  const candidates = pixiExecutableCandidates(platform, home, env, systemCandidates);
   for (const candidate of candidates) {
     try {
       await execFile(candidate, ["--version"], { env, timeout: 10000 });

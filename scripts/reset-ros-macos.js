@@ -5,7 +5,7 @@ const readline = require("node:readline/promises");
 const { execFileSync } = require("node:child_process");
 const { parse, modify, applyEdits } = require("jsonc-parser");
 
-const settingsKeys = ["ROS2.rosSetupScript", "ROS2.distro", "ROS2.pixiRoot", "ROS2.neverInstallRos"];
+const settingsKeys = ["ROS2.rosSetupScript", "ROS2.distro", "ROS2.pixiRoot", "ROS2.pixiInstallLocationsByMachine", "ROS2.neverInstallRos"];
 
 async function readOptional(filename) {
   try {
@@ -103,6 +103,12 @@ async function createPlan({ home = os.homedir(), cwd = process.cwd(), env = proc
     const document = parse(content);
     const config = workspaceFile ? document.settings || {} : document;
     if (config["ROS2.pixiRoot"]) { removals.add(config["ROS2.pixiRoot"]); }
+    const machineLocations = config["ROS2.pixiInstallLocationsByMachine"];
+    if (machineLocations && typeof machineLocations === "object" && !Array.isArray(machineLocations)) {
+      for (const root of Object.values(machineLocations)) {
+        if (typeof root === "string" && root) { removals.add(root); }
+      }
+    }
     if (updated !== content) { edits.push({ filename, content: updated }); }
   }
   const pixiHome = env.PIXI_HOME || path.join(home, ".pixi");

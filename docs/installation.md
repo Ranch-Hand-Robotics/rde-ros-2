@@ -80,17 +80,30 @@ blockers and the extension does not repair the OS automatically.
 
 | Check | Blocking conditions |
 |-------|---------------------|
-| Existing target | A nonempty target, a target symlink/non-directory, or already installed packages for the selected APT ROS distribution. |
+| Existing target | A nonempty target, a target symlink/non-directory, or already installed packages for the selected APT ROS distribution. A Windows Pixi target containing only the matching generated `pixi.toml` and `pixi.lock` is recognized as incomplete and prompts before removal. |
 | Ubuntu compatibility | Wrong Ubuntu codename, unsupported architecture, or inability to establish compatibility. Humble requires Jammy; Jazzy/Kilted require Noble. Newer distributions and Rolling are checked against ROS distribution metadata. |
 | APT/dpkg state | Missing prerequisite tools, active package operations, incomplete package configuration, broken dependencies, or failure to inspect package-manager state. |
-| Restart state | Ubuntu's reboot-required marker, or a pending Windows reboot/installer operation. |
+| Restart state | Ubuntu's reboot-required marker, Windows Update/component-servicing restart flags, or an active Windows Installer operation. Queued Windows file rename/deletion operations are logged as warnings but do not block installation. |
+| Windows filesystem features | Developer Mode and Win32 long-path support are checked. If either is disabled or cannot be read, the installer recommends enabling it and asks whether to continue. |
 | Storage | Less than 8 GiB on the target filesystem, 1 GiB of writable temporary space, 2 GiB on the APT cache filesystem, or fewer than 20,000 available target inodes where reported. These are conservative floors, not exact download/install-size estimates. |
 | Native host/Pixi | Unsupported host architecture, failed host-readiness inspection, broken Pixi, or missing bootstrap prerequisites when Pixi is absent. |
 | Dependency plan | An APT simulation that cannot resolve dependencies without removals, or a failed Pixi dependency solve. |
 
-Warnings require explicit confirmation. Examples include other distributions
-alongside the selected target, intentional held packages, JetPack compatibility
-limitations, missing macOS build tools, and dependency changes shown by APT.
+Most warnings are recorded in the Output channel and installation report without
+stopping installation. Disabled or unreadable Windows Developer Mode/long-path
+settings prompt **Continue Now** or **Stop**. These checks are read-only: the
+extension does not change system settings. Enabling Developer Mode may require
+administrator approval or may be restricted by organization policy. Enabling
+Win32 long paths changes a machine-wide setting, may require administrator
+rights, and may need VS Code and related tools restarted; only applications that
+opt in can use paths beyond the legacy limit.
+
+If a Windows Pixi target contains exactly the matching generated `pixi.toml`
+and `pixi.lock`, with no installed environment, it is treated as a recognized
+incomplete install. The installer asks **Remove and Start Over** or **Stop**;
+it removes that target only after confirmation and revalidates it before
+cleanup. Targets containing other files, symlinks, or a different manifest
+remain blocked and untouched.
 **Install ROS 2 is a fresh-install command, not an upgrade or repair command.**
 Use the independent health command for an existing installation. For Pixi, choose
 a different root rather than overwriting an existing or partial environment.
@@ -134,11 +147,22 @@ When installing, you'll be prompted to select a ROS 2 distribution:
 
 ### Pixi Root Directory
 
-By default, Pixi workspaces are created in `c:\pixi_ws` on Windows. You can change this:
+Pixi workspaces default to `c:\pixi_ws` on Windows and `~/pixi_ws` on macOS. The
+extension caches the chosen root under the current VS Code machine ID in
+`ROS2.pixiInstallLocationsByMachine`. If Settings Sync copies this map to another
+computer, that computer uses only its own entry and otherwise falls back to its
+own platform default.
+
+Each Windows/macOS install opens a folder picker before preflight or Pixi
+bootstrap. The selected folder is the Pixi root; the selected ROS distribution
+is installed into a subfolder named for that distro. The cached root is shown as
+the picker starting location, but you can choose a different folder each time.
+Canceling the picker starts no installation.
 
 1. Open Settings (`Ctrl+,` or `Cmd+,`)
 2. Search for "ROS2 Pixi Root"
-3. Change the `ROS2.pixiRoot` setting to your preferred location
+3. Set `ROS2.pixiRoot` to an absolute path to override the cached/default root on
+  this computer. This setting is machine-scoped and is not synchronized.
 
 ### Never Install Prompt
 
@@ -219,7 +243,7 @@ then offers to reload VS Code. If validation fails, installed packages remain in
 place and the report distinguishes runtime failure from package-installation failure.
 
 On Linux the target is `/opt/ros/<distro>/setup.bash`. On Windows and macOS it is
-the selected Pixi environment in `<ROS2.pixiRoot>/<distro>` (default roots:
+the selected Pixi environment in `<Pixi install root>/<distro>` (default roots:
 `c:\pixi_ws` and `~/pixi_ws`, respectively). Installer-generated Pixi manifests do
 not activate a workspace's `install/setup.*` overlay before it has been built.
 
@@ -298,7 +322,8 @@ deleting an environment.
 |---------|-------------|---------|
 | `ROS2.distro` | ROS distribution to source | (empty) |
 | `ROS2.rosSetupScript` | Path to ROS setup script | (auto-detected) |
-| `ROS2.pixiRoot` | Pixi workspace root directory | `c:\pixi_ws` |
+| `ROS2.pixiRoot` | Optional computer-local Pixi workspace root override; not synchronized | `c:\pixi_ws` on Windows, `~/pixi_ws` on macOS |
+| `ROS2.pixiInstallLocationsByMachine` | Automatically cached Pixi roots, keyed by VS Code machine ID; safe to sync | `{}` |
 | `ROS2.neverInstallRos` | Never prompt to install ROS for this workspace | `false` |
 
 ## Getting Help

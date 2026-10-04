@@ -32,6 +32,7 @@ import { registerPackageDecorationProvider, refreshPackageDecoration } from "./b
 import { TopicTreeDataProvider } from "./ros/topic-tree/topic-tree-provider";
 import { TopicTreeItem } from "./ros/topic-tree/topic-tree-item";
 import { TopicWebviewManager } from "./ros/ros2/topic-webview";
+import { getPixiInstallRoot } from "./ros/installer/pixi-location";
 
 import * as mcp from "./mcp";
 
@@ -325,7 +326,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         const updatedConfig = vscode_utils.getExtensionConfiguration();
-        if (event.affectsConfiguration("ROS2.rosSetupScript") || event.affectsConfiguration("ROS2.distro") || event.affectsConfiguration("ROS2.pixiRoot")) {
+        if (event.affectsConfiguration("ROS2.rosSetupScript") || event.affectsConfiguration("ROS2.distro") ||
+            event.affectsConfiguration("ROS2.pixiRoot")) {
             void ensureErrorMessageOnException(() => activateEnvironment(context));
         }
 
@@ -422,7 +424,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // Fast-path: look in configured/default Pixi roots for known setup scripts.
         const config = vscode.workspace.getConfiguration("ROS2");
-        const configuredPixiRoot = config.get<string>("pixiRoot", "") ?? "";
+        const configuredPixiRoot = getPixiInstallRoot();
         const defaultPixiRoot = process.platform === "win32"
             ? "c:\\pixi_ws"
             : path.join(os.homedir(), "pixi_ws");
@@ -1157,12 +1159,7 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
 
     const config = vscode_utils.getExtensionConfiguration();
 
-    let rosSetupScript = config.get("rosSetupScript", "");
-
-    // If no setup script is configured, try to get one from the workspace (e.g., via pixi if configured)
-    if (!rosSetupScript) {
-        rosSetupScript = vscode_utils.getRosSetupScript();
-    }
+    let rosSetupScript = vscode_utils.getRosSetupScript();
 
     // If the workspace setup script is not set, try to find the ROS setup script in the environment
     let attemptWorkspaceDiscovery = true;

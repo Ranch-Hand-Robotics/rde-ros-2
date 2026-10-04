@@ -19,9 +19,10 @@ RoboStack provides a community-driven distribution of ROS 2 packages, which incl
    - For Production Environments, follow the instructions on the [ros.org](https://docs.ros.org/en/kilted/Installation/Windows-Install-Binary.html).
 5. **Install the Robot Developer Extensions (RDE) for ROS 2**: Install the [Robot Developer Extensions for ROS 2](https://ranchhandrobotics.github.io/rde-ros-2/) from the [Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Ranch-Hand-Robotics.rde-ros-2) or [Open-Vsx.org](https://open-vsx.org/extension/Ranch-Hand-Robotics/rde-ros-2).
 6. **Configure Pixi in RDE**
-    - Open the Workspace settings.
-    - Set `ROS2.pixiRoot` to an absolute directory to override the installer location. An empty setting uses `C:\pixi_ws` on Windows or `~/pixi_ws` on macOS.
-    - The extension will automatically detect and use the appropriate setup script based on your platform and Pixi configuration.
+    - Each Windows/macOS installation asks you to choose a Pixi root folder; the distro is created in a named child folder. Cancel to stop before installation.
+    - The extension caches its Pixi install root by VS Code machine ID in `ROS2.pixiInstallLocationsByMachine`; Settings Sync can safely sync this map between computers.
+    - Set the machine-scoped `ROS2.pixiRoot` in User settings to an absolute directory to override the cache on this computer. An empty setting uses `C:\pixi_ws` on Windows or `~/pixi_ws` on macOS.
+    - The extension automatically uses the setup script for this computer's installation.
 7. **Open a ROS 2 Workspace**: Open a folder containing a ROS 2 workspace. The Robot Developer Extensions will automatically detect the ROS 2 environment and configure the workspace accordingly.
 
 ## Pixi Environment Detection
@@ -116,7 +117,8 @@ the installer PATH entries and completion setup from common Bash, Zsh, and Fish
 profiles, backing up edited files. Homebrew-installed Pixi is uninstalled through
 Homebrew. Unmanaged system binaries or unsafe paths cause the reset to stop.
 
-It removes `ROS2.rosSetupScript`, `ROS2.distro`, `ROS2.pixiRoot`, and
+It removes `ROS2.rosSetupScript`, `ROS2.distro`, `ROS2.pixiRoot`,
+`ROS2.pixiInstallLocationsByMachine`, and
 `ROS2.neverInstallRos` from the current folder settings and VS Code, VS Code
 Insiders, and Cursor user/profile settings, preserving unrelated JSONC content.
 For custom roots or other workspace settings, pass explicit paths:

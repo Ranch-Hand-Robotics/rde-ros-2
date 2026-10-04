@@ -123,7 +123,7 @@ The `LaunchTreeDataProvider` class manages the tree view:
 ```typescript
 // Registration in activate()
 launchTreeProvider = new LaunchTreeDataProvider(context, outputChannel, extPath);
-const launchTreeView = vscode.window.createTreeView('ros2LaunchTree', {
+const launchTreeView = vscode.window.createTreeView('ranchhandrobotics.rde-ros-2.launchTree', {
     treeDataProvider: launchTreeProvider,
     showCollapseAll: true
 });
@@ -142,7 +142,7 @@ vscode.commands.registerCommand(Commands.LaunchTreeDebug, ...);
   "views": {
     "explorer": [
       {
-        "id": "ros2LaunchTree",
+        "id": "ranchhandrobotics.rde-ros-2.launchTree",
         "name": "ROS 2 Launch Files"
       }
     ]

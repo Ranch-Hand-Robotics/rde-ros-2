@@ -11,6 +11,7 @@ import * as net from 'net';
 import * as ros_utils from "./ros/utils";
 import * as extension from "./extension";
 import * as mcp from "./mcp";
+import { getPixiInstallRoot } from "./ros/installer/pixi-location";
 
 import { 
     checkExternallyManagedEnvironment,
@@ -89,6 +90,18 @@ export function getWorkspaceFolder(dirPath: string): string | null {
 export function getRosSetupScript(): string {
     const config = getExtensionConfiguration();
     let rosSetupScript = config.get("rosSetupScript", "");
+    const machineLocations = config.inspect<Record<string, string>>("pixiInstallLocationsByMachine")?.globalValue ?? {};
+    const isWithin = (root: string, filename: string): boolean => {
+        if (!path.isAbsolute(root) || !filename) { return false; }
+        const relative = path.relative(path.resolve(root), path.resolve(filename));
+        return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
+    };
+    const currentRoot = getPixiInstallRoot();
+    const configuredRootIsFromAnotherMachine = Object.values(machineLocations).some((root) => isWithin(root, rosSetupScript)) &&
+        !isWithin(currentRoot, rosSetupScript);
+    if (configuredRootIsFromAnotherMachine) {
+        rosSetupScript = "";
+    }
     
     // First, handle workspace folder variable substitution if present
     const regex = /\$\{workspaceFolder\}/g;
@@ -105,7 +118,7 @@ export function getRosSetupScript(): string {
     // If still empty after substitution, check for pixiRoot default
     if (!rosSetupScript) {
         // If pixiRoot is configured, use it on any platform
-        const pixiRoot = config.get("pixiRoot", "") || (process.platform === "win32" ? "c:\\pixi_ws" : "");
+        const pixiRoot = getPixiInstallRoot();
         
         if (pixiRoot) {
             const shellInfo = ros_utils.detectUserShell();

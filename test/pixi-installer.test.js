@@ -7,7 +7,7 @@ const { promisify } = require("node:util");
 const { execFile } = require("node:child_process");
 const { Worker } = require("node:worker_threads");
 const { test } = require("node:test");
-const { findPixi, quoteShell, pixiPlatform, pixiManifest, pixiSetupScript, macInstallScript, macOSVersion, sourceBashEnvironment } = require("../out/src/ros/installer/pixi");
+const { findPixi, pixiExecutableCandidates, quoteShell, pixiPlatform, pixiManifest, pixiSetupScript, macInstallScript, macOSVersion, sourceBashEnvironment } = require("../out/src/ros/installer/pixi");
 
 test("finds and validates Pixi outside the inherited PATH", async () => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "pixi-test-"));
@@ -147,4 +147,10 @@ test("live macOS bootstrap, ROS install and environment smoke test", {
     await worker.terminate();
     await fs.rm(directory, { recursive: true, force: true });
   }
+});
+
+test("includes the per-user WinGet MSI install path in Windows Pixi discovery", () => {
+  const localAppData = path.join(os.tmpdir(), "pixi-test-local-app-data");
+  const candidates = pixiExecutableCandidates("win32", os.tmpdir(), { LOCALAPPDATA: localAppData, PATH: "" }, []);
+  assert.ok(candidates.includes(path.join(localAppData, "pixi", "bin", "pixi.exe")));
 });

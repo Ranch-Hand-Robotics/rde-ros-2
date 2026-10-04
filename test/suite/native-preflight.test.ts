@@ -18,12 +18,17 @@ function makeRunner(responses: Record<string, PreflightCommandResult>): Prefligh
   };
 }
 
-const HEALTHY_WIN_PS_OUTPUT = JSON.stringify({
+const HEALTHY_WIN_PS_STATE = {
   cbsRebootPending: false,
   wuRebootRequired: false,
   pendingFileRenames: false,
   installerInProgress: false,
-});
+  developerModeEnabled: true,
+  developerModeKnown: true,
+  longPathsEnabled: true,
+  longPathsKnown: true,
+};
+const HEALTHY_WIN_PS_OUTPUT = JSON.stringify(HEALTHY_WIN_PS_STATE);
 
 const WIN_VER_OUTPUT = "Microsoft Windows [Version 10.0.19045.4651]";
 
@@ -44,6 +49,8 @@ describe("nativePreflight - Windows", () => {
         assert.ok(script.includes("$ErrorActionPreference = 'Stop'"));
         assert.ok(script.includes("Installer\\InProgress"));
         assert.ok(script.includes("PSObject.Properties['PendingFileRenameOperations']"));
+        assert.ok(script.includes("AllowDevelopmentWithoutDevLicense"));
+        assert.ok(script.includes("LongPathsEnabled"));
         assert.ok(!script.includes("SilentlyContinue"));
         assert.ok(!script.includes("catch {}"));
         return { exitCode: 0, stdout: HEALTHY_WIN_PS_OUTPUT, stderr: "" };
@@ -66,7 +73,7 @@ describe("nativePreflight - Windows", () => {
   });
 
   it("blocks when CBS reboot-pending flag is set", async () => {
-    const ps = JSON.stringify({ cbsRebootPending: true, wuRebootRequired: false, pendingFileRenames: false, installerInProgress: false });
+    const ps = JSON.stringify({ ...HEALTHY_WIN_PS_STATE, cbsRebootPending: true });
     const run = makeRunner({
       "cmd.exe": { exitCode: 0, stdout: WIN_VER_OUTPUT, stderr: "" },
       "powershell.exe": { exitCode: 0, stdout: ps, stderr: "" },
@@ -78,7 +85,7 @@ describe("nativePreflight - Windows", () => {
   });
 
   it("blocks when Windows Update reboot is required", async () => {
-    const ps = JSON.stringify({ cbsRebootPending: false, wuRebootRequired: true, pendingFileRenames: false, installerInProgress: false });
+    const ps = JSON.stringify({ ...HEALTHY_WIN_PS_STATE, wuRebootRequired: true });
     const run = makeRunner({
       "cmd.exe": { exitCode: 0, stdout: WIN_VER_OUTPUT, stderr: "" },
       "powershell.exe": { exitCode: 0, stdout: ps, stderr: "" },
@@ -87,18 +94,44 @@ describe("nativePreflight - Windows", () => {
     assert.strictEqual(checks.find(c => c.id === "windows-reboot")?.status, "blocked");
   });
 
-  it("blocks when PendingFileRenameOperations is non-empty", async () => {
-    const ps = JSON.stringify({ cbsRebootPending: false, wuRebootRequired: false, pendingFileRenames: true, installerInProgress: false });
+  it("warns rather than blocks when PendingFileRenameOperations is non-empty", async () => {
+    const ps = JSON.stringify({ ...HEALTHY_WIN_PS_STATE, pendingFileRenames: true });
     const run = makeRunner({
       "cmd.exe": { exitCode: 0, stdout: WIN_VER_OUTPUT, stderr: "" },
       "powershell.exe": { exitCode: 0, stdout: ps, stderr: "" },
     });
     const checks = await nativePreflight("win32", "x64", run);
-    assert.strictEqual(checks.find(c => c.id === "windows-reboot")?.status, "blocked");
+    const reboot = checks.find(c => c.id === "windows-reboot");
+    assert.strictEqual(reboot?.status, "warning");
+    assert.match(reboot.detail, /queued file rename or deletion operations/);
+  });
+
+  it("warns when Developer Mode is disabled", async () => {
+    const ps = JSON.stringify({ ...HEALTHY_WIN_PS_STATE, developerModeEnabled: false });
+    const run = makeRunner({
+      "cmd.exe": { exitCode: 0, stdout: WIN_VER_OUTPUT, stderr: "" },
+      "powershell.exe": { exitCode: 0, stdout: ps, stderr: "" },
+    });
+    const checks = await nativePreflight("win32", "x64", run);
+    const check = checks.find(c => c.id === "windows-developer-mode");
+    assert.strictEqual(check?.status, "warning");
+    assert.match(check.remediation, /For developers/);
+  });
+
+  it("warns when Win32 long-path support is disabled", async () => {
+    const ps = JSON.stringify({ ...HEALTHY_WIN_PS_STATE, longPathsEnabled: false });
+    const run = makeRunner({
+      "cmd.exe": { exitCode: 0, stdout: WIN_VER_OUTPUT, stderr: "" },
+      "powershell.exe": { exitCode: 0, stdout: ps, stderr: "" },
+    });
+    const checks = await nativePreflight("win32", "x64", run);
+    const check = checks.find(c => c.id === "windows-long-paths");
+    assert.strictEqual(check?.status, "warning");
+    assert.match(check.remediation, /LongPathsEnabled/);
   });
 
   it("blocks when Windows Installer is in progress", async () => {
-    const ps = JSON.stringify({ cbsRebootPending: false, wuRebootRequired: false, pendingFileRenames: false, installerInProgress: true });
+    const ps = JSON.stringify({ ...HEALTHY_WIN_PS_STATE, installerInProgress: true });
     const run = makeRunner({
       "cmd.exe": { exitCode: 0, stdout: WIN_VER_OUTPUT, stderr: "" },
       "powershell.exe": { exitCode: 0, stdout: ps, stderr: "" },

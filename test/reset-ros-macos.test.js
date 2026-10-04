@@ -7,11 +7,11 @@ const { parse } = require("jsonc-parser");
 const { cleanSettings, cleanProfile, validateRemoval, createPlan, executePlan } = require("../scripts/reset-ros-macos");
 
 test("reset removes only ROS settings and retains JSONC comments", () => {
-  const original = '{\n// Keep this comment\n"editor.fontSize": 14, "ROS2.distro": "jazzy", "ROS2.neverInstallRos": true,\n}';
+  const original = '{\n// Keep this comment\n"editor.fontSize": 14, "ROS2.distro": "jazzy", "ROS2.pixiInstallLocationsByMachine": {"device": "/pixi"}, "ROS2.neverInstallRos": true,\n}';
   const updated = cleanSettings(original);
   assert.deepEqual(parse(updated), { "editor.fontSize": 14 });
   assert.match(updated, /Keep this comment/);
-  assert.deepEqual(parse(cleanSettings('{"folders": [], "settings": {"ROS2.pixiRoot": "/custom", "other": true}}', true)), { folders: [], settings: { other: true } });
+  assert.deepEqual(parse(cleanSettings('{"folders": [], "settings": {"ROS2.pixiRoot": "/custom", "ROS2.pixiInstallLocationsByMachine": {"device": "/pixi"}, "other": true}}', true)), { folders: [], settings: { other: true } });
   assert.throws(() => cleanSettings('{"broken": }'));
 });
 
@@ -26,14 +26,18 @@ test("reset requires exact confirmation and deletes only planned sandbox paths",
   try {
     await fs.mkdir(path.join(cwd, ".vscode"), { recursive: true });
     await fs.mkdir(path.join(home, ".pixi/bin"), { recursive: true });
+    await fs.mkdir(path.join(home, "custom-pixi"), { recursive: true });
     await fs.writeFile(path.join(home, ".pixi/bin/pixi"), "fixture");
-    await fs.writeFile(path.join(cwd, ".vscode/settings.json"), '{"ROS2.distro":"jazzy", "keep":true}');
+    await fs.writeFile(path.join(cwd, ".vscode/settings.json"), JSON.stringify({
+      "ROS2.distro": "jazzy", "ROS2.pixiInstallLocationsByMachine": { device: path.join(home, "custom-pixi") }, keep: true,
+    }));
     await fs.writeFile(path.join(home, ".zshrc"), 'export PATH="$HOME/.pixi/bin:$PATH"\nexport KEEP=yes\n');
     const plan = await createPlan({ home, cwd, env: {}, brewPrefixes: [] });
     assert.equal(await executePlan(plan, "yes"), false);
     assert.equal(await fs.readFile(path.join(home, ".pixi/bin/pixi"), "utf8"), "fixture");
     assert.equal(await executePlan(plan, "RESET"), true);
     await assert.rejects(fs.access(path.join(home, ".pixi")));
+    await assert.rejects(fs.access(path.join(home, "custom-pixi")));
     assert.deepEqual(parse(await fs.readFile(path.join(cwd, ".vscode/settings.json"), "utf8")), { keep: true });
     assert.match(await fs.readFile(path.join(home, ".zshrc"), "utf8"), /KEEP=yes/);
     assert.ok((await fs.readdir(path.join(cwd, ".vscode"))).some(name => name.includes("before-ros-reset")));

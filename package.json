@@ -51,9 +51,7 @@
         "onDebug",
         "onDebugInitialConfigurations:ros2",
         "onDebugResolve:ros2",
-        "onDebugDynamicConfigurations:ros2",
-        "onView:ros2Distributions",
-        "onView:ros2LaunchTree"
+        "onDebugDynamicConfigurations:ros2"
     ],
     "contributes": {
         "commands": [
@@ -306,6 +304,11 @@
                     "contextualTitle": "ROS 2 Topic Monitor",
                     "icon": "media/topic-tree-icon.svg",
                     "visibility": "visible"
+                },
+                {
+                    "id": "ros2Distributions",
+                    "name": "Distributions",
+                    "visibility": "visible"
                 }
             ]
         },
@@ -392,37 +395,6 @@
                 }
             ]
         },
-        "submenus": [
-            {
-                "id": "ROS2.explorer",
-                "label": "ROS 2"
-            }
-        ],
-        "viewsContainers": {
-            "activitybar": [
-                {
-                    "id": "ros2-sidebar",
-                    "title": "ROS 2",
-                    "icon": "media/robot-icon.svg"
-                }
-            ]
-        },
-        "views": {
-            "ros2-sidebar": [
-                {
-                    "id": "ros2Distributions",
-                    "name": "Distributions",
-                    "visibility": "visible"
-                },
-                {
-                    "id": "ros2LaunchTree",
-                    "name": "Launch Files",
-                    "contextualTitle": "ROS 2 Launch Tree",
-                    "visibility": "visible",
-                    "when": "ros2.hasPackageXml"
-                }
-            ]
-        },
         "viewsWelcome": [
             {
                 "view": "ros2Distributions",
@@ -471,7 +443,16 @@
                 "ROS2.pixiRoot": {
                     "type": "string",
                     "default": "",
-                    "description": "Absolute root directory for Pixi workspaces. The installer defaults to C:\\pixi_ws on Windows and ~/pixi_ws on macOS."
+                    "scope": "machine",
+                    "description": "Optional Pixi workspace root override for this computer. If empty, the extension uses its per-machine cached location or the platform default. This setting is not synchronized."
+                },
+                "ROS2.pixiInstallLocationsByMachine": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Pixi install roots keyed by VS Code machine ID. The extension caches each computer's location here so synced settings do not make computers reuse another system's path.",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "ROS2.showROS2WelcomeOnStartup": {
                     "type": "boolean",

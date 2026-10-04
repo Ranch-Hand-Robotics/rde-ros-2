@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { promises as fsPromises } from "fs";
 import * as os from "os";
+import { getPixiInstallRoot } from "./installer/pixi-location";
 
 /**
  * Represents a single installed ROS distribution in the tree.
@@ -54,8 +55,7 @@ async function detectInstalledDistros(): Promise<{ name: string; setupScript: st
 
     if (os.platform() === "win32") {
         // Windows: quickly probe Pixi roots first, then check C:\opt\ros.
-        const config = vscode.workspace.getConfiguration("ROS2");
-        const configuredPixiRoot: string = config.get("pixiRoot") ?? "";
+        const configuredPixiRoot = getPixiInstallRoot();
         const defaultPixiRoot = "c:\\pixi_ws";
         const pixiRoots = Array.from(new Set([configuredPixiRoot, defaultPixiRoot].filter(Boolean)));
 
@@ -132,7 +132,7 @@ async function detectInstalledDistros(): Promise<{ name: string; setupScript: st
         }
     } else {
         if (os.platform() === "darwin") {
-            const configuredRoot = vscode.workspace.getConfiguration("ROS2").get<string>("pixiRoot");
+            const configuredRoot = getPixiInstallRoot();
             const roots = new Set([configuredRoot, path.join(os.homedir(), "pixi_ws")].filter(Boolean));
             for (const root of roots) {
                 try {
@@ -199,7 +199,7 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
         if (!path.isAbsolute(setupScript)) {
             return undefined;
         }
-        const configuredRoot = vscode.workspace.getConfiguration("ROS2").get<string>("pixiRoot");
+        const configuredRoot = getPixiInstallRoot();
         const defaultRoot = os.platform() === "win32" ? "c:\\pixi_ws" : path.join(os.homedir(), "pixi_ws");
         for (const root of new Set([configuredRoot, defaultRoot].filter(Boolean))) {
             if (!path.isAbsolute(root!)) {

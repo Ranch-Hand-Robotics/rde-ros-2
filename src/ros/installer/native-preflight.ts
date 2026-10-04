@@ -8,11 +8,36 @@ const WIN_REBOOT_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 $session = Get-ItemProperty -LiteralPath 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager' -ErrorAction Stop
 $renames = $session.PSObject.Properties['PendingFileRenameOperations']
+$developerModeEnabled = $false
+$developerModeKnown = $true
+try {
+  $developerModePath = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock'
+  if (Test-Path -LiteralPath $developerModePath -ErrorAction Stop) {
+    $developerMode = Get-ItemProperty -LiteralPath $developerModePath -ErrorAction Stop
+    $setting = $developerMode.PSObject.Properties['AllowDevelopmentWithoutDevLicense']
+    $developerModeEnabled = ($null -ne $setting -and [int]$setting.Value -eq 1)
+  }
+} catch {
+  $developerModeKnown = $false
+}
+$longPathsEnabled = $false
+$longPathsKnown = $true
+try {
+  $fileSystem = Get-ItemProperty -LiteralPath 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\FileSystem' -ErrorAction Stop
+  $setting = $fileSystem.PSObject.Properties['LongPathsEnabled']
+  $longPathsEnabled = ($null -ne $setting -and [int]$setting.Value -eq 1)
+} catch {
+  $longPathsKnown = $false
+}
 $result = @{
   cbsRebootPending = Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending' -ErrorAction Stop
   wuRebootRequired = Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired' -ErrorAction Stop
   pendingFileRenames = ($null -ne $renames -and @($renames.Value | Where-Object { $_ }).Count -gt 0)
   installerInProgress = Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\InProgress' -ErrorAction Stop
+  developerModeEnabled = $developerModeEnabled
+  developerModeKnown = $developerModeKnown
+  longPathsEnabled = $longPathsEnabled
+  longPathsKnown = $longPathsKnown
 }
 ConvertTo-Json -InputObject $result -Compress
 `.trim();
@@ -84,14 +109,27 @@ async function windowsPreflight(arch: string, run: PreflightRunner): Promise<Pre
     return checks;
   }
 
-  let parsed: { cbsRebootPending: boolean; wuRebootRequired: boolean; pendingFileRenames: boolean; installerInProgress: boolean };
+  let parsed: {
+    cbsRebootPending: boolean;
+    wuRebootRequired: boolean;
+    pendingFileRenames: boolean;
+    installerInProgress: boolean;
+    developerModeEnabled: boolean;
+    developerModeKnown: boolean;
+    longPathsEnabled: boolean;
+    longPathsKnown: boolean;
+  };
   try {
     parsed = JSON.parse(psResult.stdout.trim());
     if (typeof parsed !== "object" || parsed === null ||
         typeof parsed.cbsRebootPending !== "boolean" ||
         typeof parsed.wuRebootRequired !== "boolean" ||
         typeof parsed.pendingFileRenames !== "boolean" ||
-        typeof parsed.installerInProgress !== "boolean") {
+        typeof parsed.installerInProgress !== "boolean" ||
+        typeof parsed.developerModeEnabled !== "boolean" ||
+        typeof parsed.developerModeKnown !== "boolean" ||
+        typeof parsed.longPathsEnabled !== "boolean" ||
+        typeof parsed.longPathsKnown !== "boolean") {
       throw new Error("unexpected shape");
     }
   } catch (e) {
@@ -105,20 +143,26 @@ async function windowsPreflight(arch: string, run: PreflightRunner): Promise<Pre
     return checks;
   }
 
-  const rebootPending = parsed.cbsRebootPending || parsed.wuRebootRequired || parsed.pendingFileRenames;
-  if (rebootPending) {
+  const rebootRequired = parsed.cbsRebootPending || parsed.wuRebootRequired;
+  if (rebootRequired) {
     const reasons: string[] = [];
     if (parsed.cbsRebootPending) { reasons.push("CBS component servicing"); }
     if (parsed.wuRebootRequired) { reasons.push("Windows Update"); }
-    if (parsed.pendingFileRenames) { reasons.push("pending file renames"); }
     checks.push({
       id: "windows-reboot",
       status: "blocked",
       detail: `A system reboot is required before installation: ${reasons.join(", ")}.`,
       remediation: "Reboot Windows and retry.",
     });
+  } else if (parsed.pendingFileRenames) {
+    checks.push({
+      id: "windows-reboot",
+      status: "warning",
+      detail: "Windows has queued file rename or deletion operations for a future restart. These can be unrelated to ROS/Pixi, so installation may proceed; restart if installation encounters file-in-use errors.",
+      remediation: "Review the queued-operation warning. Restart Windows to apply the operations, or choose Proceed with Installation to continue.",
+    });
   } else {
-    checks.push({ id: "windows-reboot", status: "passed", detail: "No pending reboot detected." });
+    checks.push({ id: "windows-reboot", status: "passed", detail: "No pending Windows Update or component servicing reboot detected." });
   }
 
   if (parsed.installerInProgress) {
@@ -130,6 +174,32 @@ async function windowsPreflight(arch: string, run: PreflightRunner): Promise<Pre
     });
   } else {
     checks.push({ id: "windows-installer-busy", status: "passed", detail: "No installer currently in progress." });
+  }
+
+  if (!parsed.developerModeKnown || !parsed.developerModeEnabled) {
+    checks.push({
+      id: "windows-developer-mode",
+      status: "warning",
+      detail: parsed.developerModeKnown
+        ? "Windows Developer Mode is disabled. Enabling it can allow package tools to create symbolic links without elevation."
+        : "Windows Developer Mode could not be determined.",
+      remediation: "Recommended: search Windows Settings for 'For developers' and enable Developer Mode. Administrator approval or organization policy may be required.",
+    });
+  } else {
+    checks.push({ id: "windows-developer-mode", status: "passed", detail: "Windows Developer Mode is enabled." });
+  }
+
+  if (!parsed.longPathsKnown || !parsed.longPathsEnabled) {
+    checks.push({
+      id: "windows-long-paths",
+      status: "warning",
+      detail: parsed.longPathsKnown
+        ? "Win32 long-path support is disabled. Enabling it helps applications that opt in handle paths beyond the legacy MAX_PATH limit."
+        : "Win32 long-path support could not be determined.",
+      remediation: "Recommended: enable 'Enable Win32 long paths' in Local Group Policy (Computer Configuration > Administrative Templates > System > Filesystem), or set HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled to 1. Administrator rights may be required; restart VS Code and related tools afterward.",
+    });
+  } else {
+    checks.push({ id: "windows-long-paths", status: "passed", detail: "Win32 long-path support is enabled." });
   }
 
   return checks;
