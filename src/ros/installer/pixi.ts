@@ -32,6 +32,8 @@ export function pixiExecutableCandidates(
   systemCandidates = platform === "darwin" ? ["/opt/homebrew/bin/pixi", "/usr/local/bin/pixi"] : []
 ): string[] {
   const executable = platform === "win32" ? "pixi.exe" : "pixi";
+  const pathKey = platform === "win32"
+    ? Object.keys(env).find(key => key.toLowerCase() === "path") : "PATH";
   return [
     ...(env.PIXI_BIN_DIR ? [path.join(env.PIXI_BIN_DIR, executable)] : []),
     path.join(env.PIXI_HOME || path.join(home, ".pixi"), "bin", executable),
@@ -40,7 +42,7 @@ export function pixiExecutableCandidates(
         path.join(env.LOCALAPPDATA, "Microsoft", "WinGet", "Links", executable),
         path.join(env.LOCALAPPDATA, "pixi", "bin", executable),
       ] : []),
-    ...(env.PATH || "").split(path.delimiter).filter(Boolean).map(directory => path.join(directory, executable)),
+    ...(env[pathKey] || "").split(path.delimiter).filter(Boolean).map(directory => path.join(directory, executable)),
     ...systemCandidates,
   ];
 }

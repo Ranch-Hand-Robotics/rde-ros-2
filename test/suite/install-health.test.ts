@@ -3,6 +3,7 @@
 
 import * as assert from "assert";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import {
   buildHealthCommand, HEALTH_SENTINEL, HealthTarget, parseHealthOutput,
@@ -24,8 +25,7 @@ describe("ROS installation health checking", () => {
   let probe: string;
 
   beforeEach(async () => {
-    directory = path.join(process.cwd(), "test", `.health-fixtures-${process.pid}-${Math.random().toString(16).slice(2)} with spaces`);
-    await fs.promises.mkdir(directory);
+    directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rde health fixtures "));
     probe = path.join(directory, "probe with spaces.py");
     await fs.promises.writeFile(probe, "# test probe\n");
     target = { kind: "setup", distro: "jazzy", setupScript: path.join(directory, "setup.bash") };
@@ -200,7 +200,7 @@ describe("ROS installation health checking", () => {
     await fs.promises.writeFile((target as { setupScript: string }).setupScript,
       "export ROS_VERSION=2\nexport ROS_DISTRO=humble\n");
     const report = await validateInstallation(target,
-      path.join(process.cwd(), "assets", "scripts", "ros_install_health.py"));
+      path.resolve(__dirname, "../../../assets/scripts/ros_install_health.py"));
     assert.strictEqual(report.healthy, false);
     assert.strictEqual(report.checks[0].id, "environment");
     assert.match(report.checks[0].detail, /Expected ROS_DISTRO=jazzy/);

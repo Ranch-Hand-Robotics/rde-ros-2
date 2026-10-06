@@ -35,7 +35,7 @@ export class RosDistributionItem extends vscode.TreeItem {
  * Detects installed ROS distributions by scanning standard install paths
  * on the current platform.
  */
-async function detectInstalledDistros(): Promise<{ name: string; setupScript: string }[]> {
+export async function detectInstalledDistros(): Promise<{ name: string; setupScript: string }[]> {
     const results: { name: string; setupScript: string }[] = [];
     const seenScripts = new Set<string>();
 
@@ -118,12 +118,16 @@ async function detectInstalledDistros(): Promise<{ name: string; setupScript: st
             const entries = await fsPromises.readdir(winRosBase, { withFileTypes: true });
             for (const entry of entries) {
                 if (entry.isDirectory()) {
-                    const script = path.join(winRosBase, entry.name, "x64", "local_setup.bat");
-                    const foundX64 = await pushIfExists(entry.name, script);
-                    if (!foundX64) {
-                        // try setup.bat in root
-                        const scriptRoot = path.join(winRosBase, entry.name, "local_setup.bat");
-                        await pushIfExists(entry.name, scriptRoot);
+                    const directory = path.join(winRosBase, entry.name);
+                    for (const script of [
+                        path.join(directory, "x64", "local_setup.bat"),
+                        path.join(directory, "x64", "setup.bat"),
+                        path.join(directory, "local_setup.bat"),
+                        path.join(directory, "setup.bat"),
+                    ]) {
+                        if (await pushIfExists(entry.name, script)) {
+                            break;
+                        }
                     }
                 }
             }
@@ -179,6 +183,23 @@ async function detectInstalledDistros(): Promise<{ name: string; setupScript: st
     }
 
     return results;
+}
+
+/** Select an actual setup script, preserving discovery's cached-Pixi-first order. */
+export function selectInstalledDistro(
+    distros: { name: string; setupScript: string }[],
+    configuredDistro: string = "",
+    environmentDistro: string = ""
+): { name: string; setupScript: string } | undefined {
+    const distroName = (name: string) => name.replace(/ \(pixi\)$/, "");
+    const requestedDistro = configuredDistro || environmentDistro;
+    if (requestedDistro) {
+        return distros.find(distro => distroName(distro.name) === distroName(requestedDistro));
+    }
+
+    // Multiple installations of the same distro are not an ambiguous selection.
+    const names = new Set(distros.map(distro => distroName(distro.name)));
+    return names.size === 1 ? distros[0] : undefined;
 }
 
 /**

@@ -23,4 +23,20 @@ describe('Task definition contributions', () => {
             'Expected colcon.properties.command.type to be "string"',
         );
     });
+
+    for (const type of ['ROS2', 'colcon']) {
+        it(`should preserve deferred execution options for ${type} tasks`, () => {
+            const manifestPath = path.resolve(__dirname, '../../../package.json');
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            const definition = manifest.contributes.taskDefinitions.find((item: any) => item.type === type);
+            const options = definition?.properties?.taskOptions;
+            assert.strictEqual(options?.type, 'object', 'CustomExecution needs contributed taskOptions; reserved options are stripped');
+            assert.strictEqual(options?.properties?.cwd?.type, 'string');
+            assert.strictEqual(options?.properties?.env?.type, 'object');
+            assert.deepStrictEqual(options?.properties?.env?.additionalProperties?.type, ['string', 'null']);
+            assert.strictEqual(options?.properties?.shell?.type, 'object');
+            assert.strictEqual(options?.properties?.shell?.properties?.executable?.type, 'string');
+            assert.strictEqual(options?.properties?.shell?.properties?.args?.type, 'array');
+        });
+    }
 });

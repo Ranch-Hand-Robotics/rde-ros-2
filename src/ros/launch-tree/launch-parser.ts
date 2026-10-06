@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as child_process from 'child_process';
 import { promisify } from 'util';
 import * as extension from '../../extension';
+import { resolveRosPython } from '../python';
 import {
   ILaunchFileData,
   IWorkspacePackage,
@@ -15,7 +16,7 @@ import {
   ILaunchArgument
 } from './types';
 
-const execAsync = promisify(child_process.exec);
+const execFileAsync = promisify(child_process.execFile);
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 const readFile = promisify(fs.readFile);
@@ -173,9 +174,12 @@ export class LaunchFileParser {
       
       // Execute ros2_launch_dumper.py with proper ROS environment
       // Note: The dumper script automatically outputs JSON when USE_JSON_OUTPUT=True
-      const { stdout, stderr } = await execAsync(
-        `python3 "${this.dumperScript}" "${filePath}"`,
+      const python = await resolveRosPython(rosEnv);
+      this.outputChannel.appendLine(`ROS launch Python: ${python}`);
+      const { stdout, stderr } = await execFileAsync(
+        python, [this.dumperScript, filePath],
         { 
+          windowsHide: true,
           timeout: 30000, // 30 second timeout
           maxBuffer: 1024 * 1024 * 10, // 10MB buffer
           env: rosEnv // Use ROS environment from extension

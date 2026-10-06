@@ -46,7 +46,7 @@ enabled: true
     assert.strictEqual(metrics?.maxRate, 0.035);
   });
 
-  it("requests full-length topic echo output for image payloads", () => {
+  it("preserves full-length topic echo output for generic messages", () => {
     assert.deepStrictEqual(createTopicEchoArguments("/image"), [
       "topic",
       "echo",
@@ -72,7 +72,7 @@ enabled: true
     assert.ok(!html.includes("onclick="));
   });
 
-  it("enables image rendering only for compressed image topics", () => {
+  it("enables appropriate rendering for raw and compressed image topics", () => {
     const compressed = createTopicMonitorHtml(
       "vscode-webview:",
       "/camera/compressed",

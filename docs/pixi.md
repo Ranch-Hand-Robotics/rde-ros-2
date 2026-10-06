@@ -12,7 +12,7 @@ RoboStack provides a community-driven distribution of ROS 2 packages, which incl
 
 ## Getting Started with Pixi, ROS 2, and the Robot Developer Extensions
 1. **Install Pixi**: Follow the instructions on the [Pixi website](https://pixi.sh/latest/) to install Pixi on your system.
-2. **Install Visual Studio**: Download and install [Visual Studio](https://visualstudio.com/). This is needed for building ROS 2 packages on Windows.
+2. **On Windows only, install C++ tools**: Visual Studio 2022 or its standalone Build Tools must include MSVC x64/x86 and a Windows SDK. The full IDE is not required; see below. Linux and macOS do not use this compiler preflight.
 3. **Install Visual Studio Code**: Download and install [Visual Studio Code](https://code.visualstudio.com/).
 4. **Install ROS 2 through RoboStack or Open Robotics** depending on your use case:
    - For Development and Testing, follow the instructions on the [RoboStack website](https://robostack.github.io/).
@@ -27,7 +27,11 @@ RoboStack provides a community-driven distribution of ROS 2 packages, which incl
 
 ## Pixi Environment Detection
 The distribution view scans known setup-script locations under the configured and
-default Pixi roots. On macOS it discovers the per-distribution setup wrappers
+default Pixi roots. Environment activation uses the same discovery: for a selected
+distro, this computer's cached Pixi installation takes precedence over a standard
+installation. An explicit `ROS2.rosSetupScript` takes priority, and `ROS2.distro`
+takes priority over an inherited `ROS_DISTRO` value.
+On macOS it discovers the per-distribution setup wrappers
 published by successful installations. **Find ROS** can also locate these wrappers.
 For a manually created environment, set `ROS2.rosSetupScript` to a script that
 activates it; a `pixi.toml` alone does not automatically select an environment.
@@ -57,9 +61,109 @@ workspace. If moving to Trash fails, the extension does not fall back to permane
 deletion.
 
 ## Platform-Specific Behavior
-- **Windows**: Uses `local_setup.bat` from the Pixi ROS 2 environment
-- **Linux**: Uses `local_setup.bash` from the Pixi ROS 2 environment
+- **Windows**: Activates the Visual Studio C++ environment, then the selected Pixi environment and its ROS `local_setup.bat`.
+- **Linux**: For a manually managed Pixi environment, configure `ROS2.rosSetupScript` to activate that environment and source its ROS setup. This change does not add automatic discovery of arbitrary Linux Pixi manifests.
 - **macOS**: The installer generates `<pixiRoot>/<distro>/setup.bash`, which activates the complete Pixi environment, including Python and native libraries.
+
+On Linux and macOS, extension-provided `ROS2` and `colcon` tasks wait for the
+resolved ROS environment when executed, not when listed. Each rerun obtains the
+current environment. Use `taskOptions.cwd`, `taskOptions.env` (null removes a
+variable), and `taskOptions.shell` for overrides; variables are resolved by VS Code.
+The default shell is `/bin/sh`; explicit shells must use POSIX quoting. Commands
+and arguments are literal words. For pipelines, invoke `sh` with `-c` explicitly.
+These task terminals use piped input/output, not a full interactive shell or TTY.
+
+### Windows compiler prerequisites
+
+WinGet package `Microsoft.VisualStudio.2022.BuildTools` supplies the standalone
+compiler tools. The base package alone is insufficient: select the C++ workload,
+`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`,
+`Microsoft.VisualStudio.Component.VC.ATL` (C++ ATL for x86/x64), and
+`Microsoft.VisualStudio.Component.Windows11SDK.26100`.
+
+When these prerequisites are missing, **ROS2: Install ROS 2** stops before creating
+the ROS environment and offers **Copy Install Command**. Review and run that
+command in Administrator PowerShell, accepting the applicable agreements. This
+is a large, machine-wide installation; the extension does not elevate itself or
+run it automatically. Restart Windows if the installer requests it, then retry.
+For an existing incomplete installation, use **Visual Studio Installer > Modify >
+Desktop development with C++** to add MSVC v143 and a Windows SDK. Under
+**Individual components**, also select **C++ ATL for latest v143 build tools (x86 & x64)**;
+repeating
+`winget install` does not add workloads to an already-installed package.
+
+The extension discovers C++-capable Visual Studio 2022 installations using
+`vswhere`, including standalone Build Tools, and runs `vcvarsall.bat x64` before
+Pixi activation, dependency solving, package installation, and runtime checks.
+It preserves that environment for colcon tasks and ROS terminals. A complete
+inherited developer environment is reused for workspace overlays.
+
+Before each Windows colcon build task (including package builds and Test Explorer
+builds), the extension rechecks the compiler and SDK files and activates available
+tools if needed. Windows colcon tasks remain available in every open workspace,
+even when startup activation failed; listing them does not require ROS or colcon.
+After the compiler check, a build freshly sources the selected ROS installation
+and external underlays, then checks `ros2 --help` and `colcon --help` before building.
+If the compiler tools were removed or the setup is incomplete, the build stops
+before launching colcon and offers **Copy Install Command** or **Cancel Build**.
+ROS setup failures stop the build with an error in the task terminal and
+**Output > ROS 2**, including the script path and underlying error. The output
+panel opens on setup failures unless `ROS2.autoShowOutputChannel` is disabled.
+Listing tasks does not prompt. This check applies to extension-provided `colcon`
+tasks, not commands typed directly into a terminal or custom `shell` tasks.
+Colcon build tasks are registered at extension startup on all platforms and stay
+available during ROS environment reloads. **Tasks: Run Build Task** offers Debug
+and Release builds in any open trusted workspace folder, even without
+`package.xml`, ROS, or colcon installed. Discovery does not wait for ROS setup or
+installation prompts; execution still requires a working build environment.
+For Windows `colcon` build tasks in `tasks.json`, use `buildOptions.cwd` and
+`buildOptions.env` for working-directory and environment overrides. VS Code
+resolves variables in these properties before the preflight runs.
+
+### Recovering from an incomplete workspace install
+
+Windows builds do **not** source the current workspace's install overlay, even
+when it exists. A failed compilation can leave `package.bat` referencing a missing
+package `local_setup.bat`; this must not prevent the next build from repairing it.
+The task terminal and **Output > ROS 2** explain that the overlay is skipped.
+
+Builds start from the host environment, not the extension's runtime environment.
+Current install paths (including a task's `--install-base`) are removed from
+inherited path lists and package-directory values before compiler/ROS activation.
+External underlays and SDK paths are preserved. Recorded external parents in a
+standard colcon `setup.bat` are loaded separately; self parents and case/slash
+duplicates are excluded. Broken external parents, selected ROS setup, compiler,
+SDK, and CLI checks remain fatal. Select the actual ROS/Pixi underlay, not this
+workspace's install script, in `ROS2.rosSetupScript`.
+
+Generated Windows package builds and Test Explorer builds use `--packages-up-to`
+to build the target and its workspace dependencies. Custom `--packages-select`
+arguments are unchanged: colcon loads installed dependencies per package. If those
+hooks are incomplete, use `--packages-up-to <package>` or rebuild the dependencies;
+explicit skip/ignore filters still apply. No dependencies are silently ignored.
+Runtime/debug activation still sources the workspace overlay and reports errors;
+Windows C++ tests prepare fresh underlays and load the local overlay on every
+run/debug request, including when the executable already exists. Existing binaries
+are not rebuilt merely to refresh their environment.
+
+Building with the workspace already in `COLCON_PREFIX_PATH` can record it as its
+own parent. Windows case and trailing-separator differences can evade colcon's
+string comparisons, producing repeated warnings. The extension excludes these
+paths and deduplicates external prefix lists before launching colcon. Only colcon
+regenerates setup files; the extension never patches them or deletes build outputs.
+
+Limits: nonstandard batch parent chains are rejected rather than guessed or
+silently discarded. Use a terminal with explicit underlays for such custom chains.
+Path cleanup handles case and separator variants, not arbitrary junction/short-name
+aliases or non-path variables set by a shell before VS Code started. If VS Code was
+launched from a self-overlay-sourced shell, restart it from a clean shell when such
+custom hooks are involved. Existing CMake cache entries are not rewritten. Recovery
+preflight does not fix C++ compilation errors; colcon must report those normally.
+
+Do not manually set `VisualStudioVersion` to suppress an error: the compiler,
+linker, SDK tools, headers, and libraries must actually be available. After
+installing the tools, restart the extension debugger or reload the window and
+create a new ROS terminal; already-open terminals retain their old environment.
 
 ## One-Touch Installation on macOS
 

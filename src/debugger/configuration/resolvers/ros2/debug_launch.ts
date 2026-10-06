@@ -16,6 +16,7 @@ import * as extension from "../../../../extension";
 import * as requests from "../../../requests";
 import * as utils from "../../../utils";
 import { rosApi } from "../../../../ros/ros";
+import { resolveRosPython } from "../../../../ros/python";
 
 const promisifiedExec = util.promisify(child_process.exec);
 
@@ -56,8 +57,8 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             },
         };
 
-        extension.outputChannel.appendLine("Executing dumper with the following environment:");
-        extension.outputChannel.appendLine(JSON.stringify(rosExecOptions.env, null, 2));
+        const python = await resolveRosPython(rosExecOptions.env);
+        extension.outputChannel.appendLine(`ROS launch Python: ${python}`);
 
         let ros2_launch_dumper = getExtensionFilePath(path.join("assets", "scripts", "ros2_launch_dumper.py"));
 
@@ -73,6 +74,7 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             type: "python",
             request: "launch",
             program: ros2_launch_dumper,
+            python,
             args: args,
             env: rosExecOptions.env,
             stopOnEntry: false,

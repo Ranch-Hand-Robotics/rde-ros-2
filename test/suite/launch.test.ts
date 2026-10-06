@@ -8,9 +8,15 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
+import { resolveRosPython } from '../../src/ros/python';
 
 describe('Launch Dumper Test', () => {
-    it('should run ros2_launch_dumper.py with test_launch.py and produce valid JSON output', async () => {
+    it('should run ros2_launch_dumper.py with test_launch.py and produce valid JSON output', async function () {
+        // Windows test hosts must inherit a sourced native ROS/Pixi environment.
+        // Never invoke a Windows Bash alias (which may silently enter WSL).
+        if (process.platform === 'win32' && process.env.ROS_VERSION !== '2') {
+            this.skip();
+        }
         // Get paths relative to workspace root
         // __dirname is out/test/suite, so we need to go up 3 levels to reach workspace root
         const workspaceRoot = path.join(__dirname, '../../../');
@@ -25,7 +31,7 @@ describe('Launch Dumper Test', () => {
         const result = await runDumper(dumperScript, testLaunchFile);
         
         // If ROS 2 is not available, skip the test with a warning
-        if (result.exitCode !== 0 && result.stderr.includes('ModuleNotFoundError')) {
+        if (process.platform !== 'win32' && result.exitCode !== 0 && result.stderr.includes('ModuleNotFoundError')) {
             // Check if it's specifically lark that's missing
             if (result.stderr.includes("No module named 'lark'")) {
                 console.warn('lark-parser not available in ROS 2 environment. Install with:');
@@ -35,7 +41,7 @@ describe('Launch Dumper Test', () => {
                 console.warn('ROS 2 environment not available, skipping test');
                 console.warn('stderr:', result.stderr);
             }
-            return; // Skip test instead of failing
+            this.skip();
         }
         
         // Verify successful execution
@@ -59,11 +65,47 @@ describe('Launch Dumper Test', () => {
         assert.ok(data.processes.length > 0, 'Should have at least one process');
     });
 
+    for (const format of ['json', 'legacy']) {
+        for (const showLog of ['true', 'false']) {
+            it(`keeps Unicode LogInfo and nested diagnostics out of ${format} stdout (show_log=${showLog})`, async function () {
+                if (process.platform === 'win32' && process.env.ROS_VERSION !== '2') {
+                    this.skip();
+                }
+                const root = path.join(__dirname, '../../../');
+                const result = await runDumper(
+                    path.join(root, 'assets/scripts/ros2_launch_dumper.py'),
+                    path.join(root, 'test/launch/log_info.launch.py'), format, [`show_log:=${showLog}`]);
+                if (process.platform !== 'win32' && result.exitCode !== 0 && result.stderr.includes('ModuleNotFoundError')) {
+                    this.skip();
+                }
+                assert.strictEqual(result.exitCode, 0, result.stderr);
+                if (format === 'json') {
+                    const data = JSON.parse(result.stdout);
+                    assert.strictEqual(data.version, '1.0');
+                    assert.strictEqual(data.processes.length, 1);
+                    assert.deepStrictEqual(data.errors, []);
+                    assert.ok(data.processes[0].arguments.includes("print('must not execute')"));
+                } else {
+                    const lines = result.stdout.trimEnd().split(/\r?\n/);
+                    assert.strictEqual(lines.length, 1, result.stdout);
+                    assert.ok(lines[0].startsWith('\t'), result.stdout);
+                }
+                assert.ok(!result.stdout.includes('[INFO]'), result.stdout);
+                assert.ok(!result.stdout.includes('diagnostic'), result.stdout);
+                assert.ok(result.stderr.includes('🚀 Launching as Normal ROS Node'), result.stderr);
+                assert.ok(result.stderr.includes(`nested diagnostic: ${showLog}`), result.stderr);
+                assert.strictEqual(result.stderr.includes('conditional diagnostic'), showLog === 'true');
+                for (const diagnostic of ['module', 'opaque', 'shutdown']) {
+                    assert.ok(result.stderr.includes(`${diagnostic} diagnostic {not JSON}`), result.stderr);
+                }
+            });
+        }
+    }
+
     /**
      * Helper function to find the latest ROS 2 distribution
      */
     function findLatestRosDistro(): string | null {
-        const fs = require('fs');
         const rosPath = '/opt/ros';
         
         try {
@@ -82,15 +124,17 @@ describe('Launch Dumper Test', () => {
     /**
      * Helper function to run the dumper script with ROS 2 environment sourced
      */
-    async function runDumper(dumperScript: string, launchFile: string): Promise<{
+    async function runDumper(dumperScript: string, launchFile: string, format = 'json', launchArgs: string[] = []): Promise<{
         exitCode: number;
         stdout: string;
         stderr: string;
     }> {
+        const windows = process.platform === 'win32';
+        const python = windows ? await resolveRosPython(process.env) : undefined;
         return new Promise((resolve, reject) => {
-            const rosDistro = findLatestRosDistro();
+            const rosDistro = windows ? null : findLatestRosDistro();
             
-            if (!rosDistro) {
+            if (!windows && !rosDistro) {
                 // If no ROS installation found, try running without sourcing
                 console.warn('No ROS 2 installation found, attempting to run without sourcing');
             }
@@ -98,33 +142,39 @@ describe('Launch Dumper Test', () => {
             // Create a bash command that sources ROS 2 and then runs the Python script
             const setupScript = rosDistro ? `/opt/ros/${rosDistro}/setup.bash` : '';
             const bashCommand = setupScript 
-                ? `source ${setupScript} && python3 "${dumperScript}" "${launchFile}" --output-format json`
-                : `python3 "${dumperScript}" "${launchFile}" --output-format json`;
+                ? `source ${setupScript} && python3 "${dumperScript}" "${launchFile}" ${launchArgs.join(' ')} --output-format ${format}`
+                : `python3 "${dumperScript}" "${launchFile}" ${launchArgs.join(' ')} --output-format ${format}`;
             
-            const process = spawn('bash', ['-c', bashCommand], {
+            const child = spawn(windows ? python : 'bash', windows
+                ? [dumperScript, launchFile, ...launchArgs, '--output-format', format] : ['-c', bashCommand], {
+                env: process.env,
+                windowsHide: true,
                 timeout: 30000 // 30 second timeout
             });
 
             let stdout = '';
             let stderr = '';
 
-            process.stdout?.on('data', (data) => {
+            child.stdout?.setEncoding('utf8');
+            child.stderr?.setEncoding('utf8');
+
+            child.stdout?.on('data', (data) => {
                 stdout += data.toString();
             });
 
-            process.stderr?.on('data', (data) => {
+            child.stderr?.on('data', (data) => {
                 stderr += data.toString();
             });
 
-            process.on('close', (code) => {
+            child.on('close', (code) => {
                 resolve({
-                    exitCode: code || 0,
+                    exitCode: code ?? -1,
                     stdout,
                     stderr
                 });
             });
 
-            process.on('error', (error) => {
+            child.on('error', (error) => {
                 reject(error);
             });
         });

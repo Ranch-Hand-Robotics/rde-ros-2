@@ -7,7 +7,6 @@ import json
 import os
 import sys
 import subprocess
-from io import StringIO
 from tokenize import Ignore
 from typing import cast
 from typing import Dict
@@ -71,8 +70,9 @@ USE_JSON_OUTPUT = True  # Set to True to use JSON protocol, False for legacy tab
 class LaunchDumperOutput:
     """Handles different output formats for the launch dumper."""
     
-    def __init__(self, use_json=True):
+    def __init__(self, use_json=True, stream=None):
         self.use_json = use_json
+        self.stream = stream if stream is not None else sys.stdout
         self.processes = []
         self.lifecycle_nodes = []
         self.warnings = []
@@ -91,7 +91,7 @@ class LaunchDumperOutput:
             })
         else:
             # Legacy format: tab-separated command
-            print(f'\t{command}')
+            print(f'\t{command}', file=self.stream)
     
     def add_lifecycle_node(self, node_name, node_namespace, package_name, executable, command=None, arguments=None, parameters=None):
         """Add a lifecycle node."""
@@ -139,7 +139,7 @@ class LaunchDumperOutput:
                 "errors": self.errors,
                 "info": self.info
             }
-            print(json.dumps(output, indent=2))
+            print(json.dumps(output, indent=2), file=self.stream)
         # Legacy format outputs as it goes, so no finalization needed
 
 
@@ -257,8 +257,17 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Initialize output handler
-    output_handler = LaunchDumperOutput(use_json=(args.output_format == 'json'))
+    # Reserve stdout for the protocol, including legacy output. Launch's screen
+    # handler may already hold a reference to stdout from import/initialization;
+    # redirecting sys.stdout alone does not redirect that cached stream.
+    output_handler = LaunchDumperOutput(use_json=(args.output_format == 'json'), stream=sys.stdout)
+    # Debug adapters can provide a Unicode stream without TextIOWrapper APIs.
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
+    sys.stdout = sys.stderr
+    launch.logging.launch_config.get_screen_handler().setStream(sys.stderr)
+    # Keep diagnostics redirected through adapter shutdown and atexit callbacks.
+    # Using stderr directly also avoids launch's locale-based Unicode replacement.
 
     # Debug: Check package discovery
     try:
@@ -308,9 +317,7 @@ if __name__ == "__main__":
         # * Here we mimic the run loop inside launch_service,
         #   but without actually kicking off the processes.
         # * Traverse the sub entities by DFS.
-        # * Shadow the stdout to avoid random print outputs.
-        my_stdout = StringIO()
-        sys.stdout = my_stdout
+        # * Only the output handler may write to the saved protocol stream.
         while walker:
             entity = walker.pop()
             
@@ -326,9 +333,7 @@ if __name__ == "__main__":
                         visit_future.reverse()
                         walker.extend(visit_future)
                 except Exception as visit_ex:
-                    sys.stdout = sys.__stdout__
                     output_handler.add_error(f"Could not visit {type(entity).__name__}: {visit_ex}")
-                    sys.stdout = my_stdout
                 continue
             
             # Skip non-process actions that don't represent debuggable entities
@@ -370,9 +375,7 @@ if __name__ == "__main__":
                     visit_future.reverse()
                     walker.extend(visit_future)
             except Exception as visit_ex:
-                sys.stdout = sys.__stdout__
                 output_handler.add_error(f"Could not visit {type(entity).__name__}: {visit_ex}")
-                sys.stdout = my_stdout
                 
                 # For Node entities that fail to visit due to package not found,
                 # try to extract basic information directly without visiting
@@ -437,7 +440,6 @@ if __name__ == "__main__":
             # Process LifecycleNode actions FIRST (before ExecuteProcess since LifecycleNode inherits from it)
             if safe_is_a(entity, LifecycleNode):
                 typed_action = cast(LifecycleNode, entity)
-                sys.stdout = sys.__stdout__
                 
                 try:
                     # Extract lifecycle node information
@@ -494,14 +496,10 @@ if __name__ == "__main__":
                 except Exception as e:
                     output_handler.add_error(f"Could not process LifecycleNode: {e}")
                 
-                sys.stdout = my_stdout
-
             # Process regular Node actions (before ExecuteProcess since Node may create ExecuteProcess)
             elif safe_is_a(entity, Node):
                 typed_action = cast(Node, entity)
-                sys.stdout = sys.__stdout__
                 if typed_action.process_details is not None:
-                    sys.stdout = sys.__stdout__
                     
                     # Process the command using the extracted function
                     cmd_list = typed_action.process_details['cmd']
@@ -517,13 +515,10 @@ if __name__ == "__main__":
                     else:
                         output_handler.add_error(f"Could not process Node: {type(entity).__name__}")
                 
-                sys.stdout = my_stdout
-
             # Process ExecuteProcess actions (regular ROS nodes)               
             elif safe_is_a(entity, ExecuteProcess):
                 typed_action = cast(ExecuteProcess, entity)
                 if typed_action.process_details is not None:
-                    sys.stdout = sys.__stdout__
                     
                     # Process the command using the extracted function
                     cmd_list = typed_action.process_details['cmd']
@@ -537,8 +532,6 @@ if __name__ == "__main__":
                             arguments=arguments
                         )
                     
-                    sys.stdout = my_stdout
-
             # Lifecycle node support
             # https://github.com/ranchhandrobotics/rde-ros-2/issues/632
             # Lifecycle nodes use a long running future to monitor the state of the nodes.
@@ -552,11 +545,7 @@ if __name__ == "__main__":
                 pass
         
     except Exception as ex:
-        sys.stdout = sys.__stdout__
         output_handler.add_error(f"Could not process launch file: {ex}")
-    finally:
-        # Ensure stdout is restored
-        sys.stdout = sys.__stdout__
 
     # Output final results
     output_handler.finalize_output()

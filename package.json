@@ -54,6 +54,11 @@
         "onDebugDynamicConfigurations:ros2"
     ],
     "contributes": {
+        "chatSkills": [
+            {
+                "path": "./assets/skills/rosdep/SKILL.md"
+            }
+        ],
         "commands": [
             {
                 "command": "ROS2.createTerminal",
@@ -750,6 +755,25 @@
                     "args": {
                         "type": "array",
                         "description": "Command line arguments to command"
+                    },
+                    "taskOptions": {
+                        "type": "object",
+                        "description": "Linux/macOS task options applied after the ROS environment is ready.",
+                        "properties": {
+                            "cwd": { "type": "string" },
+                            "env": {
+                                "type": "object",
+                                "additionalProperties": { "type": ["string", "null"] }
+                            },
+                            "shell": {
+                                "type": "object",
+                                "required": ["executable"],
+                                "properties": {
+                                    "executable": { "type": "string" },
+                                    "args": { "type": "array", "items": { "type": "string" } }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -766,6 +790,42 @@
                     "args": {
                         "type": "array",
                         "description": "Command line arguments to colcon"
+                    },
+                    "taskOptions": {
+                        "type": "object",
+                        "description": "Linux/macOS task options applied after the ROS environment is ready.",
+                        "properties": {
+                            "cwd": { "type": "string" },
+                            "env": {
+                                "type": "object",
+                                "additionalProperties": { "type": ["string", "null"] }
+                            },
+                            "shell": {
+                                "type": "object",
+                                "required": ["executable"],
+                                "properties": {
+                                    "executable": { "type": "string" },
+                                    "args": { "type": "array", "items": { "type": "string" } }
+                                }
+                            }
+                        }
+                    },
+                    "buildOptions": {
+                        "type": "object",
+                        "description": "Windows colcon build execution options, resolved before compiler preflight.",
+                        "properties": {
+                            "cwd": {
+                                "type": "string",
+                                "description": "Build working directory (defaults to the workspace folder)."
+                            },
+                            "env": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": ["string", "null"]
+                                },
+                                "description": "Environment overrides applied before compiler preflight. Null removes a variable."
+                            }
+                        }
                     }
                 }
             }
@@ -816,6 +876,8 @@
         "build:openvsx": "node scripts/build-openvsx.js",
         "reset:ros:macos": "node scripts/reset-ros-macos.js",
         "test:installer": "npm run test-compile && node --test test/pixi-installer.test.js test/reset-ros-macos.test.js",
+        "test:images": "npm run test-compile && node --test test/image-subscription.test.js",
+        "test:discovery": "npm run test-compile && node --test test/windows-environment.test.js test/windows-toolchain-installer.test.js test/ros-setup-discovery.test.js test/windows-build-preflight.test.js test/ros-python.test.js test/deferred-ros-task.test.js",
         "lint": "eslint -p ./",
         "pretest": "npm run build && npm run test-compile",
         "test": "node ./out/test/runTest.js",

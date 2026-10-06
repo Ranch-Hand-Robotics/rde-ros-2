@@ -3,13 +3,8 @@
 
 import * as vscode from "vscode";
 
-import * as path from "path";
-import * as child_process from "child_process";
-import * as extension from "../extension";
-import * as common from "./common";
 import * as rosShell from "./ros-shell";
 import * as colconUtils from "./colcon-utils";
-import { env } from "process";
 
 export const COLCON_TASK_TYPE = "colcon";
 const COLCON_COMMAND = "colcon";
@@ -29,17 +24,11 @@ async function makeColcon(name: string, command: string, verb: string, args: str
 
     const baseArgs = [verb, installType, '--event-handlers', 'console_cohesion+', '--base-paths', vscode.workspace.rootPath, `--cmake-args`, ...args];
     
-    // Add --packages-select to filter out ignored packages
-    const workspaceRoot = vscode.workspace.rootPath;
-    if (workspaceRoot) {
-        const nonIgnoredPackages = await colconUtils.getNonIgnoredPackages(workspaceRoot);
-        if (nonIgnoredPackages.length > 0) {
-            // Insert --packages-select before --cmake-args
-            const cmakeArgsIndex = baseArgs.indexOf('--cmake-args');
-            if (cmakeArgsIndex !== -1) {
-                baseArgs.splice(cmakeArgsIndex, 0, '--packages-select', ...nonIgnoredPackages);
-            }
-        }
+    // Task discovery must work before ROS/colcon is installed or activated.
+    const ignored = Object.entries(colconUtils.getColconIgnoreConfig())
+        .filter(([, ignored]) => ignored).map(([name]) => name);
+    if (ignored.length) {
+        baseArgs.splice(baseArgs.indexOf('--cmake-args'), 0, '--packages-skip', ...ignored);
     }
 
     // The task type must match the provider id ('colcon') so VS Code can map tasks to this provider.
@@ -54,6 +43,9 @@ async function makeColcon(name: string, command: string, verb: string, args: str
  */
 export class ColconProvider implements vscode.TaskProvider {
     public async provideTasks(token?: vscode.CancellationToken): Promise<vscode.Task[]> {
+        if (!vscode.workspace.rootPath) {
+            return [];
+        }
         const make = await makeColcon('Colcon Build Release', 'colcon', 'build', [`-DCMAKE_BUILD_TYPE=RelWithDebInfo`], 'build');
         make.group = vscode.TaskGroup.Build;
 
@@ -85,23 +77,7 @@ export class ColconProvider implements vscode.TaskProvider {
 }
 
 export async function isApplicable(dir: string): Promise<boolean> {
-    let colconCommand: string;
-    if (process.platform === "win32") {
-        colconCommand = `colcon --log-base nul list --base-paths \"${dir}\"`;
-    } else {
-        colconCommand = `colcon --log-base /dev/null list --base-paths ${dir}`;
-    }
-
-    const { stdout, stderr } = await child_process.exec(colconCommand, { env: extension.env });
-
-    // Does this workspace have packages?
-    for await (const line of stdout) {
-        // Yes.
-        return true;
-    }
-
-    // no.
-    return false;
+    return (await colconUtils.getPackages(dir)).length > 0;
 }
 
 /**
@@ -120,8 +96,9 @@ export async function makeColconPackageTask(packageName: string, buildType: stri
         'console_cohesion+',
         '--base-paths',
         vscode.workspace.rootPath,
-        '--packages-select',
+        process.platform === "win32" ? '--packages-up-to' : '--packages-select',
         packageName,
+        ...(process.platform === "win32" ? colconUtils.getColconIgnoreArgs() : []),
         '--cmake-args',
         `-DCMAKE_BUILD_TYPE=${buildType}`
     ];

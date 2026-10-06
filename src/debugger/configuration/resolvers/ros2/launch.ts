@@ -19,8 +19,9 @@ import * as requests from "../../../requests";
 import * as utils from "../../../utils";
 import { rosApi } from "../../../../ros/ros";
 import * as lifecycle from "../../../../ros/ros2/lifecycle";
+import { resolveRosPython } from "../../../../ros/python";
 
-const promisifiedExec = util.promisify(child_process.exec);
+const promisifiedExecFile = util.promisify(child_process.execFile);
 
 
 
@@ -79,6 +80,7 @@ interface IPythonLaunchConfiguration {
     env: { [key: string]: string };
     stopOnEntry: boolean;
     justMyCode: boolean;
+    python?: string;
     pathMappings?: Array<{ localRoot: string; remoteRoot: string; }>;
 }
 
@@ -411,11 +413,6 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
                 args.push(`${arg}`);
             }
         }
-        let flatten_args = args.join(' ')
-        
-        // Use the detected Python command for better virtual environment support
-        let ros2_launch_dumper_cmdLine = `python3 ${ros2_launch_dumper} "${config.target}" ${flatten_args}`;
-
         // Remove LD_DEBUG environment variable for the launch dumper to prevent conflicts
         // but preserve them in the original environment for the actual processes
         const cleanedEnv = { ...rosExecOptions.env };
@@ -427,12 +424,14 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
         }
 
         // Use cleaned environment for the dumper
-        const dumperExecOptions: child_process.ExecOptions = {
-            ...rosExecOptions,
-            env: cleanedEnv
+        const dumperExecOptions: child_process.ExecFileOptions = {
+            env: cleanedEnv,
+            windowsHide: true
         };
 
-        let result = await promisifiedExec(ros2_launch_dumper_cmdLine, dumperExecOptions);
+        const python = await resolveRosPython(cleanedEnv);
+        extension.outputChannel.appendLine(`ROS launch Python: ${python}`);
+        const result = await promisifiedExecFile(python, [ros2_launch_dumper, config.target, ...args], dumperExecOptions);
 
         if (result.stderr) {
             // Having stderr output is not necessarily a problem, but it is useful for debugging
@@ -676,6 +675,9 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
             if (!debugConfig) {
                 throw (new Error(`Failed to create a debug configuration!`));
             }
+            if (debugConfig.type === "python") {
+                (debugConfig as IPythonLaunchConfiguration).python = await resolveRosPython(request.env);
+            }
             const launched = await vscode.debug.startDebugging(undefined, debugConfig);
             if (!launched) {
                 throw (new Error(`Failed to start debug session!`));
@@ -710,6 +712,9 @@ export class LaunchResolver implements vscode.DebugConfigurationProvider {
 
                 if (!debugConfig) {
                     throw (new Error(`Failed to create a debug configuration!`));
+                }
+                if (debugConfig.type === "python") {
+                    (debugConfig as IPythonLaunchConfiguration).python = await resolveRosPython(request.env);
                 }
                 const launched = await vscode.debug.startDebugging(undefined, debugConfig);
                 if (!launched) {

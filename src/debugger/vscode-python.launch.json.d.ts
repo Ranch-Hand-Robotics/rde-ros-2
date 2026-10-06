@@ -24,6 +24,9 @@ interface IPythonLaunchConfiguration {
      */
     pythonPath?: string;
 
+    /** Interpreter used by the Python debug adapter. */
+    python?: string;
+
     /**
      * Command line arguments passed to the program
      */
