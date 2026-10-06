@@ -154,12 +154,24 @@ function harness(settings = {}) {
   const execution = loadWithMocks("../out/src/build-tool/windows-colcon-task", {
     vscode: h.vscode, child_process: h.cp, "./windows-build-preflight": h.preflight,
   }, platform, h.process);
+  const deferredExecution = loadWithMocks("../out/src/build-tool/deferred-ros-task", {
+    vscode: h.vscode, child_process: h.cp,
+  }, platform, h.process);
   h.shell = loadWithMocks("../out/src/build-tool/ros-shell", {
     vscode: h.vscode, "../extension": h.extension, "./windows-colcon-task": execution,
+    "./deferred-ros-task": deferredExecution,
   }, platform, h.process);
   const noDiscoveryPrerequisite = new Proxy({}, {
     get: (_, name) => assert.fail(`Colcon task discovery must not access filesystem/subprocess APIs: ${String(name)}`),
   });
+  const colconUtils = loadWithMocks("../out/src/build-tool/colcon-utils", {
+    vscode: h.vscode, "../extension": h.extension,
+    "../vscode-utils": { getExtensionConfiguration: () => ({ get: (key, fallback) => {
+      assert.equal(key, "colconIgnore");
+      return settings.ignored ?? fallback;
+    } }) },
+    child_process: { execFile: () => assert.fail("Skip configuration must not execute colcon") },
+  }, platform);
   h.colcon = loadWithMocks("../out/src/build-tool/colcon", {
     vscode: h.vscode, "./ros-shell": h.shell,
     fs: noDiscoveryPrerequisite, "node:fs": noDiscoveryPrerequisite,
@@ -170,7 +182,7 @@ function harness(settings = {}) {
       assert.fail("Task discovery must not require package.xml");
     } },
     "./colcon-utils": {
-      getColconIgnoreConfig: () => settings.ignored ?? {},
+      ...colconUtils,
       getNonIgnoredPackages: async () => {
         assert.notEqual(platform, "win32", "Windows task discovery must not run colcon list");
         h.packageLists.push("getNonIgnoredPackages");
@@ -193,6 +205,7 @@ function harness(settings = {}) {
     "./ros-test-provider": { TestType: { CppGtest: "cpp_gtest" } },
     "./test-discovery-utils": { TestDiscoveryUtils: { getCppTestExecutable: () => "camera_test" } },
     "../build-tool/windows-build-preflight": h.preflight,
+    "../build-tool/colcon-utils": colconUtils,
   }, platform, h.process);
   h.runner = new RosTestRunner({});
   h.make = (definition = {}) => h.shell.make("fixture build", {
@@ -653,7 +666,7 @@ for (const fallback of [false, true]) {
 }
 
 for (const platform of ["win32", "linux", "darwin"]) {
-  test(`${platform}: non-build tasks remain shell executions; non-Windows builds remain unchanged`, async () => {
+  test(`${platform}: only Windows builds use compiler preflight; Unix tasks defer environment resolution`, async () => {
     const h = harness({ platform });
     const definitions = [
       { type: "colcon", command: "colcon", args: ["test"] },
@@ -665,26 +678,32 @@ for (const platform of ["win32", "linux", "darwin"]) {
     if (platform !== "win32") { definitions.push({ type: "colcon", command: "colcon", args: ["build"] }); }
     for (const definition of definitions) {
       const task = h.shell.make("unchanged", definition);
-      assert.ok(task.execution instanceof h.vscode.ShellExecution);
-      assert.equal(task.execution.command, definition.command);
-      assert.deepEqual(task.execution.args, definition.args ?? []);
-      assert.equal(task.execution.options.env, h.extension.env);
+      if (platform === "win32") {
+        assert.ok(task.execution instanceof h.vscode.ShellExecution);
+        assert.equal(task.execution.command, definition.command);
+        assert.deepEqual(task.execution.args, definition.args ?? []);
+        assert.equal(task.execution.options.env, h.extension.env);
+      } else {
+        assert.ok(task.execution instanceof h.vscode.CustomExecution);
+        await terminal(task);
+      }
       assert.equal(task.definition.options, undefined);
     }
     if (platform !== "win32") {
       const tasks = await new h.colcon.ColconProvider().provideTasks();
       for (const task of tasks) {
-        assert.ok(task.execution instanceof h.vscode.ShellExecution);
+        assert.ok(task.execution instanceof h.vscode.CustomExecution);
         assert.ok(task.definition.args.includes("--symlink-install"));
       }
       const packageTask = await h.colcon.makeColconPackageTask("camera");
-      assert.ok(packageTask.execution instanceof h.vscode.ShellExecution);
+      assert.ok(packageTask.execution instanceof h.vscode.CustomExecution);
       assert.ok(packageTask.definition.args.includes("--packages-select"));
       assert.ok(!packageTask.definition.args.includes("--packages-up-to"));
     }
     assert.deepEqual(h.activations, []);
     assert.deepEqual(h.warnings, []);
     assert.deepEqual(h.spawns, []);
+    assert.equal(h.envReads, 0);
   });
 }
 
@@ -848,6 +867,54 @@ test("Windows skip configuration is reread rather than cached by a provider", as
   assert.ok((await provider.provideTasks()).every(task => task.definition.args.includes("--packages-skip")));
   assert.deepEqual(h.packageLists, []);
   assert.deepEqual(h.events, []);
+});
+
+for (const platform of ["win32", "linux", "darwin"]) {
+  test(`${platform} generated package and Test Explorer builds reread ignore config without changing explicit selection`, async () => {
+    const settings = { platform, ignored: { broken_package: true, camera: false } };
+    const h = harness(settings);
+    for (const [index, ignored] of [
+      { broken_package: true, camera: false },
+      { broken_package: false, camera: true, other_dependency: true },
+      { camera: false, other_dependency: false },
+    ].entries()) {
+      settings.ignored = ignored;
+      const snapshot = { ...ignored };
+      const task = await h.colcon.makeColconPackageTask("camera");
+      await h.runner.buildTestExecutable("camera", false);
+      const skipArgs = platform === "win32"
+        ? Object.keys(ignored).filter(name => ignored[name]) : [];
+      for (const args of [task.definition.args, h.spawns[index].args]) {
+        const selection = platform === "win32" ? "--packages-up-to" : "--packages-select";
+        assert.equal(args[args.indexOf(selection) + 1], "camera");
+        if (skipArgs.length) {
+          assert.deepEqual(args.slice(args.indexOf("--packages-skip"), args.indexOf("--cmake-args")),
+            ["--packages-skip", ...skipArgs]);
+          assert.equal(args.filter(arg => arg === "--packages-skip").length, 1);
+        } else {
+          assert.ok(!args.includes("--packages-skip"));
+        }
+        assert.equal(args.at(-1), "-DCMAKE_BUILD_TYPE=RelWithDebInfo");
+      }
+      assert.deepEqual(ignored, snapshot, "Reading skip configuration must not mutate it");
+    }
+    assert.deepEqual(h.packageLists, [], "Selecting ignored packages must not need discovery");
+  });
+}
+
+test("Windows configured ignores do not alter custom package selection or skip arguments", async () => {
+  const h = harness({ ignored: { camera: true, unrelated: true } });
+  for (const selection of ["--packages-select", "--packages-up-to"]) {
+    const args = ["build", selection, "camera", "--packages-skip", "custom_skip", "--cmake-args", "-DCUSTOM=ON"];
+    const task = new h.colcon.ColconProvider().resolveTask({ definition: {
+      type: "colcon", command: "colcon", args,
+    } });
+    const run = await terminal(task);
+    run.pty.open();
+    assert.equal(await run.done, 0);
+    assert.deepEqual(h.spawns.at(-1).args,
+      ["build", selection, "camera", "--packages-skip", "custom_skip", "--cmake-args", "-DCUSTOM=ON"]);
+  }
 });
 
 test("PTY waits for fresh ROS preparation and uses its result, not the compiler-only environment", async () => {
@@ -1035,6 +1102,98 @@ for (const debug of [false, true]) {
     assert.equal(h.envReads, 0);
     assert.equal(h.extension.env, undefined, "Recovery must not depend on startup environment being populated");
     assert.deepEqual(h.warnings, []);
+  });
+}
+
+for (const debug of [false, true]) {
+  for (const initiallyBuilt of [false, true]) {
+    test(`Test Explorer consecutive ${debug ? "debug" : "run"} requests refresh existing binaries after undefined startup (${initiallyBuilt ? "already built" : "recovery build"})`, async () => {
+      let configuration = "first setup";
+      const h = harness({
+        prepareRos: async env => ({ ...env, ROS_SETUP: configuration }),
+        prepareRuntime: async env => ({ ...env, RUNTIME_OVERLAY: configuration }),
+      });
+      h.extension.env = undefined;
+      h.extension.resolvedEnv = () => {
+        h.envReads++;
+        assert.fail("Existing binaries must not wait for undefined startup or reuse stale runtime state");
+      };
+      const executable = path.join(h.workspace, "build", "camera", "camera_test.exe");
+      let built = initiallyBuilt;
+      h.runner.findTestExecutable = () => {
+        if (!built) { built = true; return undefined; }
+        return executable;
+      };
+      for (const index of [0, 1]) {
+        configuration = `setup ${index}`;
+        h.process.env = { Path: `C:\\host${index}`, HOST_VALUE: String(index) };
+        // Recovery stays undefined across both runs; pre-existing binaries also cover stale startup state.
+        if (initiallyBuilt && index === 1) { h.extension.env = { STALE_RUNTIME_HOOK: "stale startup" }; }
+        const startupEnv = h.extension.env;
+        const startupSnapshot = startupEnv && { ...startupEnv };
+        const hostSnapshot = { ...h.process.env };
+        await h.runner.runTest({
+          type: "cpp_gtest", packageName: "camera", filePath: "camera_test.cpp",
+          testClass: "Camera", testMethod: "CapturesFrame",
+        }, debug);
+        const expected = { ...hostSnapshot, ROS_SETUP: configuration, RUNTIME_OVERLAY: configuration };
+        const runtime = debug
+          ? Object.fromEntries(h.debugSessions[index].config.environment.map(({ name, value }) => [name, value]))
+          : h.spawns.at(-1).options.env;
+        assert.deepEqual(runtime, expected, "Each request must use fresh underlays and runtime overlay");
+        assert.deepEqual(h.activations[index].env, hostSnapshot);
+        assert.deepEqual(h.preparationOptions[index], { cwd: h.workspace });
+        assert.deepEqual(h.runtimePreparations[index], {
+          env: { ...hostSnapshot, ROS_SETUP: configuration }, workspace: h.workspace,
+        });
+        assert.equal(h.extension.env, startupEnv, "Never publish a build-only or test-local environment");
+        assert.deepEqual(h.extension.env, startupSnapshot);
+        assert.deepEqual(h.process.env, hostSnapshot);
+        assert.equal(h.spawns.filter(spawn => spawn.command === "colcon").length, initiallyBuilt ? 0 : 1,
+          "Existing binaries must never be rebuilt");
+      }
+      assert.equal(h.envReads, 0);
+      assert.equal(h.activations.length, 2);
+      assert.equal(h.runtimePreparations.length, 2);
+      assert.deepEqual(h.events, [
+        "compiler", "ros", ...(initiallyBuilt ? [] : ["spawn"]), "runtime", debug ? "debug" : "spawn",
+        "compiler", "ros", "runtime", debug ? "debug" : "spawn",
+      ]);
+      assert.deepEqual(h.warnings, []);
+    });
+  }
+}
+
+for (const [debug, failure] of [false, true].flatMap(debug =>
+  ["compiler", "ros", "runtime"].map(failure => [debug, failure]))) {
+  test(`Test Explorer existing executable stops on ${failure} failure before ${debug ? "debugging" : "execution"}`, async () => {
+    const h = harness({
+      activate: async env => {
+        if (failure === "compiler") { throw new Error("fixture missing SDK"); }
+        return env;
+      },
+      prepareRos: async env => {
+        if (failure === "ros") { throw new Error("fixture underlay failed"); }
+        return env;
+      },
+      prepareRuntime: async () => { throw new Error("fixture runtime failed"); },
+    });
+    h.extension.env = undefined;
+    h.extension.resolvedEnv = () => assert.fail("Existing executables must bypass startup resolution");
+    h.runner.findTestExecutable = () => path.join(h.workspace, "build", "camera", "camera_test.exe");
+    await assert.rejects(h.runner.runTest({
+      type: "cpp_gtest", packageName: "camera", filePath: "camera_test.cpp",
+    }, debug), {
+      compiler: /install or repair the Windows C\+\+ toolchain/,
+      ros: /fixture underlay failed/,
+      runtime: /fixture runtime failed/,
+    }[failure]);
+    assert.deepEqual(h.events, {
+      compiler: ["compiler"], ros: ["compiler", "ros"], runtime: ["compiler", "ros", "runtime"],
+    }[failure]);
+    assert.deepEqual(h.spawns, [], "Neither a rebuild nor a test may start");
+    assert.deepEqual(h.debugSessions, []);
+    assert.equal(h.extension.env, undefined);
   });
 }
 

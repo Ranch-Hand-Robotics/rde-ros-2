@@ -10,6 +10,7 @@ import * as vscode_utils from "../vscode-utils";
 import { TestType, RosTestData } from "./ros-test-provider";
 import { TestDiscoveryUtils } from "./test-discovery-utils";
 import { preflightWindowsBuild } from "../build-tool/windows-build-preflight";
+import { getColconIgnoreArgs } from "../build-tool/colcon-utils";
 import { buildInstallPrefixes, cleanBuildEnvironment } from "../ros/build-environment";
 
 /**
@@ -182,6 +183,10 @@ export class RosTestRunner {
             } catch (buildError) {
                 throw new Error(`Failed to build C++ test package ${testData.packageName}: ${buildError.message}`);
             }
+        } else if (process.platform === "win32") {
+            // Existing binaries still need fresh underlays and the runtime overlay after startup recovery.
+            env = await this.prepareBuildEnvironment(workspaceRoot);
+            env = await extension.prepareRosTestEnvironment(env, workspaceRoot);
         }
         
         env ??= await extension.resolvedEnv();
@@ -288,14 +293,9 @@ export class RosTestRunner {
     }
     
     /**
-     * Build test executable using colcon directly (no visible terminals)
+     * Prepare a local build environment without relying on or publishing startup state.
      */
-    private async buildTestExecutable(packageName: string, debug: boolean): Promise<NodeJS.ProcessEnv> {
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
-        if (!workspaceRoot) {
-            throw new Error("No workspace folder found");
-        }
-        
+    private async prepareBuildEnvironment(workspaceRoot: string): Promise<NodeJS.ProcessEnv> {
         let env = process.platform === "win32"
             ? cleanBuildEnvironment(process.env, buildInstallPrefixes(workspaceRoot, {}))
             : await extension.resolvedEnv();
@@ -306,6 +306,19 @@ export class RosTestRunner {
             if (!env) { throw new Error("Colcon build stopped: install or repair the Windows C++ toolchain, then retry."); }
             env = await extension.prepareRosBuildEnvironment(env, { cwd: workspaceRoot });
         }
+        return env;
+    }
+
+    /**
+     * Build test executable using colcon directly (no visible terminals)
+     */
+    private async buildTestExecutable(packageName: string, debug: boolean): Promise<NodeJS.ProcessEnv> {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+        if (!workspaceRoot) {
+            throw new Error("No workspace folder found");
+        }
+
+        const env = await this.prepareBuildEnvironment(workspaceRoot);
         const buildType = debug ? 'Debug' : 'RelWithDebInfo';
         
         let installType = '--symlink-install';
@@ -319,6 +332,7 @@ export class RosTestRunner {
             process.platform === "win32" ? '--packages-up-to' : '--packages-select', packageName,
             '--event-handlers', 'console_cohesion+',
             '--base-paths', workspaceRoot,
+            ...(process.platform === "win32" ? getColconIgnoreArgs() : []),
             '--cmake-args', `-DCMAKE_BUILD_TYPE=${buildType}`
         ];
         

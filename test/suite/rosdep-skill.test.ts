@@ -60,7 +60,18 @@ describe("Bundled rosdep skill", () => {
     assert.ok(walkthrough.includes("peer-directory destination"));
     assert.ok(guide.includes("Older VS Code versions"));
     assert.ok(guide.includes("not a deterministic dependency resolver"));
-    assert.ok(fs.readFileSync(path.join(root, "mkdocs.yml"), "utf8").includes("dependency-recovery.md"));
+    const config = yaml.load(fs.readFileSync(path.join(root, "mkdocs.yml"), "utf8")) as {
+      nav: Array<Record<string, string | string[]>>;
+    };
+    const usage = config.nav.find(section => section.Usage)?.Usage;
+    assert.ok(Array.isArray(usage));
+    assert.ok(usage.includes("pixi.md"));
+    assert.ok(usage.includes("dependency-recovery.md"), "Guides must be separate navigation entries");
+    for (const section of config.nav) {
+      for (const target of Object.values(section).flat()) {
+        assert.ok(fs.statSync(path.join(root, "docs", target)).isFile(), `Missing navigation target: ${target}`);
+      }
+    }
   });
 
   it("seeds diagnostics mappings without treating the catalog as an install list", () => {

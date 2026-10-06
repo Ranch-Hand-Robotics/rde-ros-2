@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const childProcess = require("node:child_process");
+const { readFileSync } = require("node:fs");
 const fs = require("node:fs/promises");
 const Module = require("node:module");
 const os = require("node:os");
@@ -14,22 +15,27 @@ class EventEmitter {
   dispose() {}
 }
 
-function loadWithMocks(filename, mocks, stubOtherLocalImports = false) {
+// Inject process only into the compiled module; never change the host platform.
+// Mock installation is synchronous and restored before any asynchronous work.
+function loadWithMocks(filename, mocks, stubOtherLocalImports = false, localProcess = process) {
   const resolved = require.resolve(filename);
   const original = Module._load;
-  delete require.cache[resolved];
+  const loaded = new Module(resolved, module);
+  loaded.filename = resolved;
+  loaded.paths = Module._nodeModulePaths(path.dirname(resolved));
+  loaded.testProcess = localProcess;
   Module._load = function(request, parent, isMain) {
-    if (parent?.filename === resolved) {
+    if (parent === loaded) {
       if (Object.hasOwn(mocks, request)) { return mocks[request]; }
       if (stubOtherLocalImports && request.startsWith(".")) { return {}; }
     }
     return original.call(this, request, parent, isMain);
   };
   try {
-    return require(resolved);
+    loaded._compile("const process = module.testProcess;\n" + readFileSync(resolved, "utf8"), resolved);
+    return loaded.exports;
   } finally {
     Module._load = original;
-    delete require.cache[resolved];
   }
 }
 
@@ -134,13 +140,17 @@ test("Linux retains standard bash/sh discovery and macOS prefers its cached Pixi
 // run build tools, launch installers, or access the host's installations.
 function activationHarness({ files = [], configured = "", explicit = "", failExplicit = false,
   workspace, source, probe, buildToolDetected = false, overlayText } = {}) {
+  // activate() changes ROS_DISTRO after loading; keep env live, not a snapshot.
+  const windowsProcess = { ...process, platform: "win32", get env() { return process.env; } };
   const loaded = discovery(files);
   loaded.promises.readFile = async filename => {
     await loaded.promises.access(filename).catch(() => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); });
     return overlayText ?? ':: generated from colcon_core/shell/template/prefix_chain.bat.em\n' +
       'call:_colcon_prefix_chain_bat_call_script "%%~dp0local_setup.bat"\n';
   };
-  const buildEnvironment = loadWithMocks("../out/src/ros/build-environment", { fs: { promises: loaded.promises } });
+  const buildEnvironment = loadWithMocks("../out/src/ros/build-environment", {
+    fs: { promises: loaded.promises }, path: path.win32,
+  }, false, windowsProcess);
   const sourced = [];
   const sourceCalls = [];
   const logs = [];
@@ -179,6 +189,7 @@ function activationHarness({ files = [], configured = "", explicit = "", failExp
   };
   const colcon = loadWithMocks("../out/src/build-tool/colcon", {
     vscode,
+    path: path.win32,
     "./ros-shell": { make: (name, definition) => ({ name, definition }) },
     "../vscode-utils": { workspaceContainsPackageXml: () => assert.fail("Tasks must not require package.xml") },
     "./colcon-utils": {
@@ -186,7 +197,7 @@ function activationHarness({ files = [], configured = "", explicit = "", failExp
       getPackages: () => assert.fail("Activation task discovery must not run colcon list"),
       getNonIgnoredPackages: () => assert.fail("Activation task discovery must not run colcon list"),
     },
-  });
+  }, false, windowsProcess);
   const execFile = () => assert.fail("CLI checks must use promisified execFile");
   execFile[promisify.custom] = async (command, args, options) => {
     h.probes.push({ command, args, options });
@@ -194,6 +205,7 @@ function activationHarness({ files = [], configured = "", explicit = "", failExp
   };
   const extension = loadWithMocks("../out/src/extension", {
     vscode,
+    path: path.win32,
     child_process: { execFile, spawn: () => assert.fail("Never spawn a build during ROS preparation") },
     fs: { promises: loaded.promises },
     "./build-tool/colcon": colcon,
@@ -244,7 +256,7 @@ function activationHarness({ files = [], configured = "", explicit = "", failExp
     "./build-tool/ros-shell": { registerRosShellTaskProvider: () => [] },
     "./debugger/manager": { registerRosDebugManager() {} },
     "./ros/installer/install-ros": { promptInstallRosIfNeeded: async () => {} },
-  }, true);
+  }, true, windowsProcess);
   extension.outputChannel = { appendLine: text => logs.push(text) };
   return { ...h, extension, context, get discoveries() { return h.discoveries; } };
 }
@@ -266,6 +278,52 @@ test("activation uses cached setup even with configured distro and stale inherit
   assert.deepEqual(result.sourced, [cachedSetup, cachedSetup]);
   assert.equal(result.env.ROS_DISTRO, "lyrical");
   assert.ok(result.logs.some(line => line.includes("Ignoring ROS_DISTRO")));
+});
+
+test("Windows activation, underlays and probes are independent of the unmodified host platform", async () => {
+  const hostPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+  const hostEnv = process.env;
+  const inheritedDistro = process.env.ROS_DISTRO;
+  const nativeJoin = path.join;
+  const originalLoad = Module._load;
+  const assertHostUnchanged = () => {
+    assert.deepEqual(Object.getOwnPropertyDescriptor(process, "platform"), hostPlatform);
+    assert.equal(process.platform, os.platform());
+    assert.equal(process.env, hostEnv);
+    assert.equal(path.join, nativeJoin);
+    assert.equal(Module._load, originalLoad);
+  };
+  const workspace = "C:\\portable fixture";
+  const install = path.win32.join(workspace, "install");
+  const overlay = path.win32.join(install, "setup.bat");
+  const external = "D:\\external fixture\\local_setup.bat";
+  const h = await activate({ workspace, configured: "lyrical", inherited: "jazzy",
+    files: [cachedSetup, overlay, external],
+    overlayText: ':: generated from colcon_core/shell/template/prefix_chain.bat.em\n' +
+      `call:_colcon_prefix_chain_bat_call_script "${external}"`,
+    source: async (script, base) => {
+      assertHostUnchanged();
+      await new Promise(resolve => setImmediate(resolve));
+      assertHostUnchanged();
+      return { ...base, ROS_VERSION: "2", ROS_DISTRO: "lyrical",
+        ...(script === external ? { EXTERNAL: "ready" } : {}) };
+    },
+    probe: async () => { assertHostUnchanged(); return { stdout: "help", stderr: "" }; },
+  });
+  assertHostUnchanged();
+  assert.equal(process.env.ROS_DISTRO, inheritedDistro);
+  assert.match(h.logs.join("\n"), /Ignoring ROS_DISTRO \(jazzy\)/, "Module-local process must see activate() env changes");
+  assert.deepEqual(h.sourced, [cachedSetup, overlay, cachedSetup, overlay]);
+  const tasks = await h.registrations[0].provider.provideTasks();
+  assert.equal(tasks.length, 4);
+  assert.ok(tasks.every(task => task.definition.args.includes("--merge-install")));
+  const prepared = await h.extension.prepareRosBuildEnvironment({ COLCON_PREFIX_PATH: install });
+  assert.deepEqual(h.sourced.slice(4), [cachedSetup, external]);
+  assert.equal(prepared.COLCON_PREFIX_PATH, undefined);
+  assert.equal(prepared.EXTERNAL, "ready");
+  assert.deepEqual(h.probes.map(({ command }) => command), ["ros2.exe", "colcon.exe"]);
+  assert.ok(h.probes.every(({ args, options }) => args[0] === "--help" && options.env === prepared && options.cwd === workspace));
+  assertHostUnchanged();
 });
 
 test("activation auto-selects duplicate distro installations using the cached script", async () => {
@@ -385,7 +443,7 @@ for (const workspace of ["C:\\empty non-ROS workspace", undefined]) {
 for (const explicit of [false, true]) {
   test(`build preparation freshly sources ${explicit ? "explicit" : "discovered"} underlay but never a valid self overlay before native help probes`, async () => {
     const workspace = "C:\\fixture user's & workspace!";
-    const overlay = path.join(workspace, "install", "setup.bat");
+    const overlay = path.win32.join(workspace, "install", "setup.bat");
     const setup = explicit ? globalSetup : cachedSetup;
     const h = activationHarness({ files: [cachedSetup, globalSetup, overlay], configured: "lyrical",
       explicit: explicit ? globalSetup : "", workspace,
@@ -424,7 +482,7 @@ for (const explicit of [false, true]) {
 for (const kind of ["explicit", "discovered"]) {
   test(`strict build preparation aborts on ${kind} source failure and shows detailed output`, async () => {
     const workspace = "C:\\fixture workspace";
-    const overlay = path.join(workspace, "install", "setup.bat");
+    const overlay = path.win32.join(workspace, "install", "setup.bat");
     const failedScript = kind === "explicit" ? globalSetup : kind === "overlay" ? overlay : cachedSetup;
     const failure = Object.assign(new Error("fixture setup failed"), { code: 23, signal: "SIGTERM", stderr: "  setup stderr detail\n" });
     const h = activationHarness({ files: [globalSetup, cachedSetup, overlay], configured: "lyrical", workspace,
@@ -505,10 +563,10 @@ for (const files of [[], [cachedSetup]]) {
 
 test("partial workspace hooks and repeated self parents cannot prevent a clean recovery build", async () => {
   const workspace = "S:\\ws\\fixture camera";
-  const install = path.join(workspace, "install");
-  const overlay = path.join(install, "setup.bat");
-  const local = path.join(install, "local_setup.bat");
-  const packageHook = path.join(install, "share", "camera", "package.bat");
+  const install = path.win32.join(workspace, "install");
+  const overlay = path.win32.join(install, "setup.bat");
+  const local = path.win32.join(install, "local_setup.bat");
+  const packageHook = path.win32.join(install, "share", "camera", "package.bat");
   const external = "D:\\external deps\\install\\local_setup.bat";
   const overlayText = ':: generated from colcon_core/shell/template/prefix_chain.bat.em\n' +
     [cachedSetup, cachedSetup.toLowerCase(), external, `${install}\\local_setup.bat`,
@@ -549,7 +607,7 @@ test("partial workspace hooks and repeated self parents cannot prevent a clean r
 
 test("a broken recorded external parent is fatal, not silently discarded for recovery", async () => {
   const workspace = "C:\\fixture workspace";
-  const overlay = path.join(workspace, "install", "setup.bat");
+  const overlay = path.win32.join(workspace, "install", "setup.bat");
   const parent = "D:\\external\\local_setup.bat";
   const h = activationHarness({ workspace, files: [cachedSetup, overlay, parent], configured: "lyrical",
     overlayText: ':: generated from colcon_core/shell/template/prefix_chain.bat.em\n' +
@@ -565,12 +623,12 @@ test("a broken recorded external parent is fatal, not silently discarded for rec
 
 test("selected self-overlay and external underlay that reintroduces self paths fail explicitly", async () => {
   const workspace = "C:\\fixture workspace";
-  const overlay = path.join(workspace, "install", "setup.bat");
+  const overlay = path.win32.join(workspace, "install", "setup.bat");
   const self = activationHarness({ workspace, files: [overlay], explicit: overlay });
   await assert.rejects(self.extension.prepareRosBuildEnvironment({}), /Selected ROS underlay is inside/);
   assert.deepEqual(self.sourced, []);
   const h = activationHarness({ workspace, files: [cachedSetup], configured: "lyrical", source: async () => ({
-    ROS_VERSION: "2", ROS_DISTRO: "lyrical", COLCON_PREFIX_PATH: path.join(workspace, "install"), PARTIAL: "hook",
+    ROS_VERSION: "2", ROS_DISTRO: "lyrical", COLCON_PREFIX_PATH: path.win32.join(workspace, "install"), PARTIAL: "hook",
   }) });
   await assert.rejects(h.extension.prepareRosBuildEnvironment({}), /reintroduced the current workspace install/);
   assert.deepEqual(h.probes, []);
@@ -584,7 +642,7 @@ test("inherited ROS identity cannot make a broken selected underlay pass validat
 
 test("runtime activation still sources valid overlays and reports broken overlays", async () => {
   const workspace = "C:\\fixture workspace";
-  const overlay = path.join(workspace, "install", "setup.bat");
+  const overlay = path.win32.join(workspace, "install", "setup.bat");
   for (const broken of [false, true]) {
     const h = await activate({ workspace, files: [cachedSetup, overlay], configured: "lyrical", source: async (script, base) => {
       if (script === overlay && broken) { throw new Error("runtime missing package hook"); }
@@ -601,7 +659,7 @@ test("runtime activation still sources valid overlays and reports broken overlay
 
 test("postbuild runtime sources local hooks strictly, not the contaminated prefix chain", async () => {
   const workspace = "C:\\fixture workspace";
-  const local = path.join(workspace, "install", "local_setup.bat");
+  const local = path.win32.join(workspace, "install", "local_setup.bat");
   for (const broken of [false, true]) {
     const h = activationHarness({ workspace, files: [local], source: async (_script, base) => {
       if (broken) { throw new Error("runtime local hook missing"); }
@@ -619,7 +677,7 @@ test("postbuild runtime sources local hooks strictly, not the contaminated prefi
 
 test("external underlay cannot silently replace the selected ROS distro", async () => {
   const workspace = "C:\\fixture workspace";
-  const overlay = path.join(workspace, "install", "setup.bat");
+  const overlay = path.win32.join(workspace, "install", "setup.bat");
   const external = "D:\\old ROS\\local_setup.bat";
   const h = activationHarness({ workspace, files: [cachedSetup, overlay, external], configured: "lyrical",
     overlayText: ':: generated from colcon_core/shell/template/prefix_chain.bat.em\n' +

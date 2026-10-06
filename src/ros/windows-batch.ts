@@ -27,8 +27,14 @@ export async function sourceWindowsBatch(
   try {
     const marker = "__RDE_ROS_ENVIRONMENT__";
     const script = path.join(directory, "setup.bat");
-    await fs.writeFile(script, ["@echo off", "setlocal DisableDelayedExpansion", ...commands,
-      `echo ${marker}`, "set", ""].join("\r\n"));
+    const checkExit = 'if not "%errorlevel%"=="0" exit /b %errorlevel%';
+    const utf8 = ["chcp 65001 >nul", checkExit];
+    // Keep the bootstrap ASCII so CMD can read it on a legacy codepage. A
+    // called setup (notably vcvars) can change the codepage: check its status
+    // before restoring UTF-8 for the next command and the final environment.
+    await fs.writeFile(script, ["@echo off", "setlocal DisableDelayedExpansion", ...utf8,
+      ...commands.flatMap(command => [command, checkExit, ...utf8]),
+      `echo ${marker}`, "set", ""].join("\r\n"), "utf8");
     const logDiagnostics = (stdout: string, stderr: string) => {
       // Everything after the marker is the environment dump, not diagnostic output.
       const diagnostic = stdout.split(marker)[0].trim();
@@ -37,7 +43,7 @@ export async function sourceWindowsBatch(
     };
     const { stdout, stderr } = await execFile(process.env.ComSpec || "cmd.exe", [
       "/d", "/s", "/c", `"${script}"`,
-    ], { env, cwd: options.cwd, timeout: 60000, maxBuffer: 1024 * 1024,
+    ], { env, cwd: options.cwd, timeout: 60000, maxBuffer: 1024 * 1024, encoding: "utf8",
       windowsHide: true, windowsVerbatimArguments: true }).catch(error => {
         logDiagnostics(String(error.stdout ?? ""), String(error.stderr ?? ""));
         throw error;

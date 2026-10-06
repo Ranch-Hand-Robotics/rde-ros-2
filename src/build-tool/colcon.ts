@@ -98,6 +98,7 @@ export async function makeColconPackageTask(packageName: string, buildType: stri
         vscode.workspace.rootPath,
         process.platform === "win32" ? '--packages-up-to' : '--packages-select',
         packageName,
+        ...(process.platform === "win32" ? colconUtils.getColconIgnoreArgs() : []),
         '--cmake-args',
         `-DCMAKE_BUILD_TYPE=${buildType}`
     ];

@@ -82,6 +82,15 @@ export function getColconIgnoreConfig(): { [key: string]: boolean } {
 }
 
 /**
+ * Gets skip arguments for generated workspace and dependency-inclusive builds.
+ */
+export function getColconIgnoreArgs(): string[] {
+    const ignored = Object.entries(getColconIgnoreConfig())
+        .filter(([, ignored]) => ignored).map(([name]) => name);
+    return ignored.length ? ['--packages-skip', ...ignored] : [];
+}
+
+/**
  * Updates the colconIgnore configuration
  */
 export async function updateColconIgnoreConfig(packageName: string, ignore: boolean): Promise<void> {

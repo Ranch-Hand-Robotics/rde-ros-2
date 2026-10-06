@@ -53,7 +53,11 @@ async function compilerFixture(root) {
   await fs.mkdir(bin, { recursive: true });
   for (const tool of ["cl.exe", "link.exe", "rc.exe"]) { await fs.writeFile(path.join(bin, tool), ""); }
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== "path"));
-  return { ...env, Path: `${bin};${process.env.Path || process.env.PATH}`, VisualStudioVersion: "17.0",
+  // Never let a real host compiler conceal a missing fixture tool. Native CMD
+  // still needs Windows utilities such as chcp, independently of the host PATH.
+  const directories = [bin];
+  if (process.platform === "win32") { directories.push(path.join(process.env.SystemRoot, "System32")); }
+  return { ...env, Path: directories.join(";"), VisualStudioVersion: "17.0",
     VSCMD_ARG_TGT_ARCH: "x64", WindowsSdkDir: sdk, WindowsSDKVersion: "10.0\\",
     INCLUDE: path.join(sdk, "Include"), LIB: path.join(sdk, "Lib") };
 }
@@ -304,6 +308,62 @@ test("batch capture preserves special paths and values and cleans up on failure"
   assert.equal(env.TEST_VALUE, "first=second&!");
   await assert.rejects(loaded.sourceWindowsBatch(["exit /b 9"], process.env), error => error.code === 9);
   assert.equal(scripts.length, 2);
+  for (const script of scripts) {
+    assert.equal(await fs.stat(path.dirname(script)).then(() => true, () => false), false);
+  }
+});
+
+test("CMD UTF-8 batches roundtrip non-ASCII paths and values despite legacy codepage changes", {
+  skip: process.platform !== "win32",
+}, async t => {
+  const root = path.join(await fixture(t), "caf\u00e9-\u65e5\u672c\u8a9e");
+  await fs.mkdir(root);
+  const env = await compilerFixture(root);
+  const expected = "caf\u00e9 \u65e5\u672c\u8a9e = & !";
+  env.TEST_INHERITED = expected;
+  env.TEST_SECRET = "private environment value";
+  const compiler = path.join(root, "vcvars.bat");
+  const setup = path.join(root, "\u74b0\u5883-setup.bat");
+  const scripts = [];
+  const encodings = [];
+  const logs = [];
+  const loaded = loadWithMocks("../out/src/ros/windows-batch", {
+    fs: { promises: { ...fs, mkdtemp: () => fs.mkdtemp(path.join(root, "wrapper-")) } },
+    child_process: mockExecFile(async (exe, args, options) => {
+      scripts.push(args.at(-1).replace(/^"|"$/g, ""));
+      encodings.push(options.encoding);
+      // Start a real CMD on an OEM codepage even on UTF-8-configured hosts.
+      // /s removes the outer quotes, retaining the quoted Unicode script path.
+      return realExecFile(exe, [...args.slice(0, -1),
+        `"chcp 437 >nul && ${args.at(-1)}"`], options);
+    }),
+  });
+  await fs.writeFile(setup, `@echo off\r\nset "TEST_CAPTURE=${expected}"\r\n` +
+    "chcp 850 >nul\r\nexit /b 0\r\n", "utf8");
+  for (const code of [0, 42, -7]) {
+    await fs.writeFile(compiler, `@echo off\r\nset "TEST_COMPILER=${expected}"\r\n` +
+      `echo Compiler setup diagnostic\r\nchcp 850 >nul\r\nexit /b ${code}\r\n`, "utf8");
+    // Deliberately omit caller-side guards: restoring the codepage must not
+    // turn a failed CALL (including a negative exit code) into a success.
+    const capture = loaded.sourceWindowsBatch([
+      `call ${loaded.quoteBatchPath(compiler)}`, `call ${loaded.quoteBatchPath(setup)}`,
+    ], env, { cwd: root, onOutput: message => logs.push(message) });
+    if (code) {
+      // Node reports the Windows DWORD exit code as an unsigned integer.
+      await assert.rejects(capture, error => error.code === (code >>> 0));
+    } else {
+      const result = await capture;
+      assert.equal(result.TEST_COMPILER, expected, "Bootstrap must precede UTF-8 batch parsing");
+      assert.equal(result.TEST_CAPTURE, expected, "Restore UTF-8 before the next non-ASCII CALL");
+      assert.equal(result.TEST_INHERITED, expected, "Capture must restore UTF-8 after setup changes it");
+      assert.equal(result.TEST_SECRET, env.TEST_SECRET);
+      assert.equal(result.Path, env.Path, "Non-ASCII environment paths must roundtrip exactly");
+    }
+  }
+  assert.match(logs.join("\n"), /Compiler setup diagnostic/);
+  assert.doesNotMatch(logs.join("\n"), /private environment value|TEST_SECRET|__RDE_ROS_ENVIRONMENT__/);
+  assert.equal(scripts.length, 3);
+  assert.deepEqual(encodings, ["utf8", "utf8", "utf8"], "Decode CMD's UTF-8 output explicitly");
   for (const script of scripts) {
     assert.equal(await fs.stat(path.dirname(script)).then(() => true, () => false), false);
   }

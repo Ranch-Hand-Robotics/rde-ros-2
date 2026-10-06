@@ -12,7 +12,7 @@ nav:
       - intellisense.md
       - openvsx.md
       - pixi.md
-        - dependency-recovery.md
+      - dependency-recovery.md
   - Debugging:
       - debug-support.md
       - launchdebugging.md

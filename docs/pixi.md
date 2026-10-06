@@ -12,7 +12,7 @@ RoboStack provides a community-driven distribution of ROS 2 packages, which incl
 
 ## Getting Started with Pixi, ROS 2, and the Robot Developer Extensions
 1. **Install Pixi**: Follow the instructions on the [Pixi website](https://pixi.sh/latest/) to install Pixi on your system.
-2. **Install Windows C++ tools**: Visual Studio 2022 or its standalone Build Tools must include MSVC x64/x86 and a Windows SDK. The full IDE is not required; see below.
+2. **On Windows only, install C++ tools**: Visual Studio 2022 or its standalone Build Tools must include MSVC x64/x86 and a Windows SDK. The full IDE is not required; see below. Linux and macOS do not use this compiler preflight.
 3. **Install Visual Studio Code**: Download and install [Visual Studio Code](https://code.visualstudio.com/).
 4. **Install ROS 2 through RoboStack or Open Robotics** depending on your use case:
    - For Development and Testing, follow the instructions on the [RoboStack website](https://robostack.github.io/).
@@ -62,8 +62,16 @@ deletion.
 
 ## Platform-Specific Behavior
 - **Windows**: Activates the Visual Studio C++ environment, then the selected Pixi environment and its ROS `local_setup.bat`.
-- **Linux**: Uses `local_setup.bash` from the Pixi ROS 2 environment
+- **Linux**: For a manually managed Pixi environment, configure `ROS2.rosSetupScript` to activate that environment and source its ROS setup. This change does not add automatic discovery of arbitrary Linux Pixi manifests.
 - **macOS**: The installer generates `<pixiRoot>/<distro>/setup.bash`, which activates the complete Pixi environment, including Python and native libraries.
+
+On Linux and macOS, extension-provided `ROS2` and `colcon` tasks wait for the
+resolved ROS environment when executed, not when listed. Each rerun obtains the
+current environment. Use `taskOptions.cwd`, `taskOptions.env` (null removes a
+variable), and `taskOptions.shell` for overrides; variables are resolved by VS Code.
+The default shell is `/bin/sh`; explicit shells must use POSIX quoting. Commands
+and arguments are literal words. For pipelines, invoke `sh` with `-c` explicitly.
+These task terminals use piped input/output, not a full interactive shell or TTY.
 
 ### Windows compiler prerequisites
 
@@ -134,7 +142,9 @@ arguments are unchanged: colcon loads installed dependencies per package. If tho
 hooks are incomplete, use `--packages-up-to <package>` or rebuild the dependencies;
 explicit skip/ignore filters still apply. No dependencies are silently ignored.
 Runtime/debug activation still sources the workspace overlay and reports errors;
-newly built C++ tests load the repaired local overlay before running/debugging.
+Windows C++ tests prepare fresh underlays and load the local overlay on every
+run/debug request, including when the executable already exists. Existing binaries
+are not rebuilt merely to refresh their environment.
 
 Building with the workspace already in `COLCON_PREFIX_PATH` can record it as its
 own parent. Windows case and trailing-separator differences can evade colcon's
