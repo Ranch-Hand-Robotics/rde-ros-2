@@ -4,12 +4,15 @@
 import * as vscode from "vscode";
 
 import * as extension from "../extension";
+import { windowsColconExecution } from "./windows-colcon-task";
 
 export interface RosTaskDefinition extends vscode.TaskDefinition {
     name?: string;
     type: string;
     command: string;
     args?: string[];
+    options?: { cwd?: string; env?: { [key: string]: string | null } };
+    buildOptions?: { cwd?: string; env?: { [key: string]: string | null } };
 }
 
 export class RosShellTaskProvider implements vscode.TaskProvider {
@@ -44,21 +47,32 @@ export function resolve(task: vscode.Task): vscode.Task {
     let definition = task.definition as RosTaskDefinition
     definition.command = definition.command || definition.type;
     // Ensure type is preserved when resolving
-    const type = definition.type || 'ROS2';
-    const resolvedTask = make(definition.command, { ...definition, type });
-
-    resolvedTask.isBackground = task.isBackground;
-    resolvedTask.problemMatchers = task.problemMatchers;
-    return resolvedTask;
+    definition.type = definition.type || 'ROS2';
+    // VS Code requires the original definition when resolving tasks.json entries.
+    // Preserve scope, presentation, group, and other user customizations as well.
+    task.execution = make(definition.command, definition, undefined, task.scope).execution;
+    return task;
 }
 
-export function make(name: string, definition: RosTaskDefinition, category?: string): vscode.Task {
+export function make(name: string, definition: RosTaskDefinition, category?: string,
+    scope: vscode.TaskScope | vscode.WorkspaceFolder = vscode.TaskScope.Workspace): vscode.Task {
     definition.command = definition.command || definition.type; // Command can be missing in build tasks that have type==command
 
     const args = definition.args || [];
-    const task = new vscode.Task(definition, vscode.TaskScope.Workspace, name, definition.command);
+    const windowsBuild = process.platform === "win32" && definition.type === "colcon" && args.includes("build");
+    if (windowsBuild) {
+        // 'options' is reserved by VS Code and removed from resolvedDefinition.
+        // Carry our execution options in a contributed property that survives it.
+        definition.buildOptions = { cwd: "${workspaceFolder}", ...definition.options, ...definition.buildOptions };
+    }
+    const task = new vscode.Task(definition, scope, name, definition.command);
 
-    task.execution = new vscode.ShellExecution(definition.command, args, {
+    task.execution = windowsBuild ? windowsColconExecution(
+        () => process.env,
+        message => extension.outputChannel?.appendLine(message),
+        typeof scope === "object" ? scope.uri.fsPath : vscode.workspace.rootPath,
+        (activated, options) => extension.prepareRosBuildEnvironment(activated, options),
+    ) : new vscode.ShellExecution(definition.command, args, {
         env: extension.env,
     });
     return task;

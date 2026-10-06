@@ -1162,7 +1162,8 @@ export class TopicWebviewManager implements vscode.Disposable {
       }
 
       const topicType = this.topicTypes.get(topicName) ?? "";
-      if (isImageType(topicType) || isConsoleTopic(topicType)) {
+      // Images are throttled before encoding in the subscriber, not after IPC.
+      if (isConsoleTopic(topicType)) {
         const now = Date.now();
         const lastDelivery = this.lastImageDelivery.get(topicName) ?? 0;
         const interval = this.refreshIntervals.get(topicName) ?? this.defaultImagePreviewIntervalMs;
@@ -1180,7 +1181,8 @@ export class TopicWebviewManager implements vscode.Disposable {
         command: "newMessage",
         message: preparedMessage
       });
-    });
+    }, this.topicTypes.get(topicName) ?? "",
+    1000 / (this.refreshIntervals.get(topicName) ?? this.defaultImagePreviewIntervalMs));
   }
 
   private handleWebviewMessage(topicName: string, message: TopicWebviewMessage): void {
@@ -1200,6 +1202,7 @@ export class TopicWebviewManager implements vscode.Disposable {
         if (typeof message.rateHz === "number" && Number.isFinite(message.rateHz)) {
           const rateHz = Math.min(30, Math.max(1, message.rateHz));
           this.refreshIntervals.set(topicName, 1000 / rateHz);
+          this.echoManager.setImageRefreshRate(topicName, rateHz);
         }
         break;
       case "setBufferLength":

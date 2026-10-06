@@ -6,12 +6,14 @@ import { promises as fsPromises } from "fs";
 import * as os from "os";
 import * as vscode from "vscode";
 import * as child_process from "child_process";
+import { promisify } from "util";
 
 import * as cpp_formatter from "./cpp-formatter";
 import * as telemetry from "./telemetry-helper";
 import * as vscode_utils from "./vscode-utils";
 
 import * as buildtool from "./build-tool/build-tool";
+import { COLCON_TASK_TYPE, ColconProvider } from "./build-tool/colcon";
 
 import * as ros_build_utils from "./ros/build-env-utils";
 import * as ros_cli from "./ros/cli";
@@ -27,12 +29,13 @@ import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
 import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
-import { RosDistributionsProvider } from "./ros/ros-distributions-provider";
+import { detectInstalledDistros, RosDistributionsProvider, selectInstalledDistro } from "./ros/ros-distributions-provider";
 import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
 import { TopicTreeDataProvider } from "./ros/topic-tree/topic-tree-provider";
 import { TopicTreeItem } from "./ros/topic-tree/topic-tree-item";
 import { TopicWebviewManager } from "./ros/ros2/topic-webview";
 import { getPixiInstallRoot } from "./ros/installer/pixi-location";
+import { buildInstallPrefixes, buildParentScripts, cleanBuildEnvironment, isWorkspaceInstall, RosBuildOptions, sameBuildScript } from "./ros/build-environment";
 
 import * as mcp from "./mcp";
 
@@ -54,6 +57,7 @@ async function exists(filePath: string): Promise<boolean> {
 export let env: any;
 export let processingWorkspace = false;
 let environmentActivation: Promise<void> | undefined;
+let colconTaskProvider: vscode.Disposable | undefined;
 
 export let extPath: string;
 export let outputChannel: vscode.OutputChannel;
@@ -163,6 +167,7 @@ async function updateWorkspaceContextKeys(): Promise<void> {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+    ensureColconTaskProvider(context);
     try {
         const reporter = telemetry.getReporter();
         extPath = context.extensionPath;
@@ -171,7 +176,7 @@ export async function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(outputChannel);
 
         // Set workspace context keys used by view visibility.
-        await updateWorkspaceContextKeys();
+        void ensureErrorMessageOnException(updateWorkspaceContextKeys);
 
         // Set explicit platform context keys for walkthrough visibility.
         const isLinuxHost = process.platform === "linux";
@@ -922,12 +927,13 @@ export async function activate(context: vscode.ExtensionContext) {
     const reporter = telemetry.getReporter();
     reporter.sendTelemetryActivate();
 
-    // Activate the workspace environment if possible.
-    await activateEnvironment(context);
-    await refreshVisibleTopicTree();
-
-    // Show welcome walkthrough on first install or if ROS is not detected
-    await showWelcomeIfNeeded(context);
+    // Task discovery must not await ROS sourcing or an installation prompt.
+    // Runtime commands still wait for environmentActivation when they need ROS.
+    void ensureErrorMessageOnException(async () => {
+        await activateEnvironment(context);
+        await refreshVisibleTopicTree();
+        await showWelcomeIfNeeded(context);
+    });
 
     return {
         getEnv: () => env,
@@ -1028,6 +1034,8 @@ export async function resolveWelcomePromptSelectionWithTimeout(
 }
 
 export async function deactivate() {
+    colconTaskProvider?.dispose();
+    colconTaskProvider = undefined;
     subscriptions.forEach(disposable => disposable.dispose());
     await telemetry.clearReporter();
     mcp.shutdownMcpServer();
@@ -1062,7 +1070,16 @@ async function withRosEnvironment(context: vscode.ExtensionContext, callback: ()
     return callback();
 }
 
+/** Colcon discovery belongs to the extension lifetime, not the ROS environment. */
+function ensureColconTaskProvider(context: vscode.ExtensionContext): void {
+    if (!colconTaskProvider) {
+        colconTaskProvider = vscode.tasks.registerTaskProvider(COLCON_TASK_TYPE, new ColconProvider());
+        context.subscriptions.push(colconTaskProvider);
+    }
+}
+
 export function activateEnvironment(context: vscode.ExtensionContext): Promise<void> {
+    ensureColconTaskProvider(context);
     if (!environmentActivation) {
         environmentActivation = activateEnvironmentImpl(context).finally(() => {
             processingWorkspace = false;
@@ -1115,9 +1132,7 @@ async function activateEnvironmentImpl(context: vscode.ExtensionContext) {
     rosApi.setContext(context, env);
 
     subscriptions.push(rosApi.activateCoreMonitor());
-    if (buildToolDetected) {
-        subscriptions.push(...buildtool.BuildTool.registerTaskProvider());
-    } else {
+    if (!buildToolDetected) {
         outputChannel.appendLine(`Build tool NOT detected`);
 
     }
@@ -1147,7 +1162,10 @@ async function activateEnvironmentImpl(context: vscode.ExtensionContext) {
 /**
  * Loads the ROS environment, and prompts the user to select a distro if required.
  */
-async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): Promise<void> {
+async function sourceRosAndWorkspace(
+    notifyEnvironmentChange: boolean = true, baseEnv?: NodeJS.ProcessEnv, forBuild: boolean = false,
+    buildPrefixes: string[] = [], onUnderlay?: (script: string) => void,
+): Promise<NodeJS.ProcessEnv | undefined> {
 
     // Processing a new environment can take time which introduces a race condition. 
     // Wait to atomicly switch by composing a new environment block then switching at the end.
@@ -1158,8 +1176,29 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
     const kWorkspaceConfigTimeout = 30000; // ms
 
     const config = vscode_utils.getExtensionConfiguration();
+    const sourceUnderlay = async (script: string): Promise<NodeJS.ProcessEnv> => {
+        if (forBuild && isWorkspaceInstall(script, buildPrefixes)) {
+            throw new Error(`Selected ROS underlay is inside the current workspace install: ${script}. Select the external ROS/Pixi setup in ROS2.rosSetupScript before rebuilding.`);
+        }
+        const sourced = await ros_utils.sourceSetupFile(script, baseEnv, forBuild);
+        onUnderlay?.(script);
+        return sourced;
+    };
+    const reportFailure = (script: string, error: unknown): void => {
+        const failure = error as { message?: string; code?: string | number; signal?: string; stderr?: string };
+        const reason = failure?.message ?? String(error);
+        outputChannel.appendLine(`[ROS setup failed] ${script}\n${reason}`);
+        if (failure?.code !== undefined) { outputChannel.appendLine(`Exit/error code: ${failure.code}`); }
+        if (failure?.signal) { outputChannel.appendLine(`Signal: ${failure.signal}`); }
+        if (failure?.stderr?.trim() && !reason.includes(failure.stderr.trim())) {
+            outputChannel.appendLine(failure.stderr.trim());
+        }
+        vscode_utils.showOutputPanel(outputChannel);
+    };
 
-    let rosSetupScript = vscode_utils.getRosSetupScript();
+    // Only an explicit setup script may bypass distro selection. The utility's
+    // implicit legacy Pixi default may belong to a different distro.
+    let rosSetupScript = config.get<string>("rosSetupScript") ? vscode_utils.getRosSetupScript() : "";
 
     // If the workspace setup script is not set, try to find the ROS setup script in the environment
     let attemptWorkspaceDiscovery = true;
@@ -1179,78 +1218,58 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
         // Try to support cases where the setup script doesn't make sense on different environments, such as host vs container.
         if (await exists(rosSetupScript)) {
             try {
-                newEnv = await ros_utils.sourceSetupFile(rosSetupScript, newEnv);
+                newEnv = await sourceUnderlay(rosSetupScript);
 
                 outputChannel.appendLine(`Sourced ${rosSetupScript}`);
 
                 attemptWorkspaceDiscovery = false;
             } catch (err) {
-                await vscode.window.setStatusBarMessage(`A ROS setup script was provided, but could not source "${rosSetupScript}". Attempting standard discovery.`);
+                reportFailure(rosSetupScript, err);
+                if (forBuild) { throw err; }
+                vscode.window.setStatusBarMessage(`Could not source "${rosSetupScript}". See Output > ROS 2. Attempting discovery.`, kWorkspaceConfigTimeout);
             }
+        } else {
+            if (forBuild) { throw new Error(`Configured ROS underlay is missing or inaccessible: ${rosSetupScript}. Select a working ROS 2 installation.`); }
+            outputChannel.appendLine(`Configured ROS setup script is missing or inaccessible: ${rosSetupScript}. Attempting discovery.`);
         }
     }
 
     if (attemptWorkspaceDiscovery) {
-        let distro = config.get("distro", "");
+        const configuredDistro = config.get("distro", "");
+        outputChannel.appendLine("Discovering installed ROS 2 setup scripts (cached Pixi installations first).");
+        const installedDistros = await detectInstalledDistros();
+        const distro = selectInstalledDistro(installedDistros, configuredDistro, process.env.ROS_DISTRO);
 
-        // Is there a distro defined either by setting or environment?
-        outputChannel.appendLine(`No ROS 2 distro configured, attempting ROS 2 distro auto-discovery`);
-        if (!distro) {
-            // No? Try to find one.
-            const installedDistros = await ros_utils.getDistros();
-            if (!installedDistros.length) {
-                outputChannel.appendLine(`No ROS 2 distros found.`);
-
-                const message = "No ROS 2 distros found. Please install a ROS 2 distribution.";
-                await vscode.window.setStatusBarMessage(message, kWorkspaceConfigTimeout);
-            } else if (installedDistros.length === 1) {
-                outputChannel.appendLine(`Only one ROS 2 distro found, selecting ${installedDistros[0]}`);
-
-                // if there is only one ROS 2 distro installed, directly choose it
-                config.update("distro", installedDistros[0]);
-                distro = installedDistros[0];
-            } else {
-                outputChannel.appendLine(`Multiple ROS 2 distros found, prompting user to select one.`);
-                // dump installedDistros to outputChannel
-                outputChannel.appendLine(`Installed ROS 2 distros: ${installedDistros}`);
-
-                const message = "Unable to determine ROS 2 distribution, please configure this workspace by adding \"ROS2.distro\": \"<ROS 2 Distro>\" in settings.json";
-                await vscode.window.setStatusBarMessage(message, kWorkspaceConfigTimeout);
-            }
-        }
-
-        if (process.env.ROS_DISTRO && process.env.ROS_DISTRO !== distro) {
-            outputChannel.appendLine(`ROS_DISTRO environment variable (${process.env.ROS_DISTRO}) does not match configured distro (${distro}).`);
-
-            outputChannel.appendLine(`Overriding the configured distro with the environment variable.`);
-
-            distro = process.env.ROS_DISTRO;
+        if (configuredDistro && process.env.ROS_DISTRO && process.env.ROS_DISTRO !== configuredDistro) {
+            outputChannel.appendLine(`Ignoring ROS_DISTRO (${process.env.ROS_DISTRO}); using configured distro (${configuredDistro}).`);
         }
 
         if (distro) {
-            let setupScript: string = "";
+            const setupScript = distro.setupScript;
             try {
-                let globalInstallPath: string;
-                if (process.platform === "win32") {
-                    globalInstallPath = path.join("C:", "opt", "ros", `${distro}`, "x64");
-                } else {
-                    globalInstallPath = path.join("/", "opt", "ros", `${distro}`);
-                }
-                setupScript = path.format({
-                    dir: globalInstallPath,
-                    name: "setup",
-                    ext: ros_utils.getSetupScriptExtension(),
-                });
-
                 outputChannel.appendLine(`Sourcing ROS Distro: ${setupScript}`);
-                newEnv = await ros_utils.sourceSetupFile(setupScript, newEnv);
+                newEnv = await sourceUnderlay(setupScript);
             } catch (err) {
-                await vscode.window.setStatusBarMessage(`Could not source ROS setup script at "${setupScript}".`);
+                reportFailure(setupScript, err);
+                if (forBuild) { throw err; }
+                vscode.window.setStatusBarMessage(`Could not source "${setupScript}". See Output > ROS 2 for the cause.`, kWorkspaceConfigTimeout);
             }
-        } else if (process.env.ROS_DISTRO) {
-            newEnv = { ...process.env };
+        } else {
+            const requestedDistro = configuredDistro || process.env.ROS_DISTRO;
+            const message = requestedDistro
+                ? `No ROS 2 setup script found for "${requestedDistro}". Use ROS2: Find ROS or select an installed distribution.`
+                : installedDistros.length
+                    ? "Multiple ROS 2 distros found. Select an installed distribution or configure ROS2.distro."
+                    : "No ROS 2 setup scripts found. Use ROS2: Find ROS or install a ROS 2 distribution.";
+            outputChannel.appendLine(message);
+            if (forBuild) { throw new Error(message); }
+            await vscode.window.setStatusBarMessage(message, kWorkspaceConfigTimeout);
         }
     }
+
+    // Build preparation deliberately never executes the current install overlay.
+    // Keep the runtime/debug sourcing and its error reporting below unchanged.
+    if (forBuild) { return newEnv; }
 
     let workspaceOverlayPath: string = "";
     // Source the workspace setup over the top.
@@ -1274,8 +1293,9 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
 
         try {
             newEnv = await ros_utils.sourceSetupFile(wsSetupScript, newEnv);
-        } catch (_err) {
-            vscode.window.showErrorMessage("Failed to source the workspace setup file.");
+        } catch (err) {
+            reportFailure(wsSetupScript, err);
+            vscode.window.showErrorMessage("Failed to source the workspace setup file. See Output > ROS 2 for the cause.");
         }
     } else if (workspaceOverlayPath) {
         outputChannel.appendLine(`Not sourcing workspace does not exist yet: ${wsSetupScript}. Need to build workspace.`);
@@ -1287,4 +1307,66 @@ async function sourceRosAndWorkspace(notifyEnvironmentChange: boolean = true): P
         // Notify listeners only when a full environment-dependent extension refresh is required.
         onEnvChanged.fire();
     }
+    return newEnv;
+}
+
+/** Fresh sourcing and read-only CLI checks, never reuse a stale successful activation. */
+export async function prepareRosBuildEnvironment(baseEnv: NodeJS.ProcessEnv, options: RosBuildOptions = {}): Promise<NodeJS.ProcessEnv> {
+    const prefixes = buildInstallPrefixes(vscode.workspace.rootPath, options);
+    const log = options.onOutput ?? (message => outputChannel.appendLine(message));
+    const clean = cleanBuildEnvironment(baseEnv, prefixes);
+    // ROS identity must be supplied by the selected underlay, not inherited flags.
+    for (const key of Object.keys(clean)) {
+        if (/^ROS_(VERSION|DISTRO)$/i.test(key)) { delete clean[key]; }
+    }
+    let selectedScript = "";
+    let sourced = await sourceRosAndWorkspace(false, clean, true, prefixes, script => { selectedScript = script; });
+    if (sourced?.ROS_VERSION !== "2" || !sourced.ROS_DISTRO) {
+        throw new Error("ROS setup did not provide ROS_VERSION=2 and ROS_DISTRO. Select a working ROS 2 installation.");
+    }
+    const rejectSelfOverlay = (current: NodeJS.ProcessEnv, script: string): void => {
+        if (Object.values(current).some(value => value?.split(";").some(entry => isWorkspaceInstall(entry, prefixes)))) {
+            throw new Error(`ROS underlay ${script} reintroduced the current workspace install. Select an external underlay that does not source this workspace; no partially sourced environment will be used.`);
+        }
+    };
+    rejectSelfOverlay(sourced, selectedScript);
+    const selectedDistro = sourced.ROS_DISTRO;
+    if (process.platform === "win32") {
+        for (const script of await buildParentScripts(prefixes)) {
+            if (sameBuildScript(script, selectedScript)) { continue; }
+            log(`Sourcing recorded external build underlay: ${script}`);
+            // Missing/broken external parents remain fatal; never treat them as self overlays.
+            sourced = await ros_utils.sourceSetupFile(script, { ...sourced }, true);
+            rejectSelfOverlay(sourced, script);
+            if (sourced.ROS_VERSION !== "2" || sourced.ROS_DISTRO !== selectedDistro) {
+                throw new Error(`External underlay ${script} changed the selected ROS distro (${selectedDistro}). Use compatible external dependencies; no build was started.`);
+            }
+        }
+    }
+    sourced = cleanBuildEnvironment(sourced, prefixes);
+    log(`[Build recovery] Skipping current-workspace install overlay: ${prefixes.join(", ")}. It may be absent or incomplete. Using fresh ROS/external underlays; colcon will source individual workspace dependencies. Rebuild to regenerate setup hooks; runtime/debug setup errors are not ignored.`);
+    if (options.args?.some(arg => arg === "--packages-select" || arg.startsWith("--packages-select="))) {
+        log("[Build recovery] Keeping --packages-select unchanged. Installed workspace dependencies are loaded by colcon per package; if a dependency is missing/incomplete, rerun with --packages-up-to <package>. Explicit skip/ignore filters are still honored.");
+    }
+    const execFile = promisify(child_process.execFile);
+    for (const tool of ["ros2", "colcon"]) {
+        const command = process.platform === "win32" ? `${tool}.exe` : tool;
+        try {
+            await execFile(command, ["--help"], {
+                env: sourced, cwd: options.cwd ?? vscode.workspace.rootPath, timeout: 30000,
+                maxBuffer: 1024 * 1024, windowsHide: true,
+            });
+        } catch (error) {
+            throw new Error(`ROS build preflight failed running ${command} --help: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+    return sourced;
+}
+
+/** A recovery build environment is not a runtime environment. Load the repaired
+ * local overlay strictly before executing/debugging a newly built test.
+ */
+export async function prepareRosTestEnvironment(baseEnv: NodeJS.ProcessEnv, workspace: string): Promise<NodeJS.ProcessEnv> {
+    const script = path.join(workspace, "install", `local_setup${ros_utils.getSetupScriptExtension()}`);
+    return ros_utils.sourceSetupFile(script, { ...baseEnv }, true);
 }

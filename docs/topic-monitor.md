@@ -9,7 +9,7 @@ The ROS 2 Topic Monitor feature provides an RQT-like interface for monitoring to
 - **Multiple Topics**: Monitor multiple topics simultaneously in separate webview panels
 - **Message Display**: 
   - Generic messages shown as formatted JSON
-  - Compressed image topics displayed as images
+  - Raw and compressed image topics displayed as images
 - **Metrics**: View publisher count, subscriber count, and QoS details in tooltips
 - **Play/Pause Controls**: Pause and resume topic monitoring per topic or all at once
 
@@ -48,6 +48,8 @@ Hover over any topic in the tree to see:
 **Individual Topic Controls** (in webview):
 - **Pause/Resume**: Click the pause button to temporarily stop receiving new messages
 - **Clear**: Click the clear button to remove all displayed messages from the view
+- **Refresh**: Set the image preview rate from 1–30 Hz (default 5 Hz)
+- **Buffer**: Adjust retained message history from 1–500 messages
 
 **All Topics Controls** (in tree view toolbar):
 - **Refresh**: Click the refresh icon to update the topic list
@@ -80,12 +82,14 @@ Most ROS 2 message types are displayed as formatted JSON with syntax highlightin
 
 ### Image Messages
 
-Compressed image topics (`sensor_msgs/msg/CompressedImage`) are rendered directly in the webview. Raw `sensor_msgs/msg/Image` topics remain available as structured message data because their encoding and row layout require conversion before browser display.
+Raw `sensor_msgs/msg/Image` and compressed `sensor_msgs/msg/CompressedImage` topics are rendered in the webview. Raw previews support common RGB/BGR and monochrome encodings, including 16-bit depth images, with row stride and endianness preserved.
+
+Image monitoring uses a direct `rclpy` subscription in the selected ROS/Pixi Python environment, rather than converting every image byte to YAML through `ros2 topic echo`. The subscriber uses best-effort, volatile QoS with a depth-one queue and throttles before base64 encoding. The refresh slider controls this source-side preview rate without restarting the subscription. Pausing or closing the monitor stops its subscriber process.
 
 ## Tips
 
 - **Performance**: Monitoring many high-frequency topics may impact performance. Use pause controls when not actively viewing messages.
-- **Message History**: Each topic webview keeps the last 100 messages by default.
+- **Message History**: Generic topics retain 100 messages by default; image previews retain only the latest frame.
 - **Auto-refresh**: The topic list automatically refreshes every 5 seconds to show new topics.
 
 ## Troubleshooting
@@ -104,6 +108,7 @@ If topic messages aren't updating:
 1. Check that the topic is actually publishing: `ros2 topic hz <topic_name>`
 2. Verify publishers exist: `ros2 topic info <topic_name>`
 3. Try unchecking and rechecking the topic checkbox
+4. For images, check the **ROS 2** Output channel for subscriber or Python environment errors. The selected ROS Python environment must include `rclpy` and `sensor_msgs`.
 
 ### Webview Not Opening
 
@@ -114,8 +119,8 @@ If clicking a topic checkbox doesn't open a webview:
 
 ## Known Limitations
 
-- Raw `sensor_msgs/msg/Image` topics are shown as structured data rather than converted images
-- Cannot adjust message buffer size (fixed at 100 messages)
+- Image previews accept payloads up to 32 MiB per frame
+- Unsupported raw image encodings display an explanatory notice instead of a preview
 - Cannot filter or search within messages
 
 ## Related Commands

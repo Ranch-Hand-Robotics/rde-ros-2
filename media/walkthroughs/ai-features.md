@@ -65,6 +65,20 @@ With the MCP server running, your AI assistant can:
 
 **First Time Setup**: On the first run, the extension will create a Python virtual environment inside the extension directory. You may be prompted for your super user password to install dependencies.
 
+## Recover Missing Dependencies
+
+Use the bundled **rosdep** skill in a skills-capable VS Code/Copilot version:
+
+> /rosdep CMake cannot find diagnostic_updater for this package. Check for a
+> binary on my platform; otherwise offer to clone its repo beside this package.
+
+The skill infers your platform and distro, checks binaries first, then offers a
+verified source revision and an exact peer-directory destination if needed.
+It asks before cloning and stops after verifying the checkout, without a full
+environment audit or automatic build. Windows, macOS, and Jetson are covered;
+source availability is not a guarantee of platform support.
+No MCP server is required. It does not change the existing rosdep command.
+
 ## AI Completions
 
 Smart code completions leverage AI to provide contextual suggestions for:

@@ -8,7 +8,7 @@ import * as util from "util";
 import * as extension from "../extension";
 import * as vscode_utils from "../vscode-utils";
 
-const promisifiedExec = util.promisify(child_process.exec);
+const promisifiedExecFile = util.promisify(child_process.execFile);
 
 /**
  * Represents a ROS 2 package
@@ -23,22 +23,18 @@ export interface Package {
  */
 export async function getPackages(workspaceRoot: string): Promise<Package[]> {
     try {
-        let colconCommand: string;
-        if (process.platform === "win32") {
-            colconCommand = `colcon --log-base nul list --base-paths "${workspaceRoot}"`;
-        } else {
-            colconCommand = `colcon --log-base /dev/null list --base-paths "${workspaceRoot}"`;
-        }
-
-        const { stdout } = await promisifiedExec(colconCommand, { env: extension.env });
+        const { stdout } = await promisifiedExecFile(process.platform === "win32" ? "colcon.exe" : "colcon", [
+            "--log-base", process.platform === "win32" ? "nul" : "/dev/null",
+            "list", "--base-paths", workspaceRoot,
+        ], { env: extension.env, cwd: workspaceRoot, timeout: 60000, maxBuffer: 1024 * 1024, windowsHide: true });
         
         const packages: Package[] = [];
         const lines = stdout.trim().split('\n');
         
         for (const line of lines) {
             if (line.trim()) {
-                // colcon list output format: package_name    path
-                const parts = line.split(/\s+/);
+                // Colcon separates name, path and type with tabs; paths may contain spaces.
+                const parts = line.trim().split(/\t+/);
                 if (parts.length >= 2) {
                     packages.push({
                         name: parts[0],
@@ -52,7 +48,7 @@ export async function getPackages(workspaceRoot: string): Promise<Package[]> {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (extension.outputChannel) {
-            extension.outputChannel.appendLine(`Error getting packages: ${errorMessage}`);
+            extension.outputChannel.appendLine(`Colcon package discovery failed for ${workspaceRoot}: ${errorMessage}`);
         }
         return [];
     }

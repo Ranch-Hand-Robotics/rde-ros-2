@@ -10,6 +10,7 @@ import * as extension from "../extension";
 import * as telemetry from "../telemetry-helper";
 import { getPixiInstallRoot } from "./installer/pixi-location";
 import { sourceBashEnvironment } from "./installer/pixi";
+import { sourceWindowsEnvironment } from "./windows-env";
 
 // Re-export common shell utilities
 export { 
@@ -28,7 +29,17 @@ import {
  * Executes a setup file and returns the resulting env.
  * This wraps the common sourceSetupFile with ROS-specific logging.
  */
-export function sourceSetupFile(filename: string, env?: any): Promise<any> {
+export function sourceSetupFile(filename: string, env?: any, failOnMissingSetup: boolean = false): Promise<any> {
+    if (process.platform === "win32") {
+        return sourceWindowsEnvironment(filename, env, {
+            failOnMissingSetup,
+            cwd: vscode.workspace.rootPath,
+            onOutput: message => extension.outputChannel.appendLine(message),
+        }).catch(error => {
+            extension.outputChannel.appendLine(`Failed to source ${filename}: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        });
+    }
     if (process.platform === "darwin" && path.extname(filename) === ".bash") {
         return sourceBashEnvironment(filename, env, vscode.workspace.rootPath);
     }

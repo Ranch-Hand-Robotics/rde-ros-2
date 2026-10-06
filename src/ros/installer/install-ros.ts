@@ -11,11 +11,12 @@ import * as vscode_utils from "../../vscode-utils";
 import * as extension from "../../extension";
 import type { WorkerRequest, WorkerResponse } from "./install-ros-worker";
 import { macInstallScript, macOSVersion, macPrerequisiteIssue, requestMacCommandLineTools, pixiManifest, pixiPlatform, pixiSetupScript, quoteShell } from "./pixi";
-import { HealthReport, HealthTarget, validateInstallation } from "./health-check";
+import { HealthReport, HealthTarget, runHealthProcess, validateInstallation } from "./health-check";
 import { InstallDiagnostics, bashInstallScript, powershellInstallScript, installationManifest, ScriptStep } from "./install-diagnostics";
 import { preflightInstallation, removeIncompletePixiTarget, runPreflightCommand } from "./install-preflight";
 import { cachePixiInstallRoot, getPixiInstallRoot, selectPixiInstallRoot } from "./pixi-location";
 import { PreflightCheck } from "./preflight-types";
+import { activateWindowsToolchain, WINDOWS_BUILD_TOOLS_COMMAND } from "../windows-toolchain";
 
 const MAX_INSTALL_LOG_CHARS = 15000;
 
@@ -299,10 +300,18 @@ async function preparePixiManifest(distro: RosDistro, diagnostics: InstallDiagno
   return manifestPath;
 }
 
-export async function preflightPixiEnvironment(distro: RosDistro, diagnostics: InstallDiagnostics): Promise<string> {
+export async function preflightPixiEnvironment(
+  distro: RosDistro, diagnostics: InstallDiagnostics, env?: NodeJS.ProcessEnv
+): Promise<string> {
   const stagedManifest = await preparePixiManifest(distro, diagnostics);
   await diagnostics.log("RDE_STEP_START:pixi-solver\n");
-  const plan = await runPreflightCommand("pixi", ["lock", "--manifest-path", stagedManifest], 120000);
+  const args = ["lock", "--manifest-path", stagedManifest];
+  const pixiExecutable = diagnostics.report.target.kind === "pixi" ? diagnostics.report.target.pixiExecutable : undefined;
+  const plan = env
+    ? pixiExecutable
+      ? await runHealthProcess({ command: pixiExecutable, args, cwd: path.dirname(stagedManifest), env }, 120000)
+      : { stdout: "", stderr: "", exitCode: null, error: "No detected Pixi executable was recorded for the solver." }
+    : await runPreflightCommand("pixi", args, 120000);
   await diagnostics.log(plan.stdout + "\n" + plan.stderr + "\n");
   let solved = !plan.error && plan.exitCode === 0;
   let error = plan.error || plan.stderr || plan.stdout;
@@ -754,12 +763,59 @@ async function installRosLinux(distro: RosDistro, diagnostics: InstallDiagnostic
 }
 
 /**
+ * Activates an existing compiler; installing or repairing Build Tools is always manual.
+ */
+export async function ensureWindowsBuildTools(
+  diagnostics: InstallDiagnostics, env: NodeJS.ProcessEnv = process.env
+): Promise<NodeJS.ProcessEnv> {
+  await diagnostics.log("RDE_STEP_START:windows-compiler\n");
+  diagnostics.report.preflight ??= { ready: true, checks: [] };
+  let activated: NodeJS.ProcessEnv;
+  try {
+    activated = await activateWindowsToolchain(env, {
+      cwd: diagnostics.directory,
+      onOutput: message => extension.outputChannel.appendLine(message),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    const remediation = "For a new installation, review the copied command and run it in Administrator PowerShell, then retry ROS 2 installation. " +
+      "If Visual Studio or Build Tools is already installed but incomplete, open Visual Studio Installer > Modify > Desktop development with C++, " +
+      "and select MSVC v143 (Visual Studio 2022) and a Windows SDK. Running winget install will not add missing components to an existing installation.";
+    diagnostics.report.status = "blocked";
+    diagnostics.report.preflight.ready = false;
+    diagnostics.report.preflight.checks.push({ id: "windows-compiler", status: "blocked", detail, remediation });
+    diagnostics.report.recovery = ["Compiler activation failed before Pixi operations or ROS target creation. No Build Tools installation or system repair was attempted.", remediation];
+    await diagnostics.log(`RDE_STEP_FAILED:windows-compiler:1\n${detail}\n${remediation}\n`);
+    await diagnostics.save();
+    const choice = await vscode.window.showWarningMessage(
+      `Windows C++ toolchain is not ready: ${detail}\n\n` +
+      "Visual Studio 2022 Build Tools requires administrator privileges and a large download, including MSVC and the Windows SDK. " +
+      "Running the copied command accepts the winget source and package agreements; review and consent to them before running it. " +
+      "The extension will not launch an elevated installer or install Build Tools automatically.\n\n" + remediation,
+      { modal: true }, "Copy Install Command", "Cancel"
+    );
+    if (choice === "Copy Install Command") {
+      await vscode.env.clipboard.writeText(WINDOWS_BUILD_TOOLS_COMMAND);
+    }
+    await diagnostics.log(`Build Tools command ${choice === "Copy Install Command" ? "copied; not executed" : "not copied; installation cancelled"}.\n`);
+    throw new Error(`ROS 2 installation blocked: ${detail} ${choice === "Copy Install Command" ? "Install command copied. " : "Build Tools setup was not started. "}${remediation}`);
+  }
+  diagnostics.report.preflight.checks.push({
+    id: "windows-compiler", status: "passed", detail: "Activated a working Windows MSVC and SDK toolchain for Pixi.",
+  });
+  await diagnostics.log("RDE_STEP_OK:windows-compiler\n");
+  await diagnostics.save();
+  return activated;
+}
+
+/**
  * Installs ROS 2 using Pixi on Windows or macOS.
  * Subprocess operations (pixi detection and pixi self-install) run in a
  * dedicated worker thread so the extension host main thread is not blocked.
  */
 async function installRosPixi(distro: RosDistro, diagnostics: InstallDiagnostics, distroWorkspace: string): Promise<number | undefined> {
   pixiPlatform();
+  const env = process.platform === "win32" ? await ensureWindowsBuildTools(diagnostics) : undefined;
   if (process.platform === "darwin") {
     const issue = await macPrerequisiteIssue();
     if (issue) {
@@ -784,7 +840,7 @@ async function installRosPixi(distro: RosDistro, diagnostics: InstallDiagnostics
       diagnostics.report.target.pixiExecutable = pixiExecutable;
     }
 
-    const stagedManifest = await preflightPixiEnvironment(distro, diagnostics);
+    const stagedManifest = await preflightPixiEnvironment(distro, diagnostics, env);
 
     extension.outputChannel.appendLine(`Installing ROS 2 ${distro.name} using Pixi...`);
     extension.outputChannel.show();
@@ -824,7 +880,7 @@ async function installRosPixi(distro: RosDistro, diagnostics: InstallDiagnostics
       ]);
     }
 
-    return await runInstallTerminal(distro, diagnostics, script, process.platform === "win32");
+    return await runInstallTerminal(distro, diagnostics, script, process.platform === "win32", env);
   } finally {
     worker.terminate();
   }
@@ -927,7 +983,8 @@ export async function runInstallTerminal(
   distro: RosDistro,
   diagnostics: InstallDiagnostics,
   script: string,
-  windows: boolean
+  windows: boolean,
+  env?: NodeJS.ProcessEnv
 ): Promise<number | undefined> {
   const scriptPath = path.join(diagnostics.directory, windows ? "install.ps1" : "install.sh");
   // Windows PowerShell 5.1 otherwise reads non-ASCII paths using the system ANSI code page.
@@ -944,6 +1001,7 @@ export async function runInstallTerminal(
       shellArgs: windows ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"] : ["--noprofile", "--norc", "-c"],
       // VS Code's global tasks in an empty window must use the user's home as cwd.
       cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir(),
+      env,
     }, distro, scriptPath);
   } finally {
     delete diagnostics.report.artifacts.script;

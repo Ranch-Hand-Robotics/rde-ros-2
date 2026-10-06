@@ -7,7 +7,9 @@ import * as util from "util";
 import * as yaml from "js-yaml";
 
 import * as extension from "../../extension";
+import { ImageSubscriptionManager } from "./image-subscription";
 import {
+  isImageType,
   TopicInfo,
   TopicQoS,
   TopicMetrics,
@@ -178,15 +180,21 @@ export function createTopicEchoArguments(topicName: string): string[] {
  * Topic echo process manager
  */
 export class TopicEchoManager {
+  private readonly images = new ImageSubscriptionManager();
   private activeProcesses = new Map<string, child_process.ChildProcess>();
   private messageHandlers = new Map<string, (message: TopicMessage) => void>();
 
   /**
    * Start echoing a topic
    */
-  public startEcho(topicName: string, onMessage: (message: TopicMessage) => void): void {
+  public startEcho(topicName: string, onMessage: (message: TopicMessage) => void, topicType = "", rateHz = 5): void {
     // Stop any existing process for this topic
     this.stopEcho(topicName);
+
+    if (isImageType(topicType)) {
+      this.images.start(topicName, topicType, onMessage, rateHz);
+      return;
+    }
 
     const childProcess = child_process.spawn(
       "ros2",
@@ -262,6 +270,7 @@ export class TopicEchoManager {
    * Stop echoing a topic
    */
   public stopEcho(topicName: string): void {
+    this.images.stop(topicName);
     const process = this.activeProcesses.get(topicName);
     if (process) {
       process.kill();
@@ -274,6 +283,7 @@ export class TopicEchoManager {
    * Stop all echo processes
    */
   public stopAll(): void {
+    this.images.dispose();
     for (const [topicName] of this.activeProcesses) {
       this.stopEcho(topicName);
     }
@@ -283,7 +293,11 @@ export class TopicEchoManager {
    * Check if a topic is being echoed
    */
   public isEchoing(topicName: string): boolean {
-    return this.activeProcesses.has(topicName);
+    return this.images.has(topicName) || this.activeProcesses.has(topicName);
+  }
+
+  public setImageRefreshRate(topicName: string, rateHz: number): void {
+    this.images.setRate(topicName, rateHz);
   }
 
   /**

@@ -4,6 +4,7 @@
 import { execFile, spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import { activateWindowsToolchain } from "../windows-toolchain";
 
 export type HealthTarget =
   | { kind: "setup"; distro: string; setupScript: string; pythonExecutable?: string }
@@ -143,8 +144,17 @@ export async function buildHealthCommand(
     const prefix = path.join(target.workspace, ".pixi", "envs", target.distro);
     // No fallback to a system Python, even if a damaged Pixi environment leaves it on PATH.
     await requireFile(path.join(prefix, platform === "win32" ? "python.exe" : "bin/python"));
+    let pixi = target.pixiExecutable;
+    if (pixi) {
+      if (!path.isAbsolute(pixi) || (platform === "win32" && !/\.exe$/i.test(pixi))) {
+        throw new Error("The Pixi executable must be an absolute executable path.");
+      }
+      await requireFile(pixi);
+    } else {
+      pixi = await findPixi(platform, inherited);
+    }
     return {
-      command: await findPixi(platform, inherited),
+      command: pixi,
       args: [
         "run", "--frozen", "--no-install", "--executable", "--manifest-path", manifest,
         "-e", target.distro, "python", "-s", probePath,
@@ -298,6 +308,9 @@ export async function validateInstallation(target: HealthTarget, probePath: stri
   });
   try {
     const command = await buildHealthCommand(target, probePath);
+    if (process.platform === "win32") {
+      command.env = await activateWindowsToolchain(command.env);
+    }
     const result = await runHealthProcess(command);
     try {
       report.checks.push(...parseHealthOutput(result.stdout, target));
