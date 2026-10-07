@@ -227,16 +227,16 @@ enabled: true
       .includes('src="https://webview.local/point-cloud-viewer.js"'));
   });
 
-  it("encodes PointCloud2 bytes while preserving layout and frame metadata", () => {
+  it("preserves PointCloud2 bytes, legacy payloads, layout and frame metadata", () => {
     const data = { width: 1, height: 1, point_step: 4, row_step: 4, is_bigendian: true,
       fields: [{ name: "x", offset: 0, datatype: 7, count: 1 }], header: { frame_id: "lidar" }, data: [0, 1, 2, 255] };
     for (const bytes of [data.data, Buffer.from(data.data), { type: "Buffer", data: data.data }, Buffer.from(data.data).toString("base64")]) {
       assert.deepStrictEqual(prepareTopicMessage({ timestamp: 42, data: { ...data, data: bytes } }, "sensor_msgs/msg/PointCloud2"), {
-        timestamp: 42, data: { ...data, data: "AAEC/w==" }
+        timestamp: 42, data: { ...data, data: Buffer.isBuffer(bytes) ? new Uint8Array(bytes) : bytes }
       });
     }
     const empty = prepareTopicMessage({ timestamp: 1, data: { ...data, data: [] } }, "sensor_msgs/msg/PointCloud2");
-    assert.strictEqual((empty.data as { data: string }).data, "");
+    assert.deepStrictEqual((empty.data as { data: number[] }).data, []);
   });
 
   it("rejects oversized cloud payloads before webview delivery without changing generic messages", () => {

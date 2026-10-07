@@ -415,13 +415,37 @@ describe("Browser PointCloud2 decoder", () => {
     }
   });
 
-  it("rejects truncation even in row padding or unsampled rows", () => {
+  it("accepts a compact camera cloud with a stale larger row_step", () => {
+    const message = fixture();
+    message.width = 349825;
+    message.point_step = 20;
+    message.row_step = 8140800;
+    message.data = new Uint8Array(6996500);
+    const result = decodePointCloud(message);
+    assert.strictEqual(result.totalPoints, 349825);
+    assert.strictEqual(result.count, MAX_RENDERED_POINTS);
+  });
+
+  it("allows omitted final row padding without changing organized row offsets", () => {
+    const data = new Uint8Array(28);
+    const view = new DataView(data.buffer);
+    [1, 2, 3].forEach((value, axis) => view.setFloat32(axis * 4, value, true));
+    [4, 5, 6].forEach((value, axis) => view.setFloat32(16 + axis * 4, value, true));
+    const message = { ...fixture(), height: 2, row_step: 16, data };
+    const result = decodePointCloud(message);
+    assert.deepStrictEqual(Array.from(result.vertices.slice(0, 3)), [1, 2, 3]);
+    assert.deepStrictEqual(Array.from(result.vertices.slice(8, 11)), [4, 5, 6]);
+    assert.throws(() => decodePointCloud({ ...message, data: data.subarray(0, 27) }, 1), /Truncated/);
+    assert.throws(() => decodePointCloud({ ...message, data: data.subarray(0, 24) }), /Truncated/);
+  });
+
+  it("rejects truncated point records even in unsampled rows", () => {
     const message = fixture([[1, 2, 3], [4, 5, 6]]);
     const data = message.data as Uint8Array;
     for (const short of [data.subarray(0, 23), Array.from(data.subarray(0, 1)), Buffer.from(data.subarray(0, 12)).toString("base64")]) {
       assert.throws(() => decodePointCloud({ ...message, data: short }, 1), /Truncated/);
     }
-    assert.throws(() => decodePointCloud({ ...fixture(), row_step: 13 }), /Truncated/);
+    assert.strictEqual(decodePointCloud({ ...fixture(), row_step: 13 }).count, 1);
     assert.throws(() => decodePointCloud({ ...fixture(), height: 2 }, 1), /Truncated/);
   });
 

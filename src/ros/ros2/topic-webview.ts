@@ -25,7 +25,10 @@ function imageDataToBase64(value: unknown): string | undefined {
   if (Array.isArray(value)) {
     return Buffer.from(value).toString("base64");
   }
-  if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
+  if (Buffer.isBuffer(value)) {
+    return value.toString("base64");
+  }
+  if (value instanceof Uint8Array) {
     return Buffer.from(value).toString("base64");
   }
   if (isRecord(value) && Array.isArray(value.data)) {
@@ -79,11 +82,19 @@ export function prepareTopicMessage(message: TopicMessage, topicType: string): T
     if (length > MAX_POINT_CLOUD_BYTES) {
       return { ...message, data: { previewError: "PointCloud2 exceeds the 32 MiB preview limit. Reduce the cloud at the publisher." } };
     }
+    if (payload instanceof Uint8Array) {
+      // Use VS Code's typed-array transport, not Buffer.toJSON(). Avoid exposing
+      // unrelated bytes in a pooled buffer while reusing dedicated frame buffers.
+      const data = payload.byteLength === payload.buffer.byteLength
+        ? new Uint8Array(payload.buffer) : new Uint8Array(payload);
+      return { ...message, data: { ...message.data, data } };
+    }
+    return message;
   }
   const encodedData = imageDataToBase64(message.data.data);
   if (encodedData === undefined) return message;
 
-  if (isPointCloudType(topicType) || topicType === "sensor_msgs/msg/CompressedImage") {
+  if (topicType === "sensor_msgs/msg/CompressedImage") {
     return {
       ...message,
       data: {
@@ -643,10 +654,10 @@ export function createTopicMonitorHtml(
     <div class="toolbar">
       <h2 class="stream-title">Message stream</h2>
       <div class="controls">
-        <label class="stream-rate" for="streamRate">Refresh <input id="streamRate" type="range" min="1" max="30" value="5" step="1"><output id="streamRateValue">5 Hz</output></label>
+        <label class="stream-rate" for="streamRate">Refresh <input id="streamRate" type="range" min="${isPointCloudTopic ? 0.2 : 1}" max="${isPointCloudTopic ? 5 : 30}" value="${isPointCloudTopic ? 1 : 5}" step="${isPointCloudTopic ? 0.2 : 1}"><output id="streamRateValue">${isPointCloudTopic ? 1 : 5} Hz</output></label>
         <label class="buffer-length" for="bufferLength">Buffer <input id="bufferLength" type="range" min="1" max="500" value="${maxMessages}" step="1"><output id="bufferLengthValue">${maxMessages}</output></label>
         <button class="control" id="pauseButton" type="button">
-          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h3.5v11H3v-11Zm6.5 0H13v11H9.5v-11Z"/></svg>
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path id="pauseIcon" d="M3 2.5h3.5v11H3v-11Zm6.5 0H13v11H9.5v-11Z"/></svg>
           <span id="pauseLabel">Pause</span>
         </button>
         <button class="control secondary" id="clearButton" type="button">
@@ -676,6 +687,7 @@ export function createTopicMonitorHtml(
     const statusText = document.getElementById("statusText");
     const pauseButton = document.getElementById("pauseButton");
     const pauseLabel = document.getElementById("pauseLabel");
+    const pauseIcon = document.getElementById("pauseIcon");
     const clearButton = document.getElementById("clearButton");
     const streamRate = document.getElementById("streamRate");
     const streamRateValue = document.getElementById("streamRateValue");
@@ -1016,6 +1028,7 @@ export function createTopicMonitorHtml(
       isPaused = paused;
       hero.classList.toggle("paused", isPaused);
       pauseLabel.textContent = isPaused ? "Resume" : "Pause";
+      pauseIcon.setAttribute("d", isPaused ? "M4 2v12l9-6-9-6Z" : "M3 2.5h3.5v11H3v-11Zm6.5 0H13v11H9.5v-11Z");
       statusText.textContent = isPaused ? "Stream paused" : "Live stream";
       pauseButton.setAttribute("aria-pressed", String(isPaused));
     }
@@ -1081,6 +1094,7 @@ export class TopicWebviewManager implements vscode.Disposable {
   private readonly maxMessagesPerTopic = 100;
   private readonly maxMessagesPerImageTopic = 1;
   private readonly defaultImagePreviewIntervalMs = 200;
+  private readonly defaultPointCloudPreviewIntervalMs = 1000;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -1115,7 +1129,8 @@ export class TopicWebviewManager implements vscode.Disposable {
     this.messageBuffers.set(topicName, new TopicMessageRingBuffer(messageLimit));
     this.topicTypes.set(topicName, topicType);
     if (isImageType(topicType) || isPointCloudType(topicType) || isConsoleTopic(topicType)) {
-      this.refreshIntervals.set(topicName, this.defaultImagePreviewIntervalMs);
+      this.refreshIntervals.set(topicName, isPointCloudType(topicType)
+        ? this.defaultPointCloudPreviewIntervalMs : this.defaultImagePreviewIntervalMs);
     }
     panel.webview.html = createTopicMonitorHtml(
       panel.webview.cspSource,
@@ -1201,8 +1216,8 @@ export class TopicWebviewManager implements vscode.Disposable {
       }
 
       const topicType = this.topicTypes.get(topicName) ?? "";
-      // Images are throttled before encoding in the subscriber, not after IPC.
-      if (isPointCloudType(topicType) || isConsoleTopic(topicType)) {
+      // Binary sensor streams are throttled before serialization in Python.
+      if (isConsoleTopic(topicType)) {
         const now = Date.now();
         const lastDelivery = this.lastImageDelivery.get(topicName) ?? 0;
         const interval = this.refreshIntervals.get(topicName) ?? this.defaultImagePreviewIntervalMs;
@@ -1239,9 +1254,12 @@ export class TopicWebviewManager implements vscode.Disposable {
         break;
       case "setRefreshRate":
         if (typeof message.rateHz === "number" && Number.isFinite(message.rateHz)) {
-          const rateHz = Math.min(30, Math.max(1, message.rateHz));
+          const cloud = isPointCloudType(this.topicTypes.get(topicName) ?? "");
+          const rateHz = cloud ? Math.min(5, Math.max(0.2, message.rateHz))
+            : Math.min(30, Math.max(1, message.rateHz));
           this.refreshIntervals.set(topicName, 1000 / rateHz);
-          this.echoManager.setImageRefreshRate(topicName, rateHz);
+          if (cloud) { this.echoManager.setPointCloudRefreshRate(topicName, rateHz); }
+          else { this.echoManager.setImageRefreshRate(topicName, rateHz); }
         }
         break;
       case "setBufferLength":

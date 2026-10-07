@@ -149,7 +149,10 @@ export function decodePointCloud(message: unknown, maxPoints = MAX_RENDERED_POIN
   const pointStep = integer(message.point_step, "point_step", 0, MAX_POINT_CLOUD_BYTES);
   const rowStep = integer(message.row_step, "row_step", 0, MAX_POINT_CLOUD_BYTES);
   const totalPoints = integer(width * height, "total points", 0, Number.MAX_SAFE_INTEGER);
-  const requiredBytes = integer(rowStep * height, "layout size", 0, MAX_POINT_CLOUD_BYTES);
+  integer(rowStep * height, "layout size", 0, MAX_POINT_CLOUD_BYTES);
+  // Some cameras retain the original row_step after compacting a one-row cloud.
+  // Require every point and inter-row stride, but not unused final row padding.
+  const requiredBytes = totalPoints > 0 ? (height - 1) * rowStep + width * pointStep : 0;
   if ((totalPoints > 0 && pointStep === 0) || width * pointStep > rowStep) {
     throw new Error("Invalid PointCloud2 point_step or row_step");
   }
@@ -174,7 +177,9 @@ export function decodePointCloud(message: unknown, maxPoints = MAX_RENDERED_POIN
   const blue = layout.get("b");
   const hasColor = !!packed || !!(red && green && blue);
   const data = bytes(message.data);
-  if (data.byteLength < requiredBytes) { throw new Error("Truncated PointCloud2 data"); }
+  if (data.byteLength < requiredBytes) {
+    throw new Error(`Truncated PointCloud2 data: received ${data.byteLength} bytes, need ${requiredBytes} for point records`);
+  }
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const sampledPoints = Math.min(totalPoints, maxPoints);
   const vertices = new Float32Array(sampledPoints * 8);

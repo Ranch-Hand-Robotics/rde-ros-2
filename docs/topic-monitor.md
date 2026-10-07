@@ -49,10 +49,11 @@ Hover over any topic in the tree to see:
 **Individual Topic Controls** (in webview):
 - **Pause/Resume**: Click the pause button to temporarily stop receiving new messages
 - **Clear**: Click the clear button to remove all displayed messages from the view
-- **Refresh**: Set the image preview rate from 1–30 Hz (default 5 Hz)
+- **Refresh**: Images use 1–30 Hz (default 5 Hz); PointCloud2 uses 0.2–5 Hz (default 1 Hz), with a size-based limit for large clouds
 - **Buffer**: Adjust retained message history from 1–500 messages
 
 **All Topics Controls** (in tree view toolbar):
+- **Play/Pause**: Start or pause the watcher and selected topic subscriptions. Play does not wait for the topic-list query before starting ready subscriptions.
 - **Refresh**: Click the refresh icon to update the topic list
 - **Stop All**: Click the stop icon to unsubscribe from all topics and close all monitoring windows
 
@@ -85,7 +86,16 @@ Most ROS 2 message types are displayed as formatted JSON with syntax highlightin
 
 Raw `sensor_msgs/msg/Image` and compressed `sensor_msgs/msg/CompressedImage` topics are rendered in the webview. Raw previews support common RGB/BGR and monochrome encodings, including 16-bit depth images, with row stride and endianness preserved.
 
-Image monitoring uses a direct `rclpy` subscription in the selected ROS/Pixi Python environment, rather than converting every image byte to YAML through `ros2 topic echo`. The subscriber uses best-effort, volatile QoS with a depth-one queue and throttles before base64 encoding. The refresh slider controls this source-side preview rate without restarting the subscription. Pausing or closing the monitor stops its subscriber process.
+Image monitoring uses a direct `rclpy` subscription in the selected ROS/Pixi Python environment, rather than converting every image byte to YAML through `ros2 topic echo`. The subscriber uses best-effort, volatile QoS with a depth-one queue and throttles before serialization. The refresh slider controls this source-side preview rate without restarting the subscription. Pausing or closing the monitor stops its subscriber process.
+
+Images and PointCloud2 share a binary-framed stdout pipe: a 12-byte header carries
+the `RDEB` magic and little-endian metadata/payload lengths, followed by UTF-8 JSON
+metadata and raw sensor bytes. Python does not base64-encode the payload. Node
+checks the 64 KiB metadata and 32 MiB payload limits before allocating buffers and
+handles partial frames. Diagnostics use stderr; synchronous writes provide pipe
+backpressure. Point-cloud payloads stay binary through VS Code's typed-array
+webview transport into the renderer, without base64 conversion. Images retain
+their existing base64 webview boundary.
 
 ### PointCloud2 preview
 
@@ -114,15 +124,24 @@ Subscribe to a `sensor_msgs/msg/PointCloud2` topic to open the WebGPU preview:
 The preview supports numeric XYZ fields, packed FLOAT32/UINT32 `rgb` or `rgba`,
 and separate `r`, `g`, `b` channels (integer 0–255 or floating-point 0–1).
 Endianness, field offsets, and organized-cloud row padding are respected.
+Unused padding after the final row may be omitted (including compact camera
+clouds with a larger declared row stride); missing point records are still rejected.
 Invalid XYZ points are skipped. The latest cloud replaces the previous one;
-the default refresh is 5 Hz and can be adjusted. Camera orientation is retained
+the default refresh is 1 Hz and can be adjusted from 0.2–5 Hz. Camera orientation is retained
 as messages arrive; use **Fit view** when the scene bounds change.
 
 To bound preview memory and GPU work, payloads are limited to 32 MiB and clouds
 over 200,000 points are evenly sampled. Counts and sampling are shown below the
 canvas. This is a lightweight preview: it does not resolve TF transforms, accumulate
-cloud history, or reproduce all RViz display features. Topic transport still uses
-`ros2 topic echo`, so reduce the publisher's rate/size for very large clouds.
+cloud history, or reproduce all RViz display features.
+
+PointCloud2 uses the same direct, latest-only binary subscription as images, not
+`ros2 topic echo`. Frames are throttled before metadata serialization or pipe
+writes. In addition to the selected rate, each delivered frame reserves an interval
+of at least its raw byte size divided by 8 MiB/s (for example, a 32 MiB cloud at
+most once every four seconds). This per-subscription budget limits preview traffic,
+not the publisher's DDS traffic. Large clouds may therefore update more slowly
+than the slider setting. Changing the rate cannot reset this size-based delay.
 
 WebGPU requires a compatible GPU/driver and a recent VS Code with hardware
 acceleration. An explicit notice is shown when WebGPU is unavailable or the GPU
@@ -151,7 +170,7 @@ If topic messages aren't updating:
 1. Check that the topic is actually publishing: `ros2 topic hz <topic_name>`
 2. Verify publishers exist: `ros2 topic info <topic_name>`
 3. Try unchecking and rechecking the topic checkbox
-4. For images, check the **ROS 2** Output channel for subscriber or Python environment errors. The selected ROS Python environment must include `rclpy` and `sensor_msgs`.
+4. For images or PointCloud2, check the **ROS 2** Output channel for subscriber or Python environment errors. The selected ROS Python environment must include `rclpy` and `sensor_msgs`.
 
 ### Webview Not Opening
 
