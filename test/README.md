@@ -22,6 +22,25 @@ The `test/launch/` directory contains various ROS 2 launch files used to test th
 
 ## Running Tests
 
+### Image and point-cloud transport
+
+Run the standalone routing, binary framing, rate-control, and watcher regressions:
+
+```bash
+npm run test:topics
+```
+
+With the ROS Python environment activated, test the native `sensor_msgs` producers:
+
+```bash
+python -m unittest discover -s test -p "test_*subscriber.py"
+```
+
+The VS Code test suite also covers point-cloud decoding, panel controls, and an
+actual binary `postMessage` round trip into a webview.
+
+### Launch dumper
+
 To test the launch dumper with these files:
 
 ```bash

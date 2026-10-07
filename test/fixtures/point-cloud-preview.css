@@ -1,0 +1,14 @@
+/* Standalone browser fixture theme; production uses the VS Code theme. */
+:root {
+  color-scheme: dark;
+  --outline: #303c50;
+  --surface-raised: #151d2b;
+  --muted: #a3b1c6;
+  --accent: #80baff;
+  --vscode-input-foreground: #e2e8f0;
+  --vscode-input-background: #202c3f;
+}
+body { margin: 24px auto; padding: 0 20px; max-width: 1100px; color: #e2e8f0; background: #0b111c; font: 14px system-ui, sans-serif; }
+h1 { font-size: 20px; margin-bottom: 6px; }
+p { color: var(--muted); }
+.control { border: 1px solid var(--outline); border-radius: 5px; padding: 8px 12px; background: #24364e; color: #e2e8f0; cursor: pointer; }

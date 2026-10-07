@@ -7,9 +7,10 @@ import * as util from "util";
 import * as yaml from "js-yaml";
 
 import * as extension from "../../extension";
-import { ImageSubscriptionManager } from "./image-subscription";
+import { ImageSubscriptionManager, PointCloudSubscriptionManager } from "./image-subscription";
 import {
   isImageType,
+  isPointCloudType,
   TopicInfo,
   TopicQoS,
   TopicMetrics,
@@ -181,18 +182,23 @@ export function createTopicEchoArguments(topicName: string): string[] {
  */
 export class TopicEchoManager {
   private readonly images = new ImageSubscriptionManager();
+  private readonly pointClouds = new PointCloudSubscriptionManager();
   private activeProcesses = new Map<string, child_process.ChildProcess>();
   private messageHandlers = new Map<string, (message: TopicMessage) => void>();
 
   /**
    * Start echoing a topic
    */
-  public startEcho(topicName: string, onMessage: (message: TopicMessage) => void, topicType = "", rateHz = 5): void {
+  public startEcho(topicName: string, onMessage: (message: TopicMessage) => void, topicType = "", rateHz?: number): void {
     // Stop any existing process for this topic
     this.stopEcho(topicName);
 
     if (isImageType(topicType)) {
       this.images.start(topicName, topicType, onMessage, rateHz);
+      return;
+    }
+    if (isPointCloudType(topicType)) {
+      this.pointClouds.start(topicName, topicType, onMessage, rateHz);
       return;
     }
 
@@ -271,6 +277,7 @@ export class TopicEchoManager {
    */
   public stopEcho(topicName: string): void {
     this.images.stop(topicName);
+    this.pointClouds.stop(topicName);
     const process = this.activeProcesses.get(topicName);
     if (process) {
       process.kill();
@@ -284,6 +291,7 @@ export class TopicEchoManager {
    */
   public stopAll(): void {
     this.images.dispose();
+    this.pointClouds.dispose();
     for (const [topicName] of this.activeProcesses) {
       this.stopEcho(topicName);
     }
@@ -293,11 +301,15 @@ export class TopicEchoManager {
    * Check if a topic is being echoed
    */
   public isEchoing(topicName: string): boolean {
-    return this.images.has(topicName) || this.activeProcesses.has(topicName);
+    return this.images.has(topicName) || this.pointClouds.has(topicName) || this.activeProcesses.has(topicName);
   }
 
   public setImageRefreshRate(topicName: string, rateHz: number): void {
     this.images.setRate(topicName, rateHz);
+  }
+
+  public setPointCloudRefreshRate(topicName: string, rateHz: number): void {
+    this.pointClouds.setRate(topicName, rateHz);
   }
 
   /**

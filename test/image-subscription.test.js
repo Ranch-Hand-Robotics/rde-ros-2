@@ -23,7 +23,25 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 const imageType = 'sensor_msgs/msg/Image';
 const compressedType = 'sensor_msgs/msg/CompressedImage';
 const frame = { width: 2, height: 1, step: 6, encoding: 'rgb8', is_bigendian: 0,
-  header: { frame_id: 'camera', stamp: { sec: 1, nanosec: 2 } }, data: 'ChQeKDI8' };
+  header: { frame_id: 'camera', stamp: { sec: 1, nanosec: 2 } }, data: Buffer.from([10, 20, 30, 40, 50, 60]) };
+const webFrame = { ...frame, data: frame.data.toString('base64') };
+
+function header(metadataLength, payloadLength, magic = 'RDEB') {
+  const result = Buffer.alloc(12);
+  result.write(magic, 0, 4, 'ascii');
+  result.writeUInt32LE(metadataLength, 4); result.writeUInt32LE(payloadLength, 8);
+  return result;
+}
+
+function binaryFrame({ data, ...metadata }) {
+  const json = Buffer.from(JSON.stringify(metadata), 'utf8');
+  return Buffer.concat([header(json.length, data.length), json, data]);
+}
+
+function metadataFrame(text, payloadLength = 0) {
+  const json = Buffer.isBuffer(text) ? text : Buffer.from(text, 'utf8');
+  return Buffer.concat([header(json.length, payloadLength), json]);
+}
 
 function harness() {
   const calls = [], logs = [], children = [];
@@ -45,28 +63,95 @@ function harness() {
 
 test('decoder preserves multi-MB frames split into arbitrary chunks and multiple documents', () => {
   const { ImageFrameDecoder } = harness();
-  const large = { ...frame, data: Buffer.alloc(1280 * 720 * 3, 42).toString('base64') };
-  const text = JSON.stringify(large) + '\r\n' + JSON.stringify(frame) + '\n';
+  const large = { ...frame, data: Buffer.alloc(1280 * 720 * 3, 42) };
+  const text = Buffer.concat([binaryFrame(large), binaryFrame(frame)]);
   const decoder = new ImageFrameDecoder(), results = [];
-  for (let i = 0; i < text.length; i += 65521) { decoder.push(text.slice(i, i + 65521), d => results.push(d)); }
+  for (let i = 0; i < text.length; i += 65521) { decoder.push(text.subarray(i, i + 65521), d => results.push(d)); }
   assert.deepEqual(results, [large, frame]);
+  text.fill(0);
+  assert.deepEqual(results, [large, frame], 'Decoded frames own their payload, not the input chunks');
 });
 
-test('decoder waits for newline and rejects malformed or oversized frames', () => {
+test('decoder waits for the last payload byte and accepts empty payloads and back-to-back frames', () => {
   const { ImageFrameDecoder } = harness();
   const decoder = new ImageFrameDecoder(), frames = [];
-  decoder.push(JSON.stringify(frame), d => frames.push(d));
+  const encoded = binaryFrame(frame);
+  decoder.push(encoded.subarray(0, -1), d => frames.push(d));
   assert.equal(frames.length, 0);
-  decoder.push('\n', d => frames.push(d));
+  decoder.push(encoded.subarray(-1), d => frames.push(d));
   assert.equal(frames.length, 1);
-  for (const input of ['bad json\n', 'null\n', '{"data":[]}\n']) {
-    assert.throws(() => new ImageFrameDecoder().push(input, () => {}));
+  const empty = { ...frame, data: Buffer.alloc(0) };
+  decoder.push(Buffer.concat([binaryFrame(empty), binaryFrame(empty), encoded]), d => frames.push(d));
+  decoder.push(Buffer.alloc(0), () => assert.fail('Empty input'));
+  assert.deepEqual(frames, [frame, empty, empty, frame]);
+});
+
+test('decoder rejects declared oversize lengths and bad magic before allocating any frame buffers', () => {
+  const { ImageFrameDecoder } = harness();
+  const inputs = [header(65537, 0), header(1, 32 * 1024 * 1024 + 1),
+    header(0xffffffff, 0xffffffff), header(0, 0), header(2, 0, 'NOPE')];
+  for (const input of inputs) {
+    const decoder = new ImageFrameDecoder();
+    const allocate = Buffer.allocUnsafe;
+    let allocations = 0;
+    Buffer.allocUnsafe = size => { allocations++; return allocate(size); };
+    try { assert.throws(() => decoder.push(input, () => assert.fail('Invalid')), /transport limit/); }
+    finally { Buffer.allocUnsafe = allocate; }
+    assert.equal(allocations, 0);
+    assert.throws(() => decoder.push(binaryFrame(frame), () => assert.fail('No recovery')));
   }
-  assert.throws(() => new ImageFrameDecoder().push('a'.repeat(64 * 1024 * 1024 + 1), () => {}), /transport limit/);
+});
+
+test('decoder rejects malformed JSON, UTF-8 and metadata before payload allocation without leaking data', () => {
+  const { ImageFrameDecoder } = harness();
+  const invalid = ['private-camera-payload', 'null', '[]', '{}', '42', '{"data":[]}',
+    JSON.stringify({ ...webFrame }), JSON.stringify({ ...frame, data: undefined, width: -1 }),
+    JSON.stringify({ ...frame, data: undefined, header: { frame_id: 42 } }),
+    JSON.stringify({ ...frame, data: undefined, step: '6' }), Buffer.from([0xff, 0xfe])];
+  for (const text of invalid) {
+    const input = metadataFrame(text, 32 * 1024 * 1024), decoder = new ImageFrameDecoder();
+    const allocate = Buffer.allocUnsafe, allocations = [];
+    Buffer.allocUnsafe = size => { allocations.push(size); return allocate(size); };
+    try {
+      assert.throws(() => decoder.push(input, () => assert.fail('Invalid')), error => {
+        assert.ok(!error.message.includes('private-camera-payload')); return true;
+      });
+    } finally { Buffer.allocUnsafe = allocate; }
+    assert.deepEqual(allocations, [input.length - 12], 'Only bounded metadata is allocated');
+  }
+  assert.throws(() => new ImageFrameDecoder().push('not a Buffer', () => {}));
+  const compressed = { header: frame.header, format: 'jpeg', data: Buffer.alloc(0) };
+  assert.throws(() => new ImageFrameDecoder(imageType).push(binaryFrame(compressed), () => {}));
+});
+
+test('decoder accepts exact 64 KiB metadata and 32 MiB payload limits', () => {
+  const { ImageFrameDecoder } = harness();
+  const { data, ...metadata } = frame;
+  const text = JSON.stringify(metadata).padEnd(65536, ' ');
+  const raw = Buffer.alloc(32 * 1024 * 1024, 0xff), results = [];
+  const decoder = new ImageFrameDecoder();
+  decoder.push(metadataFrame(text, raw.length), d => results.push(d));
+  assert.deepEqual(results, []);
+  decoder.push(raw, d => results.push(d));
+  assert.deepEqual(results, [{ ...metadata, data: raw }]);
+});
+
+test('one-byte chunks preserve Unicode metadata and allocate each frame buffer only once without concat', () => {
+  const { ImageFrameDecoder } = harness();
+  const value = { ...frame, header: { ...frame.header, frame_id: 'camera 🚀 雪' } };
+  const input = binaryFrame(value), decoder = new ImageFrameDecoder(), results = [];
+  const allocate = Buffer.allocUnsafe, concat = Buffer.concat, allocations = [];
+  Buffer.allocUnsafe = size => { allocations.push(size); return allocate(size); };
+  Buffer.concat = () => assert.fail('Decoder must not concatenate growing buffers');
+  try {
+    for (let i = 0; i < input.length; i++) { decoder.push(input.subarray(i, i + 1), d => results.push(d)); }
+  } finally { Buffer.allocUnsafe = allocate; Buffer.concat = concat; }
+  assert.deepEqual(results, [value]);
+  assert.deepEqual(allocations, [input.readUInt32LE(4), value.data.length]);
 });
 
 for (const type of [imageType, compressedType]) {
-  test(`${type}: starts explicit ROS Python and delivers base64 without a shell or YAML`, async () => {
+  test(`${type}: starts explicit ROS Python and delivers raw bytes without a shell or YAML`, async () => {
     const h = harness(), manager = new h.ImageSubscriptionManager(), received = [];
     manager.start('/camera/image & literal', type, m => received.push(m), 7);
     assert.equal(manager.has('/camera/image & literal'), true);
@@ -76,15 +161,17 @@ for (const type of [imageType, compressedType]) {
       '--topic', '/camera/image & literal', '--type', type, '--rate', '7']);
     assert.equal(h.calls[0].options.env, h.env);
     assert.equal(h.calls[0].options.shell, undefined);
-    const data = type === imageType ? frame : { format: 'jpeg', data: 'AAEC/w==' };
-    h.children[0].stdout.write(JSON.stringify(data) + '\n');
+    const data = type === imageType ? frame : { header: frame.header, format: 'jpeg', data: Buffer.from([0, 1, 2, 255]) };
+    assert.equal(h.children[0].stdout.readableEncoding, null);
+    assert.equal(h.children[0].stderr.readableEncoding, 'utf8');
+    h.children[0].stdout.write(binaryFrame(data));
     assert.deepEqual(received[0].data, data);
     manager.setRate('/camera/image & literal', 12);
     assert.deepEqual(JSON.parse(h.children[0].controls[0]), { rateHz: 12 });
     assert.equal(h.calls.length, 1, 'Rate change does not restart DDS discovery');
     manager.stop('/camera/image & literal');
     assert.ok(h.children[0].killed);
-    h.children[0].stdout.write(JSON.stringify(data) + '\n');
+    h.children[0].stdout.write(binaryFrame(data));
     assert.equal(received.length, 1, 'No late delivery after stop');
   });
 }
@@ -104,15 +191,21 @@ test('stop and dispose invalidate pending ROS activation and interpreter resolut
 });
 
 test('resume and replacement ignore old process events and use latest pending rate', async () => {
-  const h = harness(), manager = new h.ImageSubscriptionManager();
-  manager.start('/image', imageType, () => {}); await tick();
+  const h = harness(), manager = new h.ImageSubscriptionManager(), received = [];
+  manager.start('/image', imageType, m => received.push(m)); await tick();
   const old = h.children[0];
-  manager.start('/image', imageType, () => {});
+  old.stdout.write(binaryFrame(frame).subarray(0, 20));
+  manager.start('/image', imageType, m => received.push(m));
   manager.setRate('/image', 30); await tick();
   assert.ok(old.killed);
+  const logs = h.logs.length;
+  old.stdout.write(binaryFrame(frame)); old.stderr.write('stale'); old.stdin.emit('error', new Error('stale'));
   old.emit('close', 1); old.emit('error', new Error('stale'));
+  assert.equal(h.logs.length, logs); assert.deepEqual(received, []);
   assert.equal(manager.has('/image'), true);
   assert.equal(h.calls[1].args.at(-1), '30');
+  h.children[1].stdout.write(binaryFrame(frame));
+  assert.deepEqual(received.map(m => m.data), [frame]);
   manager.dispose(); assert.ok(h.children[1].killed);
 });
 
@@ -133,11 +226,14 @@ test('activation failures and stream/process errors stop cleanly with diagnostic
   }
 });
 
-test('TopicEchoManager routes only image types to direct subscriptions', () => {
+test('TopicEchoManager routes image types to direct subscriptions and keeps ordinary topics on YAML', () => {
   const h = harness(), imageCalls = [];
   const images = { start: (...args) => imageCalls.push(args), stop() {}, dispose() {}, has: () => true, setRate() {} };
   const { TopicEchoManager } = load('../out/src/ros/ros2/topic-monitor', { '../../extension': h.extension,
-    child_process: h.child_process, './image-subscription': { ImageSubscriptionManager: function() { return images; } } });
+    child_process: h.child_process, './image-subscription': {
+      ImageSubscriptionManager: function() { return images; },
+      PointCloudSubscriptionManager: function() { return { start() {}, stop() {}, dispose() {}, has: () => false, setRate() {} }; },
+    } });
   const manager = new TopicEchoManager(), handler = () => {};
   manager.startEcho('/image', handler, imageType, 8);
   assert.deepEqual(imageCalls[0], ['/image', imageType, handler, 8]);
@@ -157,7 +253,8 @@ function webviewHarness() {
     vscode: { ViewColumn: { Beside: 2 }, window: { createWebviewPanel: () => panel } },
     './topic-monitor': { TopicEchoManager: class {
       startEcho(...args) { starts.push(args); } stopEcho(t) { stops.push(t); }
-      setImageRefreshRate(...args) { rates.push(args); } dispose() {}
+      setImageRefreshRate(...args) { rates.push(args); }
+      setPointCloudRefreshRate(...args) { rates.push(args); } dispose() {}
     } },
   });
   return { ...module, starts, stops, rates, sent, receive: m => receive(m) };
@@ -168,7 +265,7 @@ test('webview routes raw images, changes source rate, pauses/resumes and preserv
   manager.openTopicMonitor('/image', imageType);
   assert.equal(h.starts[0][2], imageType); assert.equal(h.starts[0][3], 5);
   h.starts[0][1]({ timestamp: 1, data: frame });
-  assert.deepEqual(h.sent[0].message.data, frame);
+  assert.deepEqual(h.sent[0].message.data, webFrame);
   h.receive({ command: 'setRefreshRate', rateHz: 12 });
   assert.deepEqual(h.rates[0], ['/image', 12]);
   h.receive({ command: 'pause' });
@@ -178,7 +275,7 @@ test('webview routes raw images, changes source rate, pauses/resumes and preserv
   h.receive({ command: 'resume' });
   assert.equal(h.starts[1][3], 12);
   h.receive({ command: 'getHistory' });
-  assert.deepEqual(h.sent.at(-1).messages, [{ timestamp: 1, data: frame }]);
+  assert.deepEqual(h.sent.at(-1).messages, [{ timestamp: 1, data: webFrame }]);
   manager.dispose(); assert.ok(h.stops.length >= 2);
 });
 
@@ -191,8 +288,46 @@ test('received base64 RGB bytes reach the existing canvas renderer', () => {
   let pixels;
   const canvas = { getContext: () => ({ createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
     putImageData: image => { pixels = image.data; } }) };
-  assert.equal(context.drawRawImage(canvas, { data: frame }), undefined);
+  assert.equal(context.drawRawImage(canvas, { data: webFrame }), undefined);
   assert.deepEqual(Array.from(pixels), [10,20,30,255,40,50,60,255]);
+});
+
+test('webview pause/resume updates the icon for clicks and watcher state changes', () => {
+  const html = webviewHarness().createTopicMonitorHtml('test:', '/points', 'sensor_msgs/msg/PointCloud2');
+  const attributes = {}, icon = {}, sent = [];
+  let click;
+  const context = {
+    isPaused: false,
+    hero: { classList: { toggle() {} } },
+    pauseLabel: {}, statusText: {},
+    pauseIcon: { setAttribute: (key, value) => { icon[key] = value; } },
+    pauseButton: {
+      setAttribute: (key, value) => { attributes[key] = value; },
+      addEventListener: (name, callback) => { assert.equal(name, 'click'); click = callback; },
+    },
+    vscode: { postMessage: message => sent.push(message.command) },
+  };
+  vm.createContext(context);
+  vm.runInContext(html.slice(html.indexOf('    function setPaused('),
+    html.indexOf('    clearButton.addEventListener(')), context);
+  context.setPaused(false);
+  const pausePath = icon.d;
+  assert.ok(pausePath);
+  click();
+  const playPath = icon.d;
+  assert.notEqual(playPath, pausePath);
+  assert.equal(context.pauseLabel.textContent, 'Resume');
+  assert.equal(attributes['aria-pressed'], 'true');
+  click();
+  assert.equal(icon.d, pausePath);
+  assert.equal(context.pauseLabel.textContent, 'Pause');
+  assert.equal(attributes['aria-pressed'], 'false');
+  assert.deepEqual(sent, ['pause', 'resume']);
+  context.setPaused(true);
+  assert.equal(icon.d, playPath);
+  context.setPaused(false);
+  assert.equal(icon.d, pausePath);
+  assert.match(html, /id="pauseIcon"/);
 });
 
 test('UTF-8 chunk boundaries and invalid refresh rates are handled safely', async () => {
@@ -201,7 +336,7 @@ test('UTF-8 chunk boundaries and invalid refresh rates are handled safely', asyn
   await tick();
   assert.equal(h.calls[0].args.at(-1), '5');
   const data = { ...frame, header: { ...frame.header, frame_id: 'camera 🚀' } };
-  const encoded = Buffer.from(JSON.stringify(data) + '\n');
+  const encoded = binaryFrame(data);
   for (const byte of encoded) { h.children[0].stdout.write(Buffer.from([byte])); }
   assert.deepEqual(received[0].data, data);
   for (const rate of [-10, Infinity, 100]) { manager.setRate('/image', rate); }

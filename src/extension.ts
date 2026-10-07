@@ -70,6 +70,8 @@ let topicTreeView: vscode.TreeView<TopicTreeItem> | null = null;
 export let rosDistributionsProvider: RosDistributionsProvider | null = null;
 
 let onEnvChanged = new vscode.EventEmitter<void>();
+// Readiness also changes on topic-only sourcing, without reactivating providers.
+const onEnvResolved = new vscode.EventEmitter<void>();
 
 /**
  * Triggered when the env is soured.
@@ -78,7 +80,7 @@ export let onDidChangeEnv = onEnvChanged.event;
 
 export async function resolvedEnv() {
     if (env === undefined) { // Env reload in progress
-        await debug_utils.oneTimePromiseFromEvent(onDidChangeEnv);
+        await debug_utils.oneTimePromiseFromEvent(onEnvResolved.event);
     }
     return env
 }
@@ -715,25 +717,40 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     // Register Topic Tree commands
+    let topicWatcherRequest = 0;
     vscode.commands.registerCommand(Commands.TopicTreeRefresh, () => {
-        ensureErrorMessageOnException(async () => {
+        return ensureErrorMessageOnException(async () => {
             await sourceRosAndWorkspace(false);
             await topicTreeProvider?.refreshTopics();
         });
     });
 
     vscode.commands.registerCommand(Commands.TopicTreeStartWatcher, () => {
-        ensureErrorMessageOnException(async () => {
+        const request = ++topicWatcherRequest;
+        return ensureErrorMessageOnException(async () => {
             await sourceRosAndWorkspace(false);
+            // A Pause (or newer Play) during sourcing supersedes this request.
+            if (request !== topicWatcherRequest) {
+                return;
+            }
+            if (env?.ROS_VERSION !== "2") {
+                throw new Error("No ROS 2 environment is configured. Use ROS2: Find ROS or select an installed distribution.");
+            }
             topicTreeProvider?.setWatcherEnabled(true);
-            await topicTreeProvider?.refreshTopics();
             syncTopicMonitoringState();
-            await vscode.commands.executeCommand("setContext", "ros2.topicWatcherEnabled", true);
+            // Subscriptions and the Pause button must not wait for the ROS graph.
+            // Join the provider's in-flight query before yielding; do not change
+            // watcher state after it completes, since Pause may have intervened.
+            await Promise.all([
+                vscode.commands.executeCommand("setContext", "ros2.topicWatcherEnabled", true),
+                topicTreeProvider?.refreshTopics(),
+            ]);
         });
     });
 
     vscode.commands.registerCommand(Commands.TopicTreePauseWatcher, () => {
-        ensureErrorMessageOnException(async () => {
+        ++topicWatcherRequest;
+        return ensureErrorMessageOnException(async () => {
             topicTreeProvider?.setWatcherEnabled(false);
             syncTopicMonitoringState();
             await vscode.commands.executeCommand("setContext", "ros2.topicWatcherEnabled", false);
@@ -741,7 +758,7 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     vscode.commands.registerCommand(Commands.TopicTreePauseAll, () => {
-        ensureErrorMessageOnException(async () => {
+        return ensureErrorMessageOnException(async () => {
             await topicTreeProvider?.unsubscribeAll();
             vscode.window.showInformationMessage("All topic monitors stopped");
         });
@@ -1302,6 +1319,7 @@ async function sourceRosAndWorkspace(
     }
 
     env = newEnv;
+    onEnvResolved.fire();
 
     if (notifyEnvironmentChange) {
         // Notify listeners only when a full environment-dependent extension refresh is required.

@@ -79,3 +79,7 @@ export function isImageType(messageType: string): boolean {
     messageType.includes(imageType)
   );
 }
+
+export function isPointCloudType(messageType: string): boolean {
+  return messageType === "sensor_msgs/msg/PointCloud2";
+}

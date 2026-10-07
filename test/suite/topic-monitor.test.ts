@@ -212,4 +212,37 @@ enabled: true
 
     assert.strictEqual((message.data as { data: string }).data, encoded);
   });
+
+  it("loads only local, nonce-protected cloud assets for PointCloud2 topics", () => {
+    const resources = { pointCloudScript: "https://webview.local/point-cloud-viewer.js", pointCloudStyle: "https://webview.local/point-cloud.css" };
+    const html = createTopicMonitorHtml("https://webview.local", "/points", "sensor_msgs/msg/PointCloud2", 1, "cloud-nonce", resources);
+    assert.ok(html.includes('data-point-cloud-topic="true"'));
+    assert.ok(html.includes('<script nonce="cloud-nonce" src="https://webview.local/point-cloud-viewer.js"></script>'));
+    assert.ok(html.includes('<link rel="stylesheet" href="https://webview.local/point-cloud.css">'));
+    assert.ok(html.indexOf('src="https://webview.local/point-cloud-viewer.js"') < html.indexOf("const vscode = acquireVsCodeApi()"));
+    assert.ok(html.includes("pointCloudViewer?.update(latest.data)"));
+    assert.ok(html.includes("pointCloudViewer?.clear()"));
+    assert.ok(!html.includes("unsafe-eval"));
+    assert.ok(!createTopicMonitorHtml("https://webview.local", "/other", "std_msgs/msg/String", 100, "n", resources)
+      .includes('src="https://webview.local/point-cloud-viewer.js"'));
+  });
+
+  it("preserves PointCloud2 bytes, legacy payloads, layout and frame metadata", () => {
+    const data = { width: 1, height: 1, point_step: 4, row_step: 4, is_bigendian: true,
+      fields: [{ name: "x", offset: 0, datatype: 7, count: 1 }], header: { frame_id: "lidar" }, data: [0, 1, 2, 255] };
+    for (const bytes of [data.data, Buffer.from(data.data), { type: "Buffer", data: data.data }, Buffer.from(data.data).toString("base64")]) {
+      assert.deepStrictEqual(prepareTopicMessage({ timestamp: 42, data: { ...data, data: bytes } }, "sensor_msgs/msg/PointCloud2"), {
+        timestamp: 42, data: { ...data, data: Buffer.isBuffer(bytes) ? new Uint8Array(bytes) : bytes }
+      });
+    }
+    const empty = prepareTopicMessage({ timestamp: 1, data: { ...data, data: [] } }, "sensor_msgs/msg/PointCloud2");
+    assert.deepStrictEqual((empty.data as { data: number[] }).data, []);
+  });
+
+  it("rejects oversized cloud payloads before webview delivery without changing generic messages", () => {
+    const message = { timestamp: 1, data: { data: "A".repeat(Math.ceil(32 * 1024 * 1024 / 3) * 4 + 4) } };
+    const prepared = prepareTopicMessage(message, "sensor_msgs/msg/PointCloud2");
+    assert.match((prepared.data as { previewError: string }).previewError, /32 MiB/);
+    assert.strictEqual(prepareTopicMessage(message, "custom_msgs/msg/Data"), message);
+  });
 });
