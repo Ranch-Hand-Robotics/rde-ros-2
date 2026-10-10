@@ -71,14 +71,15 @@ export class RosDistributionItem extends vscode.TreeItem {
         public readonly distroName: string,
         public readonly setupScript: string,
         public readonly isActive: boolean,
-        distroArgument?: string | null
+        distroArgument?: string | null,
+        public readonly isManual: boolean = false
     ) {
         super(distroName, vscode.TreeItemCollapsibleState.None);
 
         this.description = isActive ? "active" : undefined;
         this.tooltip = `ROS 2 distribution: ${distroName}\nSetup script: ${setupScript}`;
         this.iconPath = new vscode.ThemeIcon(isActive ? "check" : "package");
-        this.contextValue = "rosDistribution";
+        this.contextValue = isManual ? "rosDistributionManual" : "rosDistribution";
 
         this.command = {
             command: "ROS2.setActiveDistro",
@@ -340,6 +341,10 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
         if (!(item instanceof RosDistributionItem) || this.removing) {
             return;
         }
+        if (item.isManual) {
+            void vscode.window.showWarningMessage("Manually configured ROS setup scripts cannot be removed by RDE. Use the environment's original package manager or remove it manually.");
+            return;
+        }
         this.removing = true;
         let offerReload = false;
         try {
@@ -427,7 +432,13 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
         try {
             return await vscode.window.withProgress({ location: { viewId: "ros2Distributions" } }, async () => {
                 const config = vscode.workspace.getConfiguration("ROS2");
-                const activeScript: string = config.get("rosSetupScript") ?? "";
+                const configuredScript: string = config.get("rosSetupScript") ?? "";
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                const activeScript = configuredScript.includes("${workspaceFolder}")
+                    ? workspaceFolder
+                        ? path.normalize(configuredScript.replace(/\$\{workspaceFolder\}/g, workspaceFolder))
+                        : ""
+                    : configuredScript;
                 const configuredDistro = config.get<string>("distro", "").trim();
                 const distros = await detectInstalledDistros();
                 const normalized = (script: string) => {
@@ -456,7 +467,8 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
                             d.name,
                             d.setupScript,
                             isActive,
-                            isManual ? configuredDistro || null : undefined
+                            isManual ? configuredDistro || null : undefined,
+                            isManual
                         );
                     }
                 );

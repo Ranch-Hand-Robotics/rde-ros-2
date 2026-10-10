@@ -40,7 +40,6 @@
     "activationEvents": [
         "onLanguage:cpp",
         "onLanguage:python",
-        "onLanguage:csharp",
         "onCommand",
         "workspaceContains:**/package.xml",
         "workspaceContains:**/test_*.py",
@@ -898,7 +897,7 @@
         "webpack": "webpack --mode development",
         "watch": "webpack --mode development --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
-        "test-compile": "tsc -p ./"
+        "test-compile": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && tsc -p ./"
     },
     "dependencies": {
         "@ranchhandrobotics/rde-common": "^1.0.0",

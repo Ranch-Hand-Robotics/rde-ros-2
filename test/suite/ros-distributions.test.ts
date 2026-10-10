@@ -126,6 +126,8 @@ describe("Distribution view actions", () => {
     assert.ok(manual);
     assert.strictEqual(manual.label, "jazzy (manual)");
     assert.strictEqual(manual.description, "active");
+    assert.strictEqual(manual.isManual, true);
+    assert.strictEqual(manual.contextValue, "rosDistributionManual");
     assert.deepStrictEqual(manual.command?.arguments, [script, "jazzy"]);
   });
 
@@ -137,6 +139,19 @@ describe("Distribution view actions", () => {
     assert.ok(manual);
     assert.strictEqual(manual.label, "Configured ROS 2 setup");
     assert.deepStrictEqual(manual.command?.arguments, [script, undefined]);
+  });
+
+  it("resolves workspaceFolder in the configured setup path", async () => {
+    replaceProperty(vscode.workspace, "workspaceFolders", [{ uri: vscode.Uri.file(sandbox) }]);
+    activeScript = "${workspaceFolder}/pixi_ws/jazzy/setup.bash";
+    configuredDistro = "jazzy";
+
+    const manual = (await provider.getChildren()).find(distribution => distribution.setupScript === script);
+
+    assert.ok(manual);
+    assert.strictEqual(manual.isActive, true);
+    assert.strictEqual(manual.isManual, true);
+    assert.strictEqual(manual.setupScript, script);
   });
 
   it("does not show a configured setup script that no longer exists", async () => {
@@ -252,6 +267,20 @@ describe("Distribution view actions", () => {
     assert.deepStrictEqual(deletions, []);
     assert.deepStrictEqual(updates, []);
     assert.strictEqual(refreshes, 0);
+  });
+
+  it("never offers removal for a manually configured Pixi-looking environment", async () => {
+    choice = "Move to Trash";
+    activeScript = script;
+    configuredDistro = "jazzy";
+    const manual = (await provider.getChildren()).find(distribution => distribution.setupScript === script);
+
+    assert.ok(manual);
+    assert.strictEqual(manual.isManual, true);
+    await provider.remove(manual);
+
+    assert.deepStrictEqual(deletions, []);
+    assert.ok(String(warnings[0][0]).includes("Manually configured ROS setup scripts cannot be removed"));
   });
 
   it("moves only the selected installation to Trash and refreshes", async () => {
