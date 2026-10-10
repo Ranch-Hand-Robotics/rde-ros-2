@@ -70,7 +70,8 @@ export class RosDistributionItem extends vscode.TreeItem {
     constructor(
         public readonly distroName: string,
         public readonly setupScript: string,
-        public readonly isActive: boolean
+        public readonly isActive: boolean,
+        distroArgument?: string | null
     ) {
         super(distroName, vscode.TreeItemCollapsibleState.None);
 
@@ -82,7 +83,9 @@ export class RosDistributionItem extends vscode.TreeItem {
         this.command = {
             command: "ROS2.setActiveDistro",
             title: "Set as Active Distribution",
-            arguments: [setupScript, distroName === "ros2-windows (pixi)" ? undefined : distroName.replace(/ \(pixi\)$/, "")],
+            arguments: [setupScript, distroArgument === null
+                ? undefined
+                : distroArgument ?? (distroName === "ros2-windows (pixi)" ? undefined : distroName.replace(/ \(pixi\)$/, ""))],
         };
     }
 }
@@ -425,9 +428,37 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
             return await vscode.window.withProgress({ location: { viewId: "ros2Distributions" } }, async () => {
                 const config = vscode.workspace.getConfiguration("ROS2");
                 const activeScript: string = config.get("rosSetupScript") ?? "";
+                const configuredDistro = config.get<string>("distro", "").trim();
                 const distros = await detectInstalledDistros();
+                const normalized = (script: string) => {
+                    const resolved = path.resolve(script);
+                    return os.platform() === "win32" ? resolved.toLowerCase() : resolved;
+                };
+                let activeScriptIsManual = false;
+                if (activeScript && !distros.some(distro => normalized(distro.setupScript) === normalized(activeScript))) {
+                    try {
+                        if ((await fsPromises.stat(activeScript)).isFile()) {
+                            distros.push({
+                                name: configuredDistro ? `${configuredDistro} (manual)` : "Configured ROS 2 setup",
+                                setupScript: activeScript,
+                            });
+                            activeScriptIsManual = true;
+                        }
+                    } catch {
+                        // Don't show configured scripts that no longer exist.
+                    }
+                }
                 this.cachedItems = distros.map(
-                    (d) => new RosDistributionItem(d.name, d.setupScript, d.setupScript === activeScript)
+                    (d) => {
+                        const isActive = Boolean(activeScript) && normalized(d.setupScript) === normalized(activeScript);
+                        const isManual = activeScriptIsManual && isActive;
+                        return new RosDistributionItem(
+                            d.name,
+                            d.setupScript,
+                            isActive,
+                            isManual ? configuredDistro || null : undefined
+                        );
+                    }
                 );
                 await this.updateDistributionContext(this.cachedItems.length > 0, true);
                 return this.cachedItems;

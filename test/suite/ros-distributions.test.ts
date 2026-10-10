@@ -16,6 +16,7 @@ describe("Distribution view actions", () => {
   let updates: unknown[][];
   let choice: string | undefined;
   let activeScript: string | undefined;
+  let configuredDistro: string;
   let globalScript: string | undefined;
   let workspaceScript: string | undefined;
   let folderScript: string | undefined;
@@ -36,6 +37,7 @@ describe("Distribution view actions", () => {
     refreshes = 0;
     choice = undefined;
     activeScript = undefined;
+    configuredDistro = "";
     globalScript = undefined;
     workspaceScript = undefined;
     folderScript = undefined;
@@ -48,7 +50,7 @@ describe("Distribution view actions", () => {
     await fs.writeFile(script, "");
     replaceProperty(vscode.workspace, "workspaceFolders", undefined);
     replaceProperty(vscode.workspace, "getConfiguration", (_section: string, resource?: vscode.Uri) => ({
-      get: (key: string) => key === "pixiRoot" ? root : activeScript,
+      get: (key: string) => key === "pixiRoot" ? root : key === "rosSetupScript" ? activeScript : key === "distro" ? configuredDistro : undefined,
       inspect: (key: string) => {
         if (key === "pixiInstallLocationsByMachine") {
           return { globalValue: { [vscode.env.machineId]: root } };
@@ -112,6 +114,37 @@ describe("Distribution view actions", () => {
     await provider.getChildren();
     assert.strictEqual(progressCalls, 2);
     assert.deepStrictEqual(loading, [true, false, true, false]);
+  });
+
+  it("shows an existing manually configured workspace setup as an active distribution", async () => {
+    activeScript = script;
+    configuredDistro = "jazzy";
+
+    const items = await provider.getChildren();
+    const manual = items.find(distribution => distribution.setupScript === script);
+
+    assert.ok(manual);
+    assert.strictEqual(manual.label, "jazzy (manual)");
+    assert.strictEqual(manual.description, "active");
+    assert.deepStrictEqual(manual.command?.arguments, [script, "jazzy"]);
+  });
+
+  it("does not invent a distro name for a configured setup without ROS2.distro", async () => {
+    activeScript = script;
+
+    const manual = (await provider.getChildren()).find(distribution => distribution.setupScript === script);
+
+    assert.ok(manual);
+    assert.strictEqual(manual.label, "Configured ROS 2 setup");
+    assert.deepStrictEqual(manual.command?.arguments, [script, undefined]);
+  });
+
+  it("does not show a configured setup script that no longer exists", async () => {
+    activeScript = path.join(directory, "missing-setup.bash");
+
+    const items = await provider.getChildren();
+
+    assert.ok(!items.some(distribution => distribution.setupScript === activeScript));
   });
 
   it("clears the loading state when discovery fails", async () => {
