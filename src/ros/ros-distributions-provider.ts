@@ -18,6 +18,34 @@ export async function showRosInstallationOptions(): Promise<void> {
     }
 }
 
+export async function findRosInstallation(): Promise<void> {
+    const folders = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: "Select ROS 2 Installation",
+    });
+    if (!folders?.length) {
+        return;
+    }
+
+    const folder = folders[0].fsPath;
+    const scriptNames = process.platform === "win32"
+        ? ["setup.bat", "local_setup.bat"]
+        : ["setup.bash", "local_setup.bash", "setup.sh", "local_setup.sh"];
+    for (const directory of [folder, path.join(folder, "install"), path.join(folder, "Library")]) {
+        for (const name of scriptNames) {
+            const script = path.join(directory, name);
+            const stat = await fsPromises.stat(script).catch(() => undefined);
+            if (stat?.isFile()) {
+                await vscode.commands.executeCommand("ROS2.setActiveDistro", script);
+                return;
+            }
+        }
+    }
+    await vscode.window.showWarningMessage(`No ROS 2 setup script found in ${folder}. Select an installation folder containing a setup script.`);
+}
+
 export async function createRosDevContainer(): Promise<void> {
     if (!vscode.workspace.workspaceFolders?.length) {
         await vscode.window.showInformationMessage("Open a workspace folder before creating a ROS 2 devcontainer.");

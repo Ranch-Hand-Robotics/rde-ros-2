@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as os from "os";
 import { promises as fs } from "fs";
-import { RosDistributionItem, RosDistributionsProvider, showRosInstallationOptions, createRosDevContainer } from "../../src/ros/ros-distributions-provider";
+import { RosDistributionItem, RosDistributionsProvider, showRosInstallationOptions, findRosInstallation, createRosDevContainer } from "../../src/ros/ros-distributions-provider";
 
 describe("Distribution view actions", () => {
   let sandbox: string;
@@ -149,6 +149,52 @@ describe("Distribution view actions", () => {
     replaceProperty(vscode.window, "showQuickPick", async () => undefined);
     await showRosInstallationOptions();
     assert.deepStrictEqual(executed, commands);
+  });
+
+  it("browses for an installation even when known distributions exist", async () => {
+    const selectedFolder = path.join(sandbox, "another-installation");
+    const setup = path.join(selectedFolder, process.platform === "win32" ? "setup.bat" : "setup.bash");
+    await fs.mkdir(selectedFolder);
+    await fs.writeFile(setup, "");
+    const executed: unknown[][] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (...args: unknown[]) => { executed.push(args); });
+    replaceProperty(vscode.window, "showQuickPick", async () => { assert.fail("Find must not list discovered distributions"); });
+    replaceProperty(vscode.window, "showOpenDialog", async (options: vscode.OpenDialogOptions) => {
+      assert.strictEqual(options.canSelectFolders, true);
+      assert.strictEqual(options.canSelectFiles, false);
+      assert.strictEqual(options.canSelectMany, false);
+      return [vscode.Uri.file(selectedFolder)];
+    });
+    await findRosInstallation();
+    assert.deepStrictEqual(executed, [["ROS2.setActiveDistro", setup]]);
+  });
+
+  it("finds setup scripts under an installation's install or Library directory", async () => {
+    const executed: unknown[][] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (...args: unknown[]) => { executed.push(args); });
+    for (const subdirectory of ["install", "Library"]) {
+      const selectedFolder = path.join(sandbox, subdirectory);
+      const setup = path.join(selectedFolder, subdirectory, process.platform === "win32" ? "local_setup.bat" : "local_setup.sh");
+      await fs.mkdir(path.dirname(setup), { recursive: true });
+      await fs.writeFile(setup, "");
+      replaceProperty(vscode.window, "showOpenDialog", async () => [vscode.Uri.file(selectedFolder)]);
+      await findRosInstallation();
+      assert.deepStrictEqual(executed[executed.length - 1], ["ROS2.setActiveDistro", setup]);
+    }
+  });
+
+  it("leaves the active installation unchanged when browsing is cancelled or no script exists", async () => {
+    replaceProperty(vscode.commands, "executeCommand", async () => { assert.fail("No installation should be selected"); });
+    replaceProperty(vscode.window, "showOpenDialog", async () => undefined);
+    await findRosInstallation();
+    assert.strictEqual(warnings.length, 0);
+    const emptyFolder = path.join(sandbox, "empty");
+    await fs.mkdir(path.join(emptyFolder, "setup.bash"), { recursive: true });
+    replaceProperty(vscode.window, "showOpenDialog", async () => [vscode.Uri.file(emptyFolder)]);
+    await findRosInstallation();
+    assert.strictEqual(warnings.length, 1);
+    assert.ok((warnings[0][0] as string).includes("No ROS 2 setup script found"));
+    assert.deepStrictEqual(updates, []);
   });
 
   it("opens the devcontainer wizard only with a workspace and the required extension", async () => {

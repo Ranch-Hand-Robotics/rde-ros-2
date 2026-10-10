@@ -3,7 +3,6 @@
 
 import * as path from "path";
 import { promises as fsPromises } from "fs";
-import * as os from "os";
 import * as vscode from "vscode";
 import * as child_process from "child_process";
 import { promisify } from "util";
@@ -29,12 +28,11 @@ import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
 import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
-import { detectInstalledDistros, RosDistributionsProvider, selectInstalledDistro, showRosInstallationOptions, createRosDevContainer } from "./ros/ros-distributions-provider";
+import { detectInstalledDistros, RosDistributionsProvider, selectInstalledDistro, showRosInstallationOptions, findRosInstallation, createRosDevContainer } from "./ros/ros-distributions-provider";
 import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
 import { TopicTreeDataProvider } from "./ros/topic-tree/topic-tree-provider";
 import { TopicTreeItem } from "./ros/topic-tree/topic-tree-item";
 import { TopicWebviewManager } from "./ros/ros2/topic-webview";
-import { getPixiInstallRoot } from "./ros/installer/pixi-location";
 import { buildInstallPrefixes, buildParentScripts, cleanBuildEnvironment, isWorkspaceInstall, RosBuildOptions, sameBuildScript } from "./ros/build-environment";
 
 import * as mcp from "./mcp";
@@ -430,114 +428,9 @@ export async function activate(context: vscode.ExtensionContext) {
     ));
 
     // Register Find ROS command
-    vscode.commands.registerCommand(Commands.FindRos, async () => {
-        const pickAndSetRosSetupScript = async (scriptPath: string): Promise<void> => {
-            if (!await vscode_utils.setRosSetupScript(scriptPath)) {
-                return;
-            }
-            vscode.window.showInformationMessage(`ROS setup script set to: ${scriptPath}`);
-            if (rosDistributionsProvider) {
-                rosDistributionsProvider.refresh();
-            }
-        };
-
-        // Fast-path: look in configured/default Pixi roots for known setup scripts.
-        const config = vscode.workspace.getConfiguration("ROS2");
-        const configuredPixiRoot = getPixiInstallRoot();
-        const defaultPixiRoot = process.platform === "win32"
-            ? "c:\\pixi_ws"
-            : path.join(os.homedir(), "pixi_ws");
-        const pixiRoots = Array.from(new Set([configuredPixiRoot, defaultPixiRoot].filter(Boolean)));
-
-        const candidates: string[] = [];
-        for (const root of pixiRoots) {
-            if (process.platform === "win32") {
-                candidates.push(path.join(root, "ros2-windows", "local_setup.bat"));
-                try {
-                    const entries = await fsPromises.readdir(root, { withFileTypes: true });
-                    for (const entry of entries) {
-                        if (!entry.isDirectory()) {
-                            continue;
-                        }
-                        candidates.push(path.join(root, entry.name, "install", "setup.bat"));
-                        candidates.push(path.join(root, entry.name, "local_setup.bat"));
-                        candidates.push(path.join(root, entry.name, ".pixi", "envs", entry.name, "Library", "local_setup.bat"));
-                        candidates.push(path.join(root, entry.name, ".pixi", "envs", entry.name, "Library", "setup.bat"));
-                    }
-                } catch {
-                    // ignore missing roots
-                }
-            } else {
-                candidates.push(path.join(root, "install", "setup.bash"));
-                candidates.push(path.join(root, "local_setup.bash"));
-                candidates.push(path.join(root, "local_setup.sh"));
-                try {
-                    const entries = await fsPromises.readdir(root, { withFileTypes: true });
-                    for (const entry of entries) {
-                        if (!entry.isDirectory()) {
-                            continue;
-                        }
-                        candidates.push(path.join(root, entry.name, "install", "setup.bash"));
-                        candidates.push(path.join(root, entry.name, "setup.bash"));
-                        candidates.push(path.join(root, entry.name, "local_setup.bash"));
-                        candidates.push(path.join(root, entry.name, "local_setup.sh"));
-                    }
-                } catch {
-                    // ignore missing roots
-                }
-            }
-        }
-
-        const existingCandidates: string[] = [];
-        const seen = new Set<string>();
-        for (const candidate of candidates) {
-            const normalized = path.normalize(candidate);
-            if (seen.has(normalized)) {
-                continue;
-            }
-            seen.add(normalized);
-            if (await exists(normalized)) {
-                existingCandidates.push(normalized);
-            }
-        }
-
-        if (existingCandidates.length === 1) {
-            await pickAndSetRosSetupScript(existingCandidates[0]);
-            return;
-        }
-
-        if (existingCandidates.length > 1) {
-            const selected = await vscode.window.showQuickPick(
-                existingCandidates.map((p) => ({ label: path.basename(p), description: p, path: p })),
-                {
-                    placeHolder: "Select a discovered ROS setup script from Pixi roots",
-                    ignoreFocusOut: true,
-                }
-            );
-            if (selected?.path) {
-                await pickAndSetRosSetupScript(selected.path);
-                return;
-            }
-        }
-
-        // Fall back to manual browse if quick discovery didn't find anything.
-        const isWindows = process.platform === "win32";
-        const filters: Record<string, string[]> = isWindows
-            ? { "ROS Setup Script": ["bat"] }
-            : { "ROS Setup Script": ["bash", "sh"] };
-
-        const uris = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
-            openLabel: "Select ROS Setup Script",
-            filters,
-        });
-
-        if (uris && uris.length > 0) {
-            await pickAndSetRosSetupScript(uris[0].fsPath);
-        }
-    });
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.FindRos, () =>
+        ensureErrorMessageOnException(findRosInstallation)
+    ));
 
     // Register Set Active Distro command
     context.subscriptions.push(vscode.commands.registerCommand(Commands.SetActiveDistro, (setupScript: string, distro?: string) =>
