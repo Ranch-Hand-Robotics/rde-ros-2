@@ -53,9 +53,9 @@ export async function setRosSetupScript(scriptPath: string, distro?: string): Pr
     }
     const config = getExtensionConfiguration();
     await config.update("rosSetupScript", scriptPath, target);
-    if (distro) {
-        await config.update("distro", distro, target);
-    }
+    // A script selected without a known distro must clear any previous value;
+    // otherwise later selections can validate against a stale ROS_DISTRO.
+    await config.update("distro", distro ?? "", target);
     return true;
 }
 

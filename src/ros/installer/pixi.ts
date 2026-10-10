@@ -133,7 +133,7 @@ export function pixiSetupScript(executable: string, manifest: string, distro: st
   ].join("\n");
 }
 
-export function macInstallScript(executable: string, workspace: string, distro: string, setup: string): string {
+export function macInstallScript(executable: string, workspace: string, distro: string, setup: string, options: { locked?: boolean; publishSetup?: boolean } = {}): string {
   const pixi = quoteShell(executable);
   const smokeTest = "import rclpy; rclpy.init(); node = rclpy.create_node('rde_install_smoke_test'); node.destroy_node(); rclpy.shutdown()";
   return [
@@ -146,12 +146,12 @@ export function macInstallScript(executable: string, workspace: string, distro: 
     `cd ${quoteShell(workspace)}`,
     "unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH PYTHONPATH PYTHONHOME ROS_DISTRO ROS_VERSION ROS_PYTHON_VERSION",
     `${pixi} --version`,
-    `${pixi} install --manifest-path ${quoteShell(path.join(workspace, "pixi.toml"))} -e ${quoteShell(distro)}`,
+    `${pixi} install ${options.locked ? "--locked " : ""}--manifest-path ${quoteShell(path.join(workspace, "pixi.toml"))} -e ${quoteShell(distro)}`,
     `source ${quoteShell(setup)}`,
     `test "$ROS_DISTRO" = ${quoteShell(distro)}`,
     "ros2 --help",
     `python -c ${quoteShell(smokeTest)}`,
-    `mv ${quoteShell(setup)} ${quoteShell(path.join(workspace, "setup.bash"))}`,
+    ...(options.publishSetup === false ? [] : [`mv ${quoteShell(setup)} ${quoteShell(path.join(workspace, "setup.bash"))}`]),
     `printf '%s\\n' ${quoteShell(`ROS 2 ${distro} setup and smoke test passed.`)}`,
     "",
   ].join("\n");

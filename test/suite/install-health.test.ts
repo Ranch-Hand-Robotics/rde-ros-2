@@ -109,6 +109,10 @@ describe("ROS installation health checking", () => {
       path.join(directory, "pixi.toml"), "-e", "jazzy", "python", "-s", probe,
     ]);
     await assert.rejects(buildHealthCommand(pixiTarget, probe, "linux", { PATH: "/missing" }), /Pixi executable not found/);
+    const explicit = await buildHealthCommand({ ...pixiTarget, pixiExecutable: pixi }, probe, "linux", { PATH: "/missing" });
+    assert.strictEqual(explicit.command, pixi);
+    assert.deepStrictEqual(explicit.args, command.args);
+    await assert.rejects(buildHealthCommand({ ...pixiTarget, pixiExecutable: "./pixi" }, probe, "linux", {}), /absolute executable path/);
     await fs.promises.unlink(python);
     await assert.rejects(buildHealthCommand(pixiTarget, probe, "linux", { PATH: bin }), /python/);
   });
@@ -227,6 +231,13 @@ describe("ROS installation health checking", () => {
     });
     assert.match(result.error, /output exceeded/);
     assert.ok(result.stdout.length <= 128 * 1024);
+    const expanded = await runHealthProcess({
+      command: process.execPath, args: ["-e", 'process.stdout.write("x".repeat(200000))'],
+      cwd: directory, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    }, 15000, 8 * 1024 * 1024);
+    assert.strictEqual(expanded.error, undefined);
+    assert.strictEqual(expanded.exitCode, 0);
+    assert.strictEqual(expanded.stdout.length, 200000);
     const missing = await runHealthProcess({
       command: path.join(directory, "missing-executable"), args: [], cwd: directory, env: {},
     });

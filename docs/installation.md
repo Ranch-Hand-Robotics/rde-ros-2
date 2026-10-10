@@ -173,9 +173,10 @@ If you selected "Never for this workspace", you can re-enable the prompt:
 
 ## Troubleshooting with Copilot
 
-Every installation records named steps, command output, host information, the
-generated installation script, and a JSON result in the extension's persistent
-storage. The Output channel prints the exact paths. Ubuntu release, architecture,
+Every installation records named steps, command output, host information, and
+a JSON result in the extension's persistent storage. Generated installer scripts
+are removed after the task ends; logs and reports are retained, and the terminal
+stays open for inspection. The Output channel prints the exact paths. Ubuntu release, architecture,
 WSL kernel detection, remote extension-host type, and Jetson L4T information help
 distinguish otherwise similar Linux installations.
 
@@ -239,7 +240,11 @@ After manual installation:
 
 Package-manager exit code zero is no longer sufficient for a successful install.
 The installer first runs the runtime health checks below against the exact target,
-then offers to reload VS Code. If validation fails, installed packages remain in
+then selects the installation and refreshes the extension's ROS environment without
+reloading VS Code. Reports remain available through **ROS2: Show ROS 2 Installation Report**
+and are not opened automatically. Existing terminals and running debug sessions keep
+their original environment; create a new ROS terminal or restart the debug session
+to use the new selection. If validation fails, installed packages remain in
 place and the report distinguishes runtime failure from package-installation failure.
 
 On Linux the target is `/opt/ros/<distro>/setup.bash`. On Windows and macOS it is

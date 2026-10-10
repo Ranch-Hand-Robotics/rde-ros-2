@@ -197,7 +197,7 @@ export async function buildHealthCommand(
 }
 
 /** Bound both process lifetime and output, including children started by setup scripts. */
-export function runHealthProcess(command: HealthCommand, limitMs = timeoutMs): Promise<HealthProcessResult> {
+export function runHealthProcess(command: HealthCommand, limitMs = timeoutMs, maxOutputBytes = outputLimit): Promise<HealthProcessResult> {
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
@@ -255,7 +255,7 @@ export function runHealthProcess(command: HealthCommand, limitMs = timeoutMs): P
     };
     const timer = setTimeout(() => terminate(`Health probe timed out after ${limitMs}ms.`), limitMs);
     const collect = (data: Buffer, isError: boolean) => {
-      const remaining = Math.max(0, outputLimit - size);
+      const remaining = Math.max(0, maxOutputBytes - size);
       const text = data.subarray(0, remaining).toString("utf8");
       if (isError) {
         stderr += text;
@@ -263,8 +263,8 @@ export function runHealthProcess(command: HealthCommand, limitMs = timeoutMs): P
         stdout += text;
       }
       size += data.length;
-      if (size > outputLimit) {
-        terminate(`Health probe output exceeded ${outputLimit} bytes.`);
+      if (size > maxOutputBytes) {
+        terminate(`Health probe output exceeded ${maxOutputBytes} bytes.`);
       }
     };
     child.stdout.on("data", (data: Buffer) => collect(data, false));

@@ -35,6 +35,9 @@ On macOS it discovers the per-distribution setup wrappers
 published by successful installations. **Find ROS** can also locate these wrappers.
 For a manually created environment, set `ROS2.rosSetupScript` to a script that
 activates it; a `pixi.toml` alone does not automatically select an environment.
+An existing manually configured setup script appears in the Distributions view
+as the active manual distribution. It is not treated as an RDE-managed Pixi
+installation and cannot be removed from that view.
 
 ## Managing Distributions
 

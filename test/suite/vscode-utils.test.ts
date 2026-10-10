@@ -43,7 +43,10 @@ describe("ROS setup selection settings scope", () => {
     it("writes a global default only after explicit consent in an empty window", async () => {
         choice = "Set Global Default";
         assert.strictEqual(await setRosSetupScript(script), true);
-        assert.deepStrictEqual(updates, [["rosSetupScript", script, vscode.ConfigurationTarget.Global]]);
+        assert.deepStrictEqual(updates, [
+            ["rosSetupScript", script, vscode.ConfigurationTarget.Global],
+            ["distro", "", vscode.ConfigurationTarget.Global],
+        ]);
         assert.strictEqual(prompts, 1);
     });
 
@@ -68,7 +71,10 @@ describe("ROS setup selection settings scope", () => {
     it("keeps settings workspace-scoped when a folder is open", async () => {
         replaceProperty(vscode.workspace, "workspaceFolders", [{ uri: vscode.Uri.file("/test/workspace") }]);
         assert.strictEqual(await setRosSetupScript(script), true);
-        assert.deepStrictEqual(updates, [["rosSetupScript", script, vscode.ConfigurationTarget.Workspace]]);
+        assert.deepStrictEqual(updates, [
+            ["rosSetupScript", script, vscode.ConfigurationTarget.Workspace],
+            ["distro", "", vscode.ConfigurationTarget.Workspace],
+        ]);
         assert.strictEqual(prompts, 0);
     });
 
@@ -76,8 +82,20 @@ describe("ROS setup selection settings scope", () => {
         replaceProperty(vscode.workspace, "workspaceFolders", []);
         replaceProperty(vscode.workspace, "workspaceFile", vscode.Uri.file("/test/empty.code-workspace"));
         assert.strictEqual(await setRosSetupScript(script), true);
-        assert.deepStrictEqual(updates, [["rosSetupScript", script, vscode.ConfigurationTarget.Workspace]]);
+        assert.deepStrictEqual(updates, [
+            ["rosSetupScript", script, vscode.ConfigurationTarget.Workspace],
+            ["distro", "", vscode.ConfigurationTarget.Workspace],
+        ]);
         assert.strictEqual(prompts, 0);
+    });
+
+    it("clears a previously configured distro when selecting an unlabelled manual setup", async () => {
+        replaceProperty(vscode.workspace, "workspaceFolders", [{ uri: vscode.Uri.file("/test/workspace") }]);
+        assert.strictEqual(await setRosSetupScript(script, undefined), true);
+        assert.deepStrictEqual(updates, [
+            ["rosSetupScript", script, vscode.ConfigurationTarget.Workspace],
+            ["distro", "", vscode.ConfigurationTarget.Workspace],
+        ]);
     });
 
     for (const [label, distro] of [["rolling (pixi)", "rolling"], ["jazzy", "jazzy"]]) {

@@ -40,7 +40,6 @@
     "activationEvents": [
         "onLanguage:cpp",
         "onLanguage:python",
-        "onLanguage:csharp",
         "onCommand",
         "workspaceContains:**/package.xml",
         "workspaceContains:**/test_*.py",
@@ -115,6 +114,17 @@
                 "title": "Install ROS 2",
                 "category": "ROS2",
                 "icon": "$(add)"
+            },
+            {
+                "command": "ROS2.addInstallation",
+                "title": "Add ROS 2 Installation",
+                "category": "ROS2",
+                "icon": "$(add)"
+            },
+            {
+                "command": "ROS2.installRosContainer",
+                "title": "Create ROS 2 Devcontainer for This Workspace",
+                "category": "ROS2"
             },
             {
                 "command": "ROS2.checkInstallation",
@@ -372,7 +382,7 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "ROS2.installRos",
+                    "command": "ROS2.addInstallation",
                     "when": "view == ros2Distributions",
                     "group": "navigation@1"
                 }
@@ -887,7 +897,7 @@
         "webpack": "webpack --mode development",
         "watch": "webpack --mode development --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
-        "test-compile": "tsc -p ./"
+        "test-compile": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && tsc -p ./"
     },
     "dependencies": {
         "@ranchhandrobotics/rde-common": "^1.0.0",

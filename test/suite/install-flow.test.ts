@@ -20,6 +20,10 @@ import * as installer from "../../src/ros/installer/install-ros";
 import * as pixiLocation from "../../src/ros/installer/pixi-location";
 import { installRos, checkRosInstallation, runInstallTerminal, preflightPixiEnvironment, createPixiTarget, confirmPixiBootstrap, ROS2_DISTROS } from "../../src/ros/installer/install-ros";
 import { InstallDiagnostics } from "../../src/ros/installer/install-diagnostics";
+import { findPixi } from "../../src/ros/installer/pixi";
+
+const livePixiSolve = process.platform === "darwin" && process.env.RDE_TEST_PIXI_SOLVE === "1" ? it : it.skip;
+const refreshRosEnvironment = extension.refreshRosEnvironment;
 
 // Real orchestration with a nonexecuting terminal and deterministic health results.
 // No package-manager command is run by these tests.
@@ -35,6 +39,7 @@ describe("ROS installation completion and validation", () => {
   let terminalCount: number;
   let expectedShell: string;
   let generatedScript: Buffer;
+  let refreshCalls: number;
   let configurationUpdates: unknown[][];
 
   function replace(object: object, key: string, value: unknown): void {
@@ -60,18 +65,23 @@ describe("ROS installation completion and validation", () => {
     infoMessages = [];
     terminalCount = 0;
     expectedShell = "/bin/bash";
+    refreshCalls = 0;
     configurationUpdates = [];
     replace(process, "platform", "linux");
     replace(vscode.workspace, "isTrusted", true);
     replace(extension, "outputChannel", { appendLine: () => undefined, show: () => undefined });
     replace(extension, "extPath", path.resolve(__dirname, "../../.."));
     replace(extension, "rosDistributionsProvider", null);
-    replace(extension, "activateEnvironment", async (_context: vscode.ExtensionContext) => {});
+    replace(extension, "refreshRosEnvironment", async (distro: string) => {
+      assert.strictEqual(distro, "jazzy");
+      refreshCalls++;
+    });
     replace(vscodeUtils, "getExtensionConfiguration", () => ({
       update: async (...args: unknown[]) => { configurationUpdates.push(args); },
     }));
     replace(preflight, "preflightInstallation", async () => ({ ready: true, checks: [] }));
     replace(extension, "extensionContext", {
+      subscriptions: [],
       globalStorageUri: vscode.Uri.file(directory),
       globalState: {
         update: async (_key: string, value: string) => { reportPath = value; },
@@ -128,6 +138,90 @@ describe("ROS installation completion and validation", () => {
     assert.strictEqual(report.health.healthy, true);
     assert.strictEqual(errorMessages.length, 0);
     assert.match(infoMessages[0], /runtime validation passed/);
+    assert.match(infoMessages[0], /environment has been refreshed/);
+    assert.strictEqual(refreshCalls, 1);
+    assert.deepStrictEqual(configurationUpdates.map(update => update.slice(0, 2)), [
+      ["rosSetupScript", "/opt/ros/jazzy/setup.bash"], ["distro", "jazzy"],
+    ]);
+  });
+
+  it("waits for environment refresh without opening a report or requesting reload", async () => {
+    let release: () => void;
+    let started: () => void;
+    const refreshing = new Promise<void>(resolve => { started = resolve; });
+    replace(extension, "refreshRosEnvironment", () => {
+      started();
+      return new Promise<void>(resolve => { release = resolve; });
+    });
+    replace(vscode.window, "showTextDocument", () => assert.fail("Reports must be opened explicitly"));
+    replace(vscode.commands, "executeCommand", (command: string) => {
+      assert.notStrictEqual(command, "workbench.action.reloadWindow");
+    });
+    const installation = installRos();
+    await refreshing;
+    assert.deepStrictEqual(infoMessages, []);
+    release();
+    await installation;
+    assert.match(infoMessages[0], /environment has been refreshed/);
+  });
+
+  it("keeps a successful installation report when environment refresh fails", async () => {
+    replace(extension, "refreshRosEnvironment", async () => { throw new Error("Refresh failed"); });
+    const warnings: string[] = [];
+    replace(vscode.window, "showWarningMessage", async (message: string) => { warnings.push(message); });
+    await installRos();
+    const report = JSON.parse(await fs.promises.readFile(reportPath, "utf8"));
+    assert.strictEqual(report.status, "passed");
+    assert.strictEqual(errorMessages.length, 0);
+    assert.strictEqual(infoMessages.length, 0);
+    assert.match(warnings[0], /refreshing the environment failed/);
+  });
+
+  it("refreshes a changed distribution in place and does not wait for an installation prompt", async () => {
+    const setup = path.join(directory, "setup.bash");
+    await fs.promises.writeFile(setup, "");
+    let selected = "rolling";
+    replace(vscode.workspace, "rootPath", directory);
+    replace(extension, "env", undefined);
+    replace(extension, "subscriptions", []);
+    replace(vscodeUtils, "getExtensionConfiguration", () => ({ get: (key: string) => key === "rosSetupScript" ? setup : selected }));
+    replace(vscodeUtils, "getRosSetupScript", () => setup);
+    replace(rosUtils, "sourceSetupFile", async () => ({ ROS_VERSION: "2", ROS_DISTRO: selected }));
+    replace(buildTool, "determineBuildTool", async () => true);
+    replace(buildTool.BuildTool, "registerTaskProvider", () => []);
+    const cppUpdates: string[] = [];
+    replace(rosBuildUtils, "createConfigFiles", async () => {
+      await new Promise<void>(resolve => setImmediate(resolve));
+      cppUpdates.push(extension.env.ROS_DISTRO);
+    });
+    replace(ros, "selectROSApi", () => {});
+    replace(ros, "rosApi", { setContext: () => {}, activateCoreMonitor: () => ({ dispose: () => {} }) });
+    replace(rosShell, "registerRosShellTaskProvider", () => []);
+    replace(debugManager, "registerRosDebugManager", () => {});
+    await refreshRosEnvironment("rolling");
+    assert.strictEqual(extension.env.ROS_DISTRO, "rolling");
+    assert.deepStrictEqual(cppUpdates, ["rolling"]);
+    replace(vscodeUtils, "setRosSetupScript", async (script: string, distro: string) => {
+      assert.strictEqual(script, setup);
+      selected = distro;
+      return true;
+    });
+    await extension.setActiveRosDistribution(setup, "lyrical");
+    assert.strictEqual(extension.env.ROS_DISTRO, "lyrical");
+    assert.deepStrictEqual(cppUpdates, ["rolling", "lyrical"]);
+    replace(vscodeUtils, "setRosSetupScript", async () => false);
+    await extension.setActiveRosDistribution(setup, "jazzy");
+    assert.strictEqual(extension.env.ROS_DISTRO, "lyrical");
+    assert.deepStrictEqual(cppUpdates, ["rolling", "lyrical"]);
+    await assert.rejects(refreshRosEnvironment("jazzy"), /Could not activate ROS 2 jazzy/);
+    let prompted = false;
+    replace(rosUtils, "sourceSetupFile", async () => undefined);
+    replace(installer, "promptInstallRosIfNeeded", () => {
+      prompted = true;
+      return new Promise<void>(() => {});
+    });
+    await assert.rejects(refreshRosEnvironment("lyrical"), /Could not activate ROS 2 lyrical/);
+    assert.strictEqual(prompted, true);
   });
 
   it("aborts before terminal execution when preflight finds a repair blocker", async () => {
@@ -308,6 +402,8 @@ describe("ROS installation completion and validation", () => {
   });
 
   it("keeps Pixi solver failures in diagnostic staging without creating the ROS target", async () => {
+    replace(process, "platform", "win32");
+    replace(process, "arch", "x64");
     const workspace = path.join(directory, "not-created");
     const diagnostics = await InstallDiagnostics.create(directory, {
       kind: "pixi", distro: "jazzy", workspace,
@@ -317,12 +413,52 @@ describe("ROS installation completion and validation", () => {
       assert.strictEqual(command, "pixi");
       assert.strictEqual(args[0], "lock");
       assert.ok(args[2].startsWith(diagnostics.directory));
+      assert.ok(args.includes("--quiet"));
       return { exitCode: 1, stdout: "", stderr: "Unsupported virtual package" };
     });
     await assert.rejects(preflightPixiEnvironment(ROS2_DISTROS.find((d) => d.name === "jazzy"), diagnostics), /dependency preflight failed/);
     assert.strictEqual(fs.existsSync(workspace), false);
     assert.strictEqual(diagnostics.report.preflight.ready, false);
     assert.strictEqual(diagnostics.report.status, "blocked");
+  });
+
+  it("solves quietly and requires a lockfile before allowing target creation", async () => {
+    replace(process, "platform", "win32");
+    replace(process, "arch", "x64");
+    const workspace = path.join(directory, "not-created");
+    const executable = path.join(directory, "custom-pixi");
+    const diagnostics = await InstallDiagnostics.create(directory, {
+      kind: "pixi", distro: "lyrical", workspace, pixiExecutable: executable,
+    }, "install");
+    diagnostics.report.preflight = { ready: true, checks: [] };
+    replace(preflight, "runPreflightCommand", async (command: string, args: string[]) => {
+      assert.strictEqual(command, executable);
+      assert.deepStrictEqual(args, ["lock", "--manifest-path", path.join(diagnostics.directory, "pixi-plan", "pixi.toml"), "--quiet"]);
+      await fs.promises.writeFile(path.join(path.dirname(args[2]), "pixi.lock"), "resolved lock");
+      return { exitCode: 0, stdout: "", stderr: "" };
+    });
+    const manifest = await preflightPixiEnvironment(ROS2_DISTROS.find(entry => entry.name === "lyrical"), diagnostics);
+    assert.ok(fs.existsSync(manifest));
+    assert.strictEqual(diagnostics.report.preflight.ready, true);
+    assert.strictEqual(fs.existsSync(workspace), false);
+  });
+
+  livePixiSolve("locks Lyrical through the bounded preflight runner without installing", async function () {
+    this.timeout(180000);
+    replace(process, "platform", "darwin");
+    const executable = await findPixi();
+    assert.ok(executable, "Pixi must be installed for the live solve");
+    const workspace = path.join(directory, "not-created");
+    const diagnostics = await InstallDiagnostics.create(directory, {
+      kind: "pixi", distro: "lyrical", workspace, pixiExecutable: executable,
+    }, "install");
+    diagnostics.report.preflight = { ready: true, checks: [] };
+    const manifest = await preflightPixiEnvironment(ROS2_DISTROS.find(entry => entry.name === "lyrical"), diagnostics)
+      .catch(error => { throw new Error(`${error.message}\n${JSON.stringify(diagnostics.report.preflight)}`); });
+    assert.ok((await fs.promises.stat(path.join(path.dirname(manifest), "pixi.lock"))).size > 0);
+    assert.strictEqual(diagnostics.report.preflight.ready, true);
+    assert.strictEqual(fs.existsSync(workspace), false);
+    assert.strictEqual(fs.existsSync(path.join(path.dirname(manifest), ".pixi", "envs")), false);
   });
 
   it("refuses a target replaced with a directory link after preflight", async () => {
@@ -413,7 +549,7 @@ describe("ROS installation completion and validation", () => {
     }
   });
 
-  it("writes Windows PowerShell scripts with a BOM and runs a directly exiting process", async () => {
+  it("writes Windows PowerShell scripts with a BOM and cleans them after task completion", async () => {
     expectedShell = "powershell.exe";
     const diagnostics = await InstallDiagnostics.create(directory, {
       kind: "pixi", distro: "jazzy", workspace: directory,
@@ -422,6 +558,9 @@ describe("ROS installation completion and validation", () => {
     const distro = ROS2_DISTROS.find((entry) => entry.name === "jazzy");
     assert.strictEqual(await runInstallTerminal(distro, diagnostics, "exit 0\r\n", true), 0);
     assert.deepStrictEqual([...generatedScript.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+    assert.strictEqual(diagnostics.report.artifacts.script, undefined);
+    assert.strictEqual(fs.existsSync(path.join(diagnostics.directory, "install.ps1")), false);
+    assert.ok(fs.existsSync(diagnostics.logPath));
   });
 });
 

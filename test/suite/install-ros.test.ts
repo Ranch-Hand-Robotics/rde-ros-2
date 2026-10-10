@@ -48,9 +48,6 @@ suite("Installer terminal retention", () => {
       let listener: (event: vscode.TaskProcessEndEvent) => Promise<void>;
       let disposed = false;
       let task: vscode.Task;
-      let complete = 0;
-      let failed = 0;
-      let configured = 0;
       replaceProperty(vscode.tasks, "onDidEndTaskProcess", callback => {
         listener = callback;
         return { dispose: () => { disposed = true; } };
@@ -60,10 +57,7 @@ suite("Installer terminal retention", () => {
         task = created;
         return { task, terminate: () => {} };
       });
-      await install_ros.runInstallationTask("exit 1", { executable: "/bin/bash", shellArgs: ["-c"] }, distro, {
-        markComplete: () => { complete++; },
-        markFailed: () => { failed++; },
-      }, log, async () => { configured++; }, script);
+      const completion = install_ros.runInstallationTask("exit 1", { executable: "/bin/bash", shellArgs: ["-c"] }, distro, script);
       assert.strictEqual(task.presentationOptions.close, false);
       assert.strictEqual(task.presentationOptions.clear, false);
       assert.strictEqual(task.presentationOptions.panel, vscode.TaskPanelKind.New);
@@ -72,30 +66,22 @@ suite("Installer terminal retention", () => {
       assert.strictEqual(disposed, false, "Unrelated tasks must not complete the install");
       assert.ok(fs.existsSync(script), "Running install scripts must be preserved");
       await listener({ execution: { task, terminate: () => {} }, exitCode });
+      assert.strictEqual(await completion, exitCode);
       assert.ok(!fs.existsSync(script));
       assert.ok(fs.existsSync(log));
       assert.ok(fs.existsSync(installedSetup));
       assert.strictEqual(disposed, true);
-      assert.strictEqual(complete, exitCode === 0 ? 1 : 0);
-      assert.strictEqual(failed, exitCode === 0 ? 0 : 1);
-      assert.strictEqual(configured, exitCode === 0 ? 1 : 0);
-      if (exitCode === 1) { assert.ok(errors[0].includes("kept open")); }
     });
   }
 
   test("releases the installation when task startup fails", async () => {
-    let failed = 0;
     let disposed = false;
     replaceProperty(vscode.tasks, "onDidEndTaskProcess", () => ({ dispose: () => { disposed = true; } }));
     replaceProperty(vscode.tasks, "executeTask", async () => { throw new Error("Task startup failed"); });
-    await assert.rejects(install_ros.runInstallationTask("exit 1", {}, distro, {
-      markComplete: () => assert.fail("Must not mark complete"),
-      markFailed: () => { failed++; },
-    }, log, undefined, script), /Task startup failed/);
+    await assert.rejects(install_ros.runInstallationTask("exit 1", {}, distro, script), /Task startup failed/);
     assert.ok(!fs.existsSync(script));
     assert.ok(fs.existsSync(log));
     assert.ok(fs.existsSync(installedSetup));
-    assert.strictEqual(failed, 1);
     assert.strictEqual(disposed, true);
   });
 
@@ -103,7 +89,6 @@ suite("Installer terminal retention", () => {
     let listener: (event: vscode.TaskEndEvent) => Promise<void>;
     let processListener: (event: vscode.TaskProcessEndEvent) => Promise<void>;
     let taskExecution: vscode.TaskExecution;
-    let failed = 0;
     replaceProperty(vscode.tasks, "onDidEndTask", callback => {
       listener = callback;
       return { dispose: () => {} };
@@ -116,13 +101,10 @@ suite("Installer terminal retention", () => {
       taskExecution = { task, terminate: () => {} };
       return taskExecution;
     });
-    await install_ros.runInstallationTask("exit 1", {}, distro, {
-      markComplete: () => assert.fail("Cancelled task must not complete"),
-      markFailed: () => { failed++; },
-    }, log, undefined, script);
+    const completion = install_ros.runInstallationTask("exit 1", {}, distro, script);
     await listener({ execution: taskExecution });
     await processListener({ execution: taskExecution, exitCode: 1 });
-    assert.strictEqual(failed, 1);
+    assert.strictEqual(await completion, undefined);
     assert.ok(!fs.existsSync(script));
     assert.ok(fs.existsSync(log));
     assert.ok(fs.existsSync(installedSetup));
@@ -131,12 +113,7 @@ suite("Installer terminal retention", () => {
   test("cleanup errors do not hide the original task launch failure", async () => {
     replaceProperty(vscode.tasks, "executeTask", async () => { throw new Error("Task startup failed"); });
     for (const target of [path.join(directory, "already-removed.sh"), directory]) {
-      let failed = 0;
-      await assert.rejects(install_ros.runInstallationTask("exit 1", {}, distro, {
-        markComplete: () => assert.fail("Must not mark complete"),
-        markFailed: () => { failed++; },
-      }, log, undefined, target), /Task startup failed/);
-      assert.strictEqual(failed, 1);
+      await assert.rejects(install_ros.runInstallationTask("exit 1", {}, distro, target), /Task startup failed/);
     }
     assert.ok(fs.existsSync(log));
   });
@@ -145,11 +122,8 @@ suite("Installer terminal retention", () => {
     if (process.platform === "win32") { this.skip(); }
     const displayName = `Retention Test ${Date.now()}`;
     const name = `ROS 2 ${displayName} Installation`;
-    let failed = 0;
     let timer: NodeJS.Timeout;
     let listener: vscode.Disposable;
-    let markFinished: () => void;
-    const finished = new Promise<void>(resolve => { markFinished = resolve; });
     const ended = new Promise<void>((resolve, reject) => {
       timer = setTimeout(() => reject(new Error("Installation task did not finish")), 15000);
       listener = vscode.tasks.onDidEndTask(event => {
@@ -157,18 +131,13 @@ suite("Installer terminal retention", () => {
       });
     });
     try {
-      await install_ros.runInstallationTask("printf 'Simulated ROS install error\\n'; exit 7", {
+      const completion = install_ros.runInstallationTask("printf 'Simulated ROS install error\\n'; exit 7", {
         executable: "/bin/bash", shellArgs: ["--noprofile", "--norc", "-c"],
-      }, { ...distro, displayName }, {
-        markComplete: () => assert.fail("Failed task must not mark complete"),
-        markFailed: () => { failed++; markFinished(); },
-      }, log, undefined, script);
+      }, { ...distro, displayName }, script);
       await ended;
-      await finished;
-      assert.strictEqual(failed, 1);
+      assert.strictEqual(await completion, 7);
       assert.ok(!fs.existsSync(script));
       assert.ok(fs.existsSync(log));
-      assert.ok(errors.some(message => message.includes("exit code: 7")));
       assert.ok(vscode.window.terminals.some(terminal => terminal.name.includes(displayName)), "Failed installer terminal must remain visible after the task ends");
     } finally {
       clearTimeout(timer);
@@ -315,7 +284,7 @@ describe("Install ROS Test Suite", () => {
   test("macOS discovers verified Pixi setup but not incomplete installations", async function () {
     if (process.platform !== "darwin") { this.skip(); }
     const config = vscode.workspace.getConfiguration("ROS2");
-    const originalRoot = config.inspect<string>("pixiRoot")?.workspaceValue;
+    const originalRoot = config.inspect<string>("pixiRoot")?.globalValue;
     const provider = new RosDistributionsProvider();
     try {
       const completed = path.join(testWorkspaceFolder, "jazzy");
@@ -324,17 +293,17 @@ describe("Install ROS Test Suite", () => {
       await fs.promises.mkdir(pending, { recursive: true });
       await fs.promises.writeFile(path.join(completed, "setup.bash"), "export ROS_DISTRO=jazzy\n");
       await fs.promises.writeFile(path.join(pending, ".setup.bash"), "export ROS_DISTRO=humble\n");
-      await config.update("pixiRoot", testWorkspaceFolder, vscode.ConfigurationTarget.Workspace);
+      await config.update("pixiRoot", testWorkspaceFolder, vscode.ConfigurationTarget.Global);
       const distributions = await provider.getChildren();
       assert.ok(distributions.some(item => item.setupScript === path.join(completed, "setup.bash")));
       assert.ok(!distributions.some(item => item.setupScript.startsWith(pending)));
     } finally {
       provider.dispose();
-      await config.update("pixiRoot", originalRoot, vscode.ConfigurationTarget.Workspace);
+      await config.update("pixiRoot", originalRoot, vscode.ConfigurationTarget.Global);
     }
   });
 
-  it("ROS2_DISTROS should include Humble (LTS)", () => {
+  test("ROS2_DISTROS should include Humble (LTS)", () => {
     const humble = install_ros.ROS2_DISTROS.find((d) => d.name === "humble");
     assert.ok(humble, "Should include Humble distro");
     assert.strictEqual(humble?.isLTS, true, "Humble should be marked as LTS");

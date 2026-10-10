@@ -86,6 +86,13 @@ test("generated scripts parse and propagate activation failure", () => {
   assert.match(install, /xcrun --show-sdk-path/);
   assert.match(install, /rclpy.create_node/);
   assert.doesNotMatch(install, /sudo|DevToolsSecurity|set -.*u/);
+  const staged = macInstallScript("/tmp/pixi", "/tmp/ROS user's", "jazzy", "/tmp/.setup.bash", {
+    locked: true, publishSetup: false,
+  });
+  execFileSync("/bin/bash", ["-n"], { input: staged });
+  assert.match(staged, /install --locked --manifest-path/);
+  assert.doesNotMatch(staged, /^mv /m);
+  assert.match(install, /^mv /m);
 });
 
 test("sources Bash setup without a login shell and preserves multiline environment values", async () => {

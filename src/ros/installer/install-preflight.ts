@@ -103,9 +103,10 @@ async function ubuntuPlatforms(distro: string): Promise<string[]> {
   return platforms;
 }
 
-export const runPreflightCommand: PreflightRunner = (command, args, limitMs = 15000) => runHealthProcess({
-  command, args, cwd: os.tmpdir(), env: { ...process.env, LC_ALL: "C", LANG: "C" },
-}, limitMs);
+export const runPreflightCommand: PreflightRunner = async (command, args, limitMs = 15000) => runHealthProcess({
+  command: command === "pixi" ? await findPixi() ?? command : command,
+  args, cwd: os.tmpdir(), env: { ...process.env, LC_ALL: "C", LANG: "C" },
+}, limitMs, 8 * 1024 * 1024);
 
 const defaults: PreflightServices = {
   platform: process.platform, arch: process.arch, run: runPreflightCommand,
@@ -236,8 +237,7 @@ export async function preflightInstallation(
     const parent = await services.inspectPath(path.dirname(targetDirectory));
     const others = parent.entries.filter((entry) => entry !== target.distro);
     if (others.length) {
-      add("other-installations", "warning", `Other entries exist alongside the target: ${others.slice(0, 20).join(", ")}`,
-        "Other ROS distributions may coexist. Confirm shared package changes will not affect environments you depend on.");
+      add("other-installations", "passed", `Other entries exist alongside the target: ${others.slice(0, 20).join(", ")}. Separate ROS distributions may coexist; these directories will not be overwritten.`);
     }
   });
   await guarded("temporary-space", async () => {
