@@ -4,6 +4,7 @@
 import * as path from "path";
 import { promises as fsPromises } from "fs";
 import * as vscode from "vscode";
+import { parse, ParseError, modify, applyEdits } from "jsonc-parser";
 
 import * as extension from "../extension";
 import * as telemetry from "../telemetry-helper";
@@ -31,7 +32,7 @@ const PYTHON_AUTOCOMPLETE_PATHS = "python.autoComplete.extraPaths";
 const PYTHON_ANALYSIS_PATHS = "python.analysis.extraPaths";
 
 /**
- * Creates config files which don't exist.
+ * Creates missing config files and refreshes the managed ROS C++ configuration.
  */
 export async function createConfigFiles() {
     const config = vscode.workspace.getConfiguration();
@@ -46,27 +47,44 @@ export async function createConfigFiles() {
         updatePythonAnalysisPathInternal();
     }
 
-    const dir = path.join(vscode.workspace.rootPath, ".vscode");
-
-    // Update the C++ path.
-    exists(path.join(dir, "c_cpp_properties.json")).then(existsResult => {
-        if (!existsResult) {
-            updateCppPropertiesInternal();
-        }
-    });
+    await updateCppPropertiesInternal(true);
 }
 
 export async function updateCppProperties(context: vscode.ExtensionContext): Promise<void> {
     const reporter = telemetry.getReporter();
     reporter.sendTelemetryCommand(extension.Commands.UpdateCppProperties);
 
-    updateCppPropertiesInternal();
+    await updateCppPropertiesInternal();
 }
 
 /**
  * Updates the `c_cpp_properties.json` file with ROS include paths.
  */
-async function updateCppPropertiesInternal(): Promise<void> {
+async function updateCppPropertiesInternal(managedOnly = false): Promise<void> {
+    const workspaceRoot = vscode.workspace.rootPath;
+    if (!workspaceRoot) {
+        return;
+    }
+    const filename = path.join(workspaceRoot, ".vscode", "c_cpp_properties.json");
+    let content = '{\n  "configurations": [],\n  "version": 4\n}\n';
+    let existingFile = false;
+    try {
+        content = await fsPromises.readFile(filename, "utf8");
+        existingFile = true;
+    } catch (error) {
+        if (error.code !== "ENOENT") {
+            throw error;
+        }
+    }
+    const errors: ParseError[] = [];
+    const properties = parse(content, errors, { allowTrailingComma: true });
+    if (errors.length || !properties || !Array.isArray(properties.configurations)) {
+        throw new Error(`Cannot update invalid C++ configuration: ${filename}`);
+    }
+    const configurationIndex = properties.configurations.findIndex(configuration => configuration?.name === "ros2");
+    if (managedOnly && existingFile && configurationIndex < 0) {
+        return;
+    }
     let includes = await rosApi.getIncludeDirs();
     const workspaceIncludes = await rosApi.getWorkspaceIncludeDirs(vscode.workspace.rootPath);
     includes = includes.concat(workspaceIncludes);
@@ -75,8 +93,6 @@ async function updateCppPropertiesInternal(): Promise<void> {
         includes.push(path.join("/", "usr", "include"));
     }
 
-    const workspaceRoot = vscode.workspace.rootPath;
-    
     // Convert paths to workspace-relative where possible
     includes = includes.map((include: string) => {
         const relativePath = makeWorkspaceRelative(include, workspaceRoot);
@@ -111,8 +127,6 @@ async function updateCppPropertiesInternal(): Promise<void> {
         version: 4,
     };
 
-    const filename = path.join(vscode.workspace.rootPath, ".vscode", "c_cpp_properties.json");
-
     if (process.platform === "linux") {
         // set the default configurations.
         cppProperties.configurations[0].intelliSenseMode = "gcc-" + process.arch
@@ -120,23 +134,6 @@ async function updateCppPropertiesInternal(): Promise<void> {
         cppProperties.configurations[0].cStandard = "gnu11"
         cppProperties.configurations[0].cppStandard = getCppStandard()
 
-        // read the existing file
-        try {
-            let existing: any = JSON.parse(await fsPromises.readFile(filename, 'utf8'));
-
-            // if the existing configurations are different from the defaults, use the existing values
-            if (existing.configurations && existing.configurations.length > 0) {
-                const existingConfig = existing.configurations[0];
-
-                cppProperties.configurations[0].intelliSenseMode = existingConfig.intelliSenseMode || cppProperties.configurations[0].intelliSenseMode;
-                cppProperties.configurations[0].compilerPath = existingConfig.compilerPath || cppProperties.configurations[0].compilerPath;
-                cppProperties.configurations[0].cStandard = existingConfig.cStandard || cppProperties.configurations[0].cStandard;
-                cppProperties.configurations[0].cppStandard = existingConfig.cppStandard || cppProperties.configurations[0].cppStandard;
-            }
-        }
-        catch (error) {
-            // ignore
-        }
     }
 
     // Ensure the ".vscode" directory exists then update the C++ path.
@@ -146,7 +143,11 @@ async function updateCppPropertiesInternal(): Promise<void> {
         await fsPromises.mkdir(dir, { recursive: true });
     }
 
-    await fsPromises.writeFile(filename, JSON.stringify(cppProperties, undefined, 2), 'utf8');
+    const options = { formattingOptions: { insertSpaces: true, tabSize: 2, eol: "\n" } };
+    const edits = configurationIndex < 0
+        ? modify(content, ["configurations", -1], cppProperties.configurations[0], options)
+        : modify(content, ["configurations", configurationIndex, "includePath"], includes, options);
+    await fsPromises.writeFile(filename, applyEdits(content, edits), 'utf8');
 }
 
 export function updatePythonPath(context: vscode.ExtensionContext) {

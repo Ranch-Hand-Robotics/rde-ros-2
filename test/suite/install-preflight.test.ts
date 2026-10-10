@@ -132,13 +132,32 @@ describe("ROS installation preflight", () => {
     paths["/opt/ros"] = { exists: true, entries: ["humble"] };
     let report = await preflightInstallation(target, services);
     assert.strictEqual(report.ready, true);
-    assert.strictEqual(report.checks.find((entry) => entry.id === "other-installations").status, "warning");
+    assert.strictEqual(report.checks.find((entry) => entry.id === "other-installations").status, "passed");
     paths["/opt/ros/jazzy"] = { exists: true, entries: ["setup.bash"] };
     report = await preflightInstallation(target, services);
     assert.strictEqual(report.ready, false);
     paths["/opt/ros/jazzy"] = { exists: true, symbolicLink: true };
     report = await preflightInstallation(target, services);
     assert.strictEqual(report.ready, false);
+  });
+
+  it("permits Lyrical alongside Rolling without a coexistence confirmation", async () => {
+    services.platform = "darwin";
+    services.arch = "arm64";
+    target = { kind: "pixi", distro: "lyrical", workspace: "/pixi_ws/lyrical" };
+    paths["/pixi_ws"] = { exists: true, entries: ["rolling"] };
+    services.run = async command => ({
+      exitCode: 0, stderr: "",
+      stdout: command === "sw_vers" ? "26.6.2" : command === "pixi" ? "pixi 0.81.0" : "/Library/Developer/CommandLineTools",
+    });
+    let report = await preflightInstallation(target, services);
+    assert.strictEqual(report.ready, true, JSON.stringify(report));
+    assert.deepStrictEqual(report.checks.filter(check => check.status === "warning"), []);
+    assert.strictEqual(report.checks.find(check => check.id === "other-installations").status, "passed");
+    paths["/pixi_ws/lyrical"] = { exists: true, entries: ["pixi.toml"] };
+    report = await preflightInstallation(target, services);
+    assert.strictEqual(report.ready, false);
+    assert.strictEqual(report.checks.find(check => check.id === "target").status, "blocked");
   });
 
   it("blocks existing ROS packages even if their installation files have disappeared", async () => {

@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as os from "os";
 import { promises as fs } from "fs";
-import { RosDistributionItem, RosDistributionsProvider } from "../../src/ros/ros-distributions-provider";
+import { RosDistributionItem, RosDistributionsProvider, showRosInstallationOptions, findRosInstallation, createRosDevContainer } from "../../src/ros/ros-distributions-provider";
 
 describe("Distribution view actions", () => {
   let sandbox: string;
@@ -16,6 +16,7 @@ describe("Distribution view actions", () => {
   let updates: unknown[][];
   let choice: string | undefined;
   let activeScript: string | undefined;
+  let configuredDistro: string;
   let globalScript: string | undefined;
   let workspaceScript: string | undefined;
   let folderScript: string | undefined;
@@ -36,6 +37,7 @@ describe("Distribution view actions", () => {
     refreshes = 0;
     choice = undefined;
     activeScript = undefined;
+    configuredDistro = "";
     globalScript = undefined;
     workspaceScript = undefined;
     folderScript = undefined;
@@ -48,7 +50,7 @@ describe("Distribution view actions", () => {
     await fs.writeFile(script, "");
     replaceProperty(vscode.workspace, "workspaceFolders", undefined);
     replaceProperty(vscode.workspace, "getConfiguration", (_section: string, resource?: vscode.Uri) => ({
-      get: (key: string) => key === "pixiRoot" ? root : activeScript,
+      get: (key: string) => key === "pixiRoot" ? root : key === "rosSetupScript" ? activeScript : key === "distro" ? configuredDistro : undefined,
       inspect: (key: string) => {
         if (key === "pixiInstallLocationsByMachine") {
           return { globalValue: { [vscode.env.machineId]: root } };
@@ -84,14 +86,163 @@ describe("Distribution view actions", () => {
 
   const item = (setup: string) => new RosDistributionItem("jazzy (pixi)", setup, false);
 
-  it("contributes install beside refresh and an inline trash action", async () => {
+  it("keeps setup paths in tooltips without displaying them in list rows", () => {
+    for (const active of [false, true]) {
+      const distribution = new RosDistributionItem("jazzy (pixi)", script, active);
+      assert.strictEqual(distribution.label, "jazzy (pixi)");
+      assert.strictEqual(distribution.description, active ? "active" : undefined);
+      assert.strictEqual(distribution.tooltip, `ROS 2 distribution: jazzy (pixi)\nSetup script: ${script}`);
+      assert.deepStrictEqual(distribution.command.arguments, [script, "jazzy"]);
+    }
+  });
+
+  it("shows view progress during discovery and refresh but not cached reads", async () => {
+    const loading: boolean[] = [];
+    let progressCalls = 0;
+    provider.onDidChangeLoading(value => loading.push(value));
+    replaceProperty(vscode.window, "withProgress", async (options: vscode.ProgressOptions, task: () => Promise<unknown>) => {
+      progressCalls++;
+      assert.deepStrictEqual(options.location, { viewId: "ros2Distributions" });
+      assert.strictEqual(loading[loading.length - 1], true);
+      return task();
+    });
+    await provider.getChildren();
+    assert.deepStrictEqual(loading, [true, false]);
+    await provider.getChildren();
+    assert.strictEqual(progressCalls, 1);
+    provider.refresh();
+    await provider.getChildren();
+    assert.strictEqual(progressCalls, 2);
+    assert.deepStrictEqual(loading, [true, false, true, false]);
+  });
+
+  it("shows an existing manually configured workspace setup as an active distribution", async () => {
+    activeScript = script;
+    configuredDistro = "jazzy";
+
+    const items = await provider.getChildren();
+    const manual = items.find(distribution => distribution.setupScript === script);
+
+    assert.ok(manual);
+    assert.strictEqual(manual.label, "jazzy (manual)");
+    assert.strictEqual(manual.description, "active");
+    assert.deepStrictEqual(manual.command?.arguments, [script, "jazzy"]);
+  });
+
+  it("does not invent a distro name for a configured setup without ROS2.distro", async () => {
+    activeScript = script;
+
+    const manual = (await provider.getChildren()).find(distribution => distribution.setupScript === script);
+
+    assert.ok(manual);
+    assert.strictEqual(manual.label, "Configured ROS 2 setup");
+    assert.deepStrictEqual(manual.command?.arguments, [script, undefined]);
+  });
+
+  it("does not show a configured setup script that no longer exists", async () => {
+    activeScript = path.join(directory, "missing-setup.bash");
+
+    const items = await provider.getChildren();
+
+    assert.ok(!items.some(distribution => distribution.setupScript === activeScript));
+  });
+
+  it("clears the loading state when discovery fails", async () => {
+    const loading: boolean[] = [];
+    provider.onDidChangeLoading(value => loading.push(value));
+    replaceProperty(vscode.window, "withProgress", async (_options: vscode.ProgressOptions, task: () => Promise<unknown>) => task());
+    replaceProperty(vscode.workspace, "getConfiguration", () => { throw new Error("Discovery failed"); });
+    await assert.rejects(provider.getChildren(), /Discovery failed/);
+    assert.deepStrictEqual(loading, [true, false]);
+  });
+
+  it("contributes add beside refresh and an inline trash action", async () => {
     const manifest = JSON.parse(await fs.readFile(path.resolve(__dirname, "../../../package.json"), "utf8"));
     const { commands, menus } = manifest.contributes;
-    assert.strictEqual(commands.find(command => command.command === "ROS2.installRos").icon, "$(add)");
-    assert.ok(menus["view/title"].some(action => action.command === "ROS2.installRos" && action.when === "view == ros2Distributions" && action.group === "navigation@1"));
+    assert.strictEqual(commands.find(command => command.command === "ROS2.addInstallation").icon, "$(add)");
+    assert.ok(commands.some(command => command.command === "ROS2.installRosContainer"));
+    assert.ok(menus["view/title"].some(action => action.command === "ROS2.addInstallation" && action.when === "view == ros2Distributions" && action.group === "navigation@1"));
     assert.ok(menus["view/title"].some(action => action.command === "ROS2.distributions.refresh" && action.group === "navigation@2"));
     assert.strictEqual(commands.find(command => command.command === "ROS2.distributions.remove").icon, "$(trash)");
     assert.ok(menus["view/item/context"].some(action => action.command === "ROS2.distributions.remove" && action.when.includes(`viewItem == ${item(script).contextValue}`) && action.group === "inline"));
+  });
+
+  it("offers all installation actions even when a distribution already exists", async () => {
+    const commands = ["ROS2.installRos", "ROS2.findRos", "ROS2.installRosContainer"];
+    const executed: string[] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (command: string) => { executed.push(command); });
+    for (const command of commands) {
+      replaceProperty(vscode.window, "showQuickPick", async (items: { command: string }[]) => {
+        assert.deepStrictEqual(items.map(entry => entry.command), commands);
+        return items.find(entry => entry.command === command);
+      });
+      await showRosInstallationOptions();
+    }
+    assert.deepStrictEqual(executed, commands);
+    replaceProperty(vscode.window, "showQuickPick", async () => undefined);
+    await showRosInstallationOptions();
+    assert.deepStrictEqual(executed, commands);
+  });
+
+  it("browses for an installation even when known distributions exist", async () => {
+    const selectedFolder = path.join(sandbox, "another-installation");
+    const setup = path.join(selectedFolder, process.platform === "win32" ? "setup.bat" : "setup.bash");
+    await fs.mkdir(selectedFolder);
+    await fs.writeFile(setup, "");
+    const executed: unknown[][] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (...args: unknown[]) => { executed.push(args); });
+    replaceProperty(vscode.window, "showQuickPick", async () => { assert.fail("Find must not list discovered distributions"); });
+    replaceProperty(vscode.window, "showOpenDialog", async (options: vscode.OpenDialogOptions) => {
+      assert.strictEqual(options.canSelectFolders, true);
+      assert.strictEqual(options.canSelectFiles, false);
+      assert.strictEqual(options.canSelectMany, false);
+      return [vscode.Uri.file(selectedFolder)];
+    });
+    await findRosInstallation();
+    assert.deepStrictEqual(executed, [["ROS2.setActiveDistro", setup]]);
+  });
+
+  it("finds setup scripts under an installation's install or Library directory", async () => {
+    const executed: unknown[][] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (...args: unknown[]) => { executed.push(args); });
+    for (const subdirectory of ["install", "Library"]) {
+      const selectedFolder = path.join(sandbox, subdirectory);
+      const setup = path.join(selectedFolder, subdirectory, process.platform === "win32" ? "local_setup.bat" : "local_setup.sh");
+      await fs.mkdir(path.dirname(setup), { recursive: true });
+      await fs.writeFile(setup, "");
+      replaceProperty(vscode.window, "showOpenDialog", async () => [vscode.Uri.file(selectedFolder)]);
+      await findRosInstallation();
+      assert.deepStrictEqual(executed[executed.length - 1], ["ROS2.setActiveDistro", setup]);
+    }
+  });
+
+  it("leaves the active installation unchanged when browsing is cancelled or no script exists", async () => {
+    replaceProperty(vscode.commands, "executeCommand", async () => { assert.fail("No installation should be selected"); });
+    replaceProperty(vscode.window, "showOpenDialog", async () => undefined);
+    await findRosInstallation();
+    assert.strictEqual(warnings.length, 0);
+    const emptyFolder = path.join(sandbox, "empty");
+    await fs.mkdir(path.join(emptyFolder, "setup.bash"), { recursive: true });
+    replaceProperty(vscode.window, "showOpenDialog", async () => [vscode.Uri.file(emptyFolder)]);
+    await findRosInstallation();
+    assert.strictEqual(warnings.length, 1);
+    assert.ok((warnings[0][0] as string).includes("No ROS 2 setup script found"));
+    assert.deepStrictEqual(updates, []);
+  });
+
+  it("opens the devcontainer wizard only with a workspace and the required extension", async () => {
+    const executed: unknown[][] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (...args: unknown[]) => { executed.push(args); });
+    await createRosDevContainer();
+    assert.deepStrictEqual(executed, []);
+    replaceProperty(vscode.workspace, "workspaceFolders", [{ uri: vscode.Uri.file(sandbox) }]);
+    replaceProperty(vscode.extensions, "getExtension", () => undefined);
+    replaceProperty(vscode.window, "showInformationMessage", async () => "Open Dev Containers");
+    await createRosDevContainer();
+    assert.deepStrictEqual(executed, [["workbench.extensions.action.showExtensionsWithIds", ["ms-vscode-remote.remote-containers"]]]);
+    replaceProperty(vscode.extensions, "getExtension", () => ({}));
+    await createRosDevContainer();
+    assert.deepStrictEqual(executed[1], ["remote-containers.createDevContainerFile"]);
   });
 
   it("does nothing when confirmation is dismissed", async () => {

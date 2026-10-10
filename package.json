@@ -117,6 +117,17 @@
                 "icon": "$(add)"
             },
             {
+                "command": "ROS2.addInstallation",
+                "title": "Add ROS 2 Installation",
+                "category": "ROS2",
+                "icon": "$(add)"
+            },
+            {
+                "command": "ROS2.installRosContainer",
+                "title": "Create ROS 2 Devcontainer for This Workspace",
+                "category": "ROS2"
+            },
+            {
                 "command": "ROS2.checkInstallation",
                 "title": "Check ROS 2 Installation Health",
                 "category": "ROS2"
@@ -372,7 +383,7 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "ROS2.installRos",
+                    "command": "ROS2.addInstallation",
                     "when": "view == ros2Distributions",
                     "group": "navigation@1"
                 }
