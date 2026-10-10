@@ -29,7 +29,7 @@ import * as debug_utils from "./debugger/utils";
 import { registerRosShellTaskProvider } from "./build-tool/ros-shell";
 import { RosTestProvider } from "./test-provider/ros-test-provider";
 import { LaunchTreeDataProvider } from "./ros/launch-tree/launch-tree-provider";
-import { detectInstalledDistros, RosDistributionsProvider, selectInstalledDistro } from "./ros/ros-distributions-provider";
+import { detectInstalledDistros, RosDistributionsProvider, selectInstalledDistro, showRosInstallationOptions, createRosDevContainer } from "./ros/ros-distributions-provider";
 import { registerPackageDecorationProvider, refreshPackageDecoration } from "./build-tool/package-decorator";
 import { TopicTreeDataProvider } from "./ros/topic-tree/topic-tree-provider";
 import { TopicTreeItem } from "./ros/topic-tree/topic-tree-item";
@@ -125,6 +125,8 @@ export enum Commands {
     TopicTreePauseWatcher = "ROS2.topicTree.pauseWatcher",
     TopicTreePauseAll = "ROS2.topicTree.pauseAll",
     InstallRos = "ROS2.installRos",
+    AddRosInstallation = "ROS2.addInstallation",
+    InstallRosContainer = "ROS2.installRosContainer",
     CheckRosInstallation = "ROS2.checkInstallation",
     ShowInstallationReport = "ROS2.showInstallationReport",
     FindRos = "ROS2.findRos",
@@ -255,6 +257,10 @@ export async function activate(context: vscode.ExtensionContext) {
         treeDataProvider: rosDistributionsProvider,
         showCollapseAll: false
     });
+    distributionsView.message = "Finding ROS installs...";
+    context.subscriptions.push(rosDistributionsProvider.onDidChangeLoading(loading => {
+        distributionsView.message = loading ? "Finding ROS installs..." : undefined;
+    }));
     context.subscriptions.push(distributionsView);
     context.subscriptions.push(rosDistributionsProvider);
 
@@ -402,6 +408,12 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     // Register Install ROS command
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.AddRosInstallation, () =>
+        ensureErrorMessageOnException(showRosInstallationOptions)
+    ));
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.InstallRosContainer, () =>
+        ensureErrorMessageOnException(createRosDevContainer)
+    ));
     context.subscriptions.push(vscode.commands.registerCommand(Commands.InstallRos, () =>
         ensureErrorMessageOnException(() => install_ros.installRos())
     ));
@@ -528,15 +540,9 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     // Register Set Active Distro command
-    vscode.commands.registerCommand(Commands.SetActiveDistro, async (setupScript: string, distro?: string) => {
-        if (!await vscode_utils.setRosSetupScript(setupScript, distro)) {
-            return;
-        }
-        vscode.window.showInformationMessage(`Active ROS distribution set.`);
-        if (rosDistributionsProvider) {
-            rosDistributionsProvider.refresh();
-        }
-    });
+    context.subscriptions.push(vscode.commands.registerCommand(Commands.SetActiveDistro, (setupScript: string, distro?: string) =>
+        ensureErrorMessageOnException(() => setActiveRosDistribution(setupScript, distro))
+    ));
 
     context.subscriptions.push(vscode.commands.registerCommand(Commands.RemoveDistribution, (item) => {
         return ensureErrorMessageOnException(() => rosDistributionsProvider?.remove(item));
@@ -1106,6 +1112,26 @@ export function activateEnvironment(context: vscode.ExtensionContext): Promise<v
     return environmentActivation;
 }
 
+export async function setActiveRosDistribution(setupScript: string, distro?: string): Promise<void> {
+    if (!await vscode_utils.setRosSetupScript(setupScript, distro)) {
+        return;
+    }
+    await refreshRosEnvironment(distro);
+    await vscode.window.showInformationMessage("Active ROS distribution set. The ROS environment has been refreshed.");
+}
+
+export async function refreshRosEnvironment(expectedDistro?: string): Promise<void> {
+    if (!extensionContext) {
+        throw new Error("The extension must be activated before refreshing the ROS environment.");
+    }
+    await environmentActivation;
+    await activateEnvironment(extensionContext);
+    rosDistributionsProvider?.refresh();
+    if (env?.ROS_VERSION !== "2" || (expectedDistro && env.ROS_DISTRO !== expectedDistro)) {
+        throw new Error(`Could not activate ROS 2${expectedDistro ? ` ${expectedDistro}` : ""}. Check the selected setup script and workspace overlay.`);
+    }
+}
+
 async function activateEnvironmentImpl(context: vscode.ExtensionContext) {
 
     if (processingWorkspace) {
@@ -1123,7 +1149,7 @@ async function activateEnvironmentImpl(context: vscode.ExtensionContext) {
 
     if (typeof env?.ROS_DISTRO === "undefined") {
         // ROS is not detected, check if we should prompt for installation
-        await install_ros.promptInstallRosIfNeeded();
+        void ensureErrorMessageOnException(() => install_ros.promptInstallRosIfNeeded());
         processingWorkspace = false;
         return;
     }
@@ -1170,7 +1196,7 @@ async function activateEnvironmentImpl(context: vscode.ExtensionContext) {
 
     // Generate config files if they don't already exist, but only for workspaces
     if (buildToolDetected) {
-        ros_build_utils.createConfigFiles();
+        await ros_build_utils.createConfigFiles();
     }
 
     processingWorkspace = false;

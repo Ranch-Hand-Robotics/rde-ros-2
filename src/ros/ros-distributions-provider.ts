@@ -7,6 +7,34 @@ import { promises as fsPromises } from "fs";
 import * as os from "os";
 import { getPixiInstallRoot } from "./installer/pixi-location";
 
+export async function showRosInstallationOptions(): Promise<void> {
+    const selected = await vscode.window.showQuickPick([
+        { label: "$(cloud-download) Install ROS 2", command: "ROS2.installRos" },
+        { label: "$(search) Find Existing ROS 2 Installation", command: "ROS2.findRos" },
+        { label: "$(remote) Create ROS 2 Devcontainer for This Workspace", command: "ROS2.installRosContainer" },
+    ], { title: "Add ROS 2 Installation", placeHolder: "Choose how to add ROS 2" });
+    if (selected) {
+        await vscode.commands.executeCommand(selected.command);
+    }
+}
+
+export async function createRosDevContainer(): Promise<void> {
+    if (!vscode.workspace.workspaceFolders?.length) {
+        await vscode.window.showInformationMessage("Open a workspace folder before creating a ROS 2 devcontainer.");
+        return;
+    }
+    if (!vscode.extensions.getExtension("ms-vscode-remote.remote-containers")) {
+        const choice = await vscode.window.showInformationMessage(
+            "The Dev Containers extension is required to create a ROS 2 devcontainer.", "Open Dev Containers"
+        );
+        if (choice === "Open Dev Containers") {
+            await vscode.commands.executeCommand("workbench.extensions.action.showExtensionsWithIds", ["ms-vscode-remote.remote-containers"]);
+        }
+        return;
+    }
+    await vscode.commands.executeCommand("remote-containers.createDevContainerFile");
+}
+
 /**
  * Represents a single installed ROS distribution in the tree.
  */
@@ -18,7 +46,7 @@ export class RosDistributionItem extends vscode.TreeItem {
     ) {
         super(distroName, vscode.TreeItemCollapsibleState.None);
 
-        this.description = isActive ? "active" : setupScript;
+        this.description = isActive ? "active" : undefined;
         this.tooltip = `ROS 2 distribution: ${distroName}\nSetup script: ${setupScript}`;
         this.iconPath = new vscode.ThemeIcon(isActive ? "check" : "package");
         this.contextValue = "rosDistribution";
@@ -210,6 +238,9 @@ export function selectInstalledDistro(
 export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDistributionItem>, vscode.Disposable {
     private _onDidChangeTreeData = new vscode.EventEmitter<RosDistributionItem | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+    private _onDidChangeLoading = new vscode.EventEmitter<boolean>();
+    readonly onDidChangeLoading = this._onDidChangeLoading.event;
+    private activeSearches = 0;
 
     private cachedItems: RosDistributionItem[] | undefined;
     private removing = false;
@@ -338,6 +369,7 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
 
     dispose(): void {
         this._onDidChangeTreeData.dispose();
+        this._onDidChangeLoading.dispose();
     }
 
     refresh(): void {
@@ -359,15 +391,24 @@ export class RosDistributionsProvider implements vscode.TreeDataProvider<RosDist
             return this.cachedItems;
         }
 
-        const config = vscode.workspace.getConfiguration("ROS2");
-        const activeScript: string = config.get("rosSetupScript") ?? "";
-
-        const distros = await detectInstalledDistros();
-        this.cachedItems = distros.map(
-            (d) => new RosDistributionItem(d.name, d.setupScript, d.setupScript === activeScript)
-        );
-        await this.updateDistributionContext(this.cachedItems.length > 0, true);
-
-        return this.cachedItems;
+        this.activeSearches++;
+        this._onDidChangeLoading.fire(true);
+        try {
+            return await vscode.window.withProgress({ location: { viewId: "ros2Distributions" } }, async () => {
+                const config = vscode.workspace.getConfiguration("ROS2");
+                const activeScript: string = config.get("rosSetupScript") ?? "";
+                const distros = await detectInstalledDistros();
+                this.cachedItems = distros.map(
+                    (d) => new RosDistributionItem(d.name, d.setupScript, d.setupScript === activeScript)
+                );
+                await this.updateDistributionContext(this.cachedItems.length > 0, true);
+                return this.cachedItems;
+            });
+        } finally {
+            this.activeSearches--;
+            if (this.activeSearches === 0) {
+                this._onDidChangeLoading.fire(false);
+            }
+        }
     }
 }

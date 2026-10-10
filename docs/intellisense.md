@@ -102,6 +102,14 @@ For C++ and Python code that uses ROS, you need to configure IntelliSense to inc
 
 Run the command **ROS2: Update C++ Properties** from the command palette to automatically configure C++ IntelliSense with ROS include paths.
 
+Selecting an active distribution refreshes the extension's ROS environment without
+reloading the window. In a ROS workspace, it also regenerates the include paths in
+the managed `ros2` C++ configuration before reporting completion. Other configurations,
+comments, and settings such as compiler paths, defines, and language standards are
+preserved. Files containing only custom configurations are not changed automatically.
+Existing terminals and debug sessions keep their original environment; start new ones
+to use the selected distribution.
+
 This updates your workspace's `c_cpp_properties.json` file to include:
 - ROS installation paths
 - Your workspace's package include directories

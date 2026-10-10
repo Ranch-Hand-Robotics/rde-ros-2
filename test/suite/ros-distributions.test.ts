@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as os from "os";
 import { promises as fs } from "fs";
-import { RosDistributionItem, RosDistributionsProvider } from "../../src/ros/ros-distributions-provider";
+import { RosDistributionItem, RosDistributionsProvider, showRosInstallationOptions, createRosDevContainer } from "../../src/ros/ros-distributions-provider";
 
 describe("Distribution view actions", () => {
   let sandbox: string;
@@ -84,14 +84,86 @@ describe("Distribution view actions", () => {
 
   const item = (setup: string) => new RosDistributionItem("jazzy (pixi)", setup, false);
 
-  it("contributes install beside refresh and an inline trash action", async () => {
+  it("keeps setup paths in tooltips without displaying them in list rows", () => {
+    for (const active of [false, true]) {
+      const distribution = new RosDistributionItem("jazzy (pixi)", script, active);
+      assert.strictEqual(distribution.label, "jazzy (pixi)");
+      assert.strictEqual(distribution.description, active ? "active" : undefined);
+      assert.strictEqual(distribution.tooltip, `ROS 2 distribution: jazzy (pixi)\nSetup script: ${script}`);
+      assert.deepStrictEqual(distribution.command.arguments, [script, "jazzy"]);
+    }
+  });
+
+  it("shows view progress during discovery and refresh but not cached reads", async () => {
+    const loading: boolean[] = [];
+    let progressCalls = 0;
+    provider.onDidChangeLoading(value => loading.push(value));
+    replaceProperty(vscode.window, "withProgress", async (options: vscode.ProgressOptions, task: () => Promise<unknown>) => {
+      progressCalls++;
+      assert.deepStrictEqual(options.location, { viewId: "ros2Distributions" });
+      assert.strictEqual(loading[loading.length - 1], true);
+      return task();
+    });
+    await provider.getChildren();
+    assert.deepStrictEqual(loading, [true, false]);
+    await provider.getChildren();
+    assert.strictEqual(progressCalls, 1);
+    provider.refresh();
+    await provider.getChildren();
+    assert.strictEqual(progressCalls, 2);
+    assert.deepStrictEqual(loading, [true, false, true, false]);
+  });
+
+  it("clears the loading state when discovery fails", async () => {
+    const loading: boolean[] = [];
+    provider.onDidChangeLoading(value => loading.push(value));
+    replaceProperty(vscode.window, "withProgress", async (_options: vscode.ProgressOptions, task: () => Promise<unknown>) => task());
+    replaceProperty(vscode.workspace, "getConfiguration", () => { throw new Error("Discovery failed"); });
+    await assert.rejects(provider.getChildren(), /Discovery failed/);
+    assert.deepStrictEqual(loading, [true, false]);
+  });
+
+  it("contributes add beside refresh and an inline trash action", async () => {
     const manifest = JSON.parse(await fs.readFile(path.resolve(__dirname, "../../../package.json"), "utf8"));
     const { commands, menus } = manifest.contributes;
-    assert.strictEqual(commands.find(command => command.command === "ROS2.installRos").icon, "$(add)");
-    assert.ok(menus["view/title"].some(action => action.command === "ROS2.installRos" && action.when === "view == ros2Distributions" && action.group === "navigation@1"));
+    assert.strictEqual(commands.find(command => command.command === "ROS2.addInstallation").icon, "$(add)");
+    assert.ok(commands.some(command => command.command === "ROS2.installRosContainer"));
+    assert.ok(menus["view/title"].some(action => action.command === "ROS2.addInstallation" && action.when === "view == ros2Distributions" && action.group === "navigation@1"));
     assert.ok(menus["view/title"].some(action => action.command === "ROS2.distributions.refresh" && action.group === "navigation@2"));
     assert.strictEqual(commands.find(command => command.command === "ROS2.distributions.remove").icon, "$(trash)");
     assert.ok(menus["view/item/context"].some(action => action.command === "ROS2.distributions.remove" && action.when.includes(`viewItem == ${item(script).contextValue}`) && action.group === "inline"));
+  });
+
+  it("offers all installation actions even when a distribution already exists", async () => {
+    const commands = ["ROS2.installRos", "ROS2.findRos", "ROS2.installRosContainer"];
+    const executed: string[] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (command: string) => { executed.push(command); });
+    for (const command of commands) {
+      replaceProperty(vscode.window, "showQuickPick", async (items: { command: string }[]) => {
+        assert.deepStrictEqual(items.map(entry => entry.command), commands);
+        return items.find(entry => entry.command === command);
+      });
+      await showRosInstallationOptions();
+    }
+    assert.deepStrictEqual(executed, commands);
+    replaceProperty(vscode.window, "showQuickPick", async () => undefined);
+    await showRosInstallationOptions();
+    assert.deepStrictEqual(executed, commands);
+  });
+
+  it("opens the devcontainer wizard only with a workspace and the required extension", async () => {
+    const executed: unknown[][] = [];
+    replaceProperty(vscode.commands, "executeCommand", async (...args: unknown[]) => { executed.push(args); });
+    await createRosDevContainer();
+    assert.deepStrictEqual(executed, []);
+    replaceProperty(vscode.workspace, "workspaceFolders", [{ uri: vscode.Uri.file(sandbox) }]);
+    replaceProperty(vscode.extensions, "getExtension", () => undefined);
+    replaceProperty(vscode.window, "showInformationMessage", async () => "Open Dev Containers");
+    await createRosDevContainer();
+    assert.deepStrictEqual(executed, [["workbench.extensions.action.showExtensionsWithIds", ["ms-vscode-remote.remote-containers"]]]);
+    replaceProperty(vscode.extensions, "getExtension", () => ({}));
+    await createRosDevContainer();
+    assert.deepStrictEqual(executed[1], ["remote-containers.createDevContainerFile"]);
   });
 
   it("does nothing when confirmation is dismissed", async () => {
