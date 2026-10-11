@@ -57,6 +57,7 @@ identified bottleneck to Core, Networking, Simulation, Hardware, or OS as needed
 ## Skills
 
 Load only the needed workflows: [build](../skills/ros2-build/SKILL.md),
+[Pixi and pixi-ros](../skills/ros2-pixi/SKILL.md),
 [testing](../skills/ros2-test/SKILL.md),
 [packaging](../skills/ros2-packaging/SKILL.md),
 [actions/services/lifecycle](../skills/ros2-actions-services-lifecycle/SKILL.md),

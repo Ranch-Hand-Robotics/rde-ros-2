@@ -27,7 +27,7 @@ const expectedSkills = [
   'ros2-build', 'ros2-packaging', 'ros2-actions-services-lifecycle', 'ros2-networking',
   'ros2-debugging', 'ros2-perception', 'ros2-manipulation', 'ros2-navigation',
   'ros2-test', 'ros2-gazebo', 'ros2-omniverse', 'ros2-mujoco', 'ros2-launch',
-  'ros2-performance',
+  'ros2-performance', 'ros2-pixi',
 ];
 const commonRules = 'assets/skills/ros2-development/SKILL.md';
 
@@ -75,7 +75,7 @@ describe('Bundled ROS 2 AI customizations', () => {
     skills = manifest.contributes.chatSkills.map(readCustomization);
   });
 
-  it('registers the coordinator, all ten specialists, and all seventeen skills exactly once', () => {
+  it('registers the coordinator, all ten specialists, and all eighteen skills exactly once', () => {
     assert.deepStrictEqual(agents.map(a => a.metadata.name).sort(), [...expectedAgents].sort());
     assert.deepStrictEqual(skills.map(s => s.metadata.name).sort(), [...expectedSkills].sort());
     const paths = [...agents, ...skills].map(c => c.file);
@@ -194,7 +194,15 @@ describe('Bundled ROS 2 AI customizations', () => {
   for (const { agentName, skillNames } of [
     {
       agentName: 'ROS 2 Expert',
-      skillNames: ['ros2-gazebo', 'ros2-omniverse', 'ros2-mujoco', 'ros2-launch', 'ros2-performance'],
+      skillNames: ['ros2-gazebo', 'ros2-omniverse', 'ros2-mujoco', 'ros2-launch', 'ros2-performance', 'ros2-pixi'],
+    },
+    {
+      agentName: 'ROS 2 OS',
+      skillNames: ['ros2-pixi'],
+    },
+    {
+      agentName: 'ROS 2 Packaging',
+      skillNames: ['ros2-pixi'],
     },
     {
       agentName: 'ROS 2 Core',
@@ -216,6 +224,50 @@ describe('Bundled ROS 2 AI customizations', () => {
       }
     });
   }
+
+  it('makes Pixi setup reachable from build and packaging without replacing dependency recovery', () => {
+    const pixi = skills.find(s => s.metadata.name === 'ros2-pixi');
+    assert.ok(pixi, 'Missing registered Pixi workflow');
+    for (const name of ['ros2-build', 'ros2-packaging']) {
+      const entry = skills.find(s => s.metadata.name === name)!;
+      assert.ok(localLinks(entry).includes(pixi.file), `Pixi workflow unreachable from ${entry.file}`);
+    }
+    const recovery = skills.find(s => s.metadata.name === 'rosdep')!;
+    assert.ok(localLinks(pixi).includes(recovery.file), 'Keep focused dependency recovery reachable');
+  });
+
+  it('bundles version-aware pixi-ros guidance and exposes its discovery triggers', () => {
+    const pixi = skills.find(s => s.metadata.name === 'ros2-pixi');
+    assert.ok(pixi, 'Missing registered Pixi workflow');
+    for (const trigger of ['Pixi', 'RoboStack', 'pixi-ros', 'pixi.toml', 'pixi.lock']) {
+      assert.ok((pixi.metadata.description as string).includes(trigger), `Missing trigger: ${trigger}`);
+    }
+    const reference = 'assets/skills/ros2-pixi/references/pixi-ros.md';
+    assert.ok(localLinks(pixi).includes(reference), 'Missing bundled pixi-ros reference');
+    const guidance = fs.readFileSync(path.join(root, reference), 'utf8');
+    assert.ok(guidance.includes('https://github.com/ruben-arts/pixi-ros'));
+    for (const requirement of [
+      'pixi-ros init --distro', '--platform', '--channel', 'README_PIXI.md',
+      'NOT FOUND', 'install/setup.bash', 'pixi-build-ros',
+    ]) {
+      assert.ok(guidance.includes(requirement), `Missing pixi-ros guidance: ${requirement}`);
+    }
+    // These are documentation contracts, not a claim that instructions enforce behavior.
+    for (const requirement of ['--locked', '--frozen', '--manifest-path', '--environment', 'ROS2.rosSetupScript']) {
+      assert.ok(pixi.body.includes(requirement), `Missing Pixi environment guidance: ${requirement}`);
+    }
+  });
+
+  it('documents all registered skills and offers Pixi invocation in the guide and walkthrough', () => {
+    const guide = fs.readFileSync(path.join(root, 'docs/ai-agents-and-skills.md'), 'utf8');
+    const documentedSkills = Array.from(guide.matchAll(/^\| `([a-z0-9-]+)` \|/gm), match => match[1]);
+    assert.deepStrictEqual(documentedSkills.sort(), [...expectedSkills].sort());
+    for (const file of ['docs/pixi.md', 'media/walkthroughs/ai-features.md']) {
+      const text = fs.readFileSync(path.join(root, file), 'utf8');
+      assert.ok(text.includes('/ros2-pixi'), `Missing Pixi invocation in ${file}`);
+      assert.ok(text.includes('pixi-ros'), `Missing project guidance in ${file}`);
+    }
+  });
 
   it('keeps the VS Code engine baseline and lockfile synchronized', () => {
     assert.strictEqual(manifest.engines.vscode, '^1.110.0');
