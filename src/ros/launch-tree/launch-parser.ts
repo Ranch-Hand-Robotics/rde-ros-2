@@ -24,6 +24,7 @@ const readFile = promisify(fs.readFile);
 export class LaunchFileParser {
   private dumperScript: string;
   private cache = new Map<string, ILaunchFileData>();
+  private cacheGeneration = 0;
 
   constructor(private outputChannel: vscode.OutputChannel, extPath: string) {
     // Path to ros2_launch_dumper.py
@@ -167,10 +168,11 @@ export class LaunchFileParser {
     if (cached) {
       return cached;
     }
+    const generation = this.cacheGeneration;
 
     try {
-      // Get ROS environment from extension
-      const rosEnv = await extension.resolvedEnv();
+      // Refresh workspace overlays before validation, including after external builds.
+      const rosEnv = await extension.prepareRosLaunchEnvironment();
       
       // Execute ros2_launch_dumper.py with proper ROS environment
       // Note: The dumper script automatically outputs JSON when USE_JSON_OUTPUT=True
@@ -215,8 +217,11 @@ export class LaunchFileParser {
         errors: data.errors || []
       };
 
-      // Cache the result
-      this.cache.set(filePath, result);
+      // Setup/packages may be repaired without editing the launch file. Also
+      // honor refreshes that occurred while sourcing or running the dumper.
+      if (result.errors.length === 0 && generation === this.cacheGeneration) {
+        this.cache.set(filePath, result);
+      }
 
       return result;
     } catch (error) {
@@ -238,6 +243,7 @@ export class LaunchFileParser {
    * Clear cache for a file (called when file changes)
    */
   invalidateCache(filePath: string): void {
+    this.cacheGeneration++;
     this.cache.delete(filePath);
   }
 
@@ -245,6 +251,7 @@ export class LaunchFileParser {
    * Clear all cache
    */
   clearCache(): void {
+    this.cacheGeneration++;
     this.cache.clear();
   }
 }

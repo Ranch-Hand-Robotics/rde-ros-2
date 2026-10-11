@@ -916,7 +916,7 @@
         "reset:ros:macos": "node scripts/reset-ros-macos.js",
         "test:installer": "npm run test-compile && node --test test/pixi-installer.test.js test/reset-ros-macos.test.js",
         "test:images": "npm run test-compile && node --test test/image-subscription.test.js",
-        "test:topics": "npm run test-compile && node --test test/image-subscription.test.js test/point-cloud-subscription.test.js test/point-cloud-routing.test.js test/topic-watcher-commands.test.js",
+        "test:topics": "npm run test-compile && node --test test/image-subscription.test.js test/point-cloud-subscription.test.js test/point-cloud-routing.test.js test/topic-watcher-commands.test.js test/topic-discovery.test.js",
         "test:discovery": "npm run test-compile && node --test test/windows-environment.test.js test/windows-toolchain-installer.test.js test/ros-setup-discovery.test.js test/windows-build-preflight.test.js test/ros-python.test.js test/deferred-ros-task.test.js",
         "lint": "eslint -p ./",
         "pretest": "npm run build && npm run test-compile",
