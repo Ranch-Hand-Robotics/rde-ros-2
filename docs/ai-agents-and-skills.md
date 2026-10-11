@@ -1,8 +1,9 @@
 # ROS 2 AI agents and skills
 
 The extension bundles eleven agents (a ROS 2 expert coordinator and ten hidden
-specialists) and sixteen reusable skills. They provide development workflows, not an autonomous robot
-controller or a replacement for validating generated code.
+specialists) and eighteen reusable skills: seventeen `/ros2-` workflows plus
+`/rosdep`. They provide development workflows, not an autonomous robot controller
+or a replacement for validating generated code.
 
 ## Getting started
 
@@ -41,8 +42,10 @@ vendor or subscription tier is pinned.
 
 | Skill / slash command | Workflow |
 | --- | --- |
+| `rosdep` | Targeted missing-dependency lookup and approved peer-directory source recovery |
 | `ros2-development` | Shared development ground rules, platform preflight, hardware safety, and validation |
 | `ros2-install-troubleshooting` | ROS 2 installation diagnostics, environment checks, and scoped recovery |
+| `ros2-pixi` | Pixi/RoboStack environments, pixi-ros initialization, dependency mappings, activation, lockfiles, and colcon tasks |
 | `ros2-build` | colcon, ament_cmake/ament_python, underlays/overlays, build and test diagnostics |
 | `ros2-test` | Requirements-based tests, bug reproductions, regression prevention, isolation, and verified test results |
 | `ros2-packaging` | package.xml, rosdep, interfaces, installed resources, release preparation |
@@ -57,6 +60,23 @@ vendor or subscription tier is pinned.
 | `ros2-mujoco` | MuJoCo models, stepping, control, and integration through an explicit ROS adapter |
 | `ros2-launch` | Launch arguments, substitutions, includes, namespaces, composition, event handling, and installed launch resources |
 | `ros2-performance` | Evidence-based profiling, latency/throughput measurements, executors, tracing, and regression comparisons |
+
+### Pixi and pixi-ros
+
+Use `/ros2-pixi` for ROS 2 environment setup or migration with Pixi, including
+[ruben-arts/pixi-ros](https://github.com/ruben-arts/pixi-ros). The coordinator,
+OS, and Packaging agents can load this workflow, as can the build and packaging
+skills. It covers existing manifests and named environments, package.xml mappings,
+RoboStack channels, lockfile consistency, and platform-correct activation.
+
+Try: "/ros2-pixi Inspect this workspace for migration with pixi-ros on Windows.
+Review the generated manifest and activation before installing or building."
+
+`pixi-ros` is an optional external tool, not installed by the extension. Its
+initializer writes files and can comment out unresolved dependencies; review its
+output rather than treating successful generation as a complete environment.
+The skill distinguishes it from the separate `pixi-build-ros` backend and retains
+`/rosdep` for focused missing-dependency recovery. See [Pixi for ROS 2](pixi.md).
 
 ### Launch, simulation, and performance
 

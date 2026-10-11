@@ -70,6 +70,7 @@
             { "path": "./assets/skills/rosdep/SKILL.md" },
             { "path": "./assets/skills/ros2-development/SKILL.md" },
             { "path": "./assets/skills/ros2-install-troubleshooting/SKILL.md" },
+            { "path": "./assets/skills/ros2-pixi/SKILL.md" },
             { "path": "./assets/skills/ros2-build/SKILL.md" },
             { "path": "./assets/skills/ros2-test/SKILL.md" },
             { "path": "./assets/skills/ros2-packaging/SKILL.md" },

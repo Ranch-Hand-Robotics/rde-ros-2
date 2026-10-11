@@ -3,6 +3,25 @@
 
 Open Robotics has standardized on Pixi for Windows development.
 
+## AI-assisted Pixi workspaces
+
+In VS Code 1.110+ with Copilot Chat, use the bundled `/ros2-pixi` skill for
+Pixi/RoboStack environment setup, dependency mapping, lockfiles, activation,
+and build/test troubleshooting. It includes
+[ruben-arts/pixi-ros](https://github.com/ruben-arts/pixi-ros), an optional tool
+that reads package.xml files and initializes a Pixi manifest and colcon tasks.
+
+Try: "/ros2-pixi Help me initialize this ROS 2 workspace with pixi-ros. Check my
+platform, preserve existing tasks, and review unresolved dependencies before
+installing anything."
+
+The workflow checks the installed tool's options, reviews generated files and
+shell compatibility, and distinguishes `pixi-ros` from the `pixi-build-ros`
+backend. Neither tool is installed automatically. A successful initializer can
+still leave missing dependencies commented out; generated cleanup tasks and
+activation scripts need review. Use `/rosdep` instead for one missing dependency.
+See [AI agents and skills](ai-agents-and-skills.md) for discovery and safety details.
+
 ## RoboStack & Open Robotics
 Open Robotics has partnered with RoboStack to provide a Pixi-based ROS 2 development environment. This environment is designed to work seamlessly with the Robot Developer Extensions for ROS 2, providing a consistent and easy-to-use development experience across platforms.
 

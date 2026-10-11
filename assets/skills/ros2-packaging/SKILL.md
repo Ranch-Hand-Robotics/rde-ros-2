@@ -19,7 +19,7 @@ user-invocable: true
 2. Distinguish build-tool, build, build-export, execution, and test dependencies; avoid undeclared transitive dependencies.
 3. Resolve dependency keys against the selected ROS distribution and OS; do not substitute arbitrary system package names.
 4. Use `rosdep check` or a supported dry-run workflow before requesting dependency installation.
-5. For Pixi-managed environments, follow project manifests and lockfiles rather than assuming rosdep manages everything.
+5. For Pixi-managed environments, use [Pixi and pixi-ros](../ros2-pixi/SKILL.md) for manifest/lockfile management and package.xml mapping rather than assuming rosdep manages everything.
 6. Do not use vcpkg; preserve the project's supported native or Pixi dependency strategy.
 
 ## Verify install contracts

@@ -96,6 +96,9 @@ ports or camera devices automatically appear in Ubuntu without forwarding.
 
 ## Validation and output
 
+Use [Pixi and pixi-ros](../skills/ros2-pixi/SKILL.md) for environment setup,
+activation, manifest/lockfile management, and platform-specific recovery.
+
 Use [build](../skills/ros2-build/SKILL.md),
 [packaging](../skills/ros2-packaging/SKILL.md), or
 [debugging](../skills/ros2-debugging/SKILL.md) for focused validation. Test executable

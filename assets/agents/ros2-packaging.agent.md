@@ -34,5 +34,7 @@ before work; stop execution if unavailable.
 
 Load [build](../skills/ros2-build/SKILL.md) or
 [packaging](../skills/ros2-packaging/SKILL.md) as needed.
+Use [Pixi and pixi-ros](../skills/ros2-pixi/SKILL.md) for package.xml mapping,
+manifest/lockfile changes, and the distinction between colcon and pixi-build-ros.
 Return package/dependency findings, artifacts checked, files changed, and release
 prerequisites; refer OS/toolchain incompatibilities back to the coordinator.

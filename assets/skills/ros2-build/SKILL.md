@@ -22,6 +22,9 @@ user-invocable: true
 5. Record underlay prefixes, overlay order, Python interpreter, compiler ABI, and architecture compatibility.
 6. Check missing dependencies using the project's supported dependency workflow; report gaps before proposing installation.
 
+For Pixi manifests, activation, or generated colcon tasks, use
+[Pixi and pixi-ros](../ros2-pixi/SKILL.md) before changing the environment.
+
 ## Build incrementally
 1. Start in a clean, correctly activated shell; source the intended underlay before building an overlay.
 2. Inspect `colcon list` after preflight and compare discovered packages with expected workspace contents.
