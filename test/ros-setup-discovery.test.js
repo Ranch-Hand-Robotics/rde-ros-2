@@ -139,17 +139,18 @@ test("Linux retains standard bash/sh discovery and macOS prefers its cached Pixi
 // Exercise the real exported activation entry point, but never activate ROS,
 // run build tools, launch installers, or access the host's installations.
 function activationHarness({ files = [], configured = "", explicit = "", failExplicit = false,
-  workspace, source, probe, buildToolDetected = false, overlayText } = {}) {
+  workspace, source, probe, buildToolDetected = false, overlayText, platform = "win32" } = {}) {
   // activate() changes ROS_DISTRO after loading; keep env live, not a snapshot.
-  const windowsProcess = { ...process, platform: "win32", get env() { return process.env; } };
-  const loaded = discovery(files);
+  const windowsProcess = { ...process, platform, get env() { return process.env; } };
+  const platformPath = platform === "win32" ? path.win32 : path.posix;
+  const loaded = discovery(files, platform);
   loaded.promises.readFile = async filename => {
     await loaded.promises.access(filename).catch(() => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); });
     return overlayText ?? ':: generated from colcon_core/shell/template/prefix_chain.bat.em\n' +
       'call:_colcon_prefix_chain_bat_call_script "%%~dp0local_setup.bat"\n';
   };
   const buildEnvironment = loadWithMocks("../out/src/ros/build-environment", {
-    fs: { promises: loaded.promises }, path: path.win32,
+    fs: { promises: loaded.promises }, path: platformPath,
   }, false, windowsProcess);
   const sourced = [];
   const sourceCalls = [];
@@ -189,7 +190,7 @@ function activationHarness({ files = [], configured = "", explicit = "", failExp
   };
   const colcon = loadWithMocks("../out/src/build-tool/colcon", {
     vscode,
-    path: path.win32,
+    path: platformPath,
     "./ros-shell": { make: (name, definition) => ({ name, definition }) },
     "../vscode-utils": { workspaceContainsPackageXml: () => assert.fail("Tasks must not require package.xml") },
     "./colcon-utils": {
@@ -205,7 +206,7 @@ function activationHarness({ files = [], configured = "", explicit = "", failExp
   };
   const extension = loadWithMocks("../out/src/extension", {
     vscode,
-    path: path.win32,
+    path: platformPath,
     child_process: { execFile, spawn: () => assert.fail("Never spawn a build during ROS preparation") },
     fs: { promises: loaded.promises },
     "./build-tool/colcon": colcon,
@@ -228,13 +229,13 @@ function activationHarness({ files = [], configured = "", explicit = "", failExp
       showOutputPanel: channel => { h.panels.push(channel); },
     },
     "./ros/ros-distributions-provider": {
-      RosDistributionsProvider: class {},
+      RosDistributionsProvider: class { onDidChangeLoading = disposable; },
       selectInstalledDistro: loaded.selectInstalledDistro,
       detectInstalledDistros: async () => { h.discoveries++; return loaded.detectInstalledDistros(); },
     },
     "./ros/utils": {
       getDistros: () => assert.fail("Must not use /opt/ros-only discovery"),
-      getSetupScriptExtension: () => ".bat",
+      getSetupScriptExtension: () => platform === "win32" ? ".bat" : ".bash",
       sourceSetupFile: async (script, baseEnv, failOnMissingSetup) => {
         h.events.push("source");
         sourced.push(script);
@@ -656,6 +657,88 @@ test("runtime activation still sources valid overlays and reports broken overlay
     assert.doesNotMatch(h.logs.join("\n"), /Build recovery/);
   }
 });
+
+test("launch preparation freshly sources ROS then workspace without reactivating providers", async () => {
+  const workspace = "C:\\fixture workspace";
+  const overlay = path.win32.join(workspace, "install", "setup.bat");
+  const h = activationHarness({ workspace, files: [cachedSetup, overlay], configured: "lyrical",
+    source: async (script, base) => ({ ...base, ROS_VERSION: "2", ROS_DISTRO: "lyrical",
+      ...(script === overlay ? { AMENT_PREFIX_PATH: path.win32.join(workspace, "install"), PYTHONPATH: "workspace modules" }
+        : { UNDERLAY: "ready" }) }),
+  });
+  h.extension.env = { ROS_VERSION: "2", ROS_DISTRO: "stale", STALE: "cached underlay" };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const prepared = await h.extension.prepareRosLaunchEnvironment();
+    assert.equal(prepared.UNDERLAY, "ready");
+    assert.equal(prepared.AMENT_PREFIX_PATH, path.win32.join(workspace, "install"));
+    assert.equal(prepared.PYTHONPATH, "workspace modules");
+    assert.equal(prepared.STALE, undefined);
+    assert.equal(h.extension.env, prepared);
+  }
+  assert.deepEqual(h.sourced, [cachedSetup, overlay, cachedSetup, overlay]);
+  assert.ok(h.sourceCalls.every(call => call.failOnMissingSetup === true));
+  assert.deepEqual(h.registrations, []);
+  assert.deepEqual(h.probes, [], "Launch preparation is not build recovery");
+});
+
+for (const platform of ["linux", "darwin"]) {
+  test(`${platform}: launch preparation sources the native workspace overlay after its underlay`, async () => {
+    const workspace = "/workspace/camera";
+    const underlay = "/opt/ros/lyrical/setup.bash";
+    const overlay = `${workspace}/install/setup.bash`;
+    const h = activationHarness({ platform, workspace, explicit: underlay, files: [underlay, overlay],
+      source: async (script, base) => ({ ...base, ROS_VERSION: "2", ROS_DISTRO: "lyrical",
+        ...(script === overlay ? { AMENT_PREFIX_PATH: `${workspace}/install:/opt/ros/lyrical` }
+          : { AMENT_PREFIX_PATH: "/opt/ros/lyrical" }) }),
+    });
+    const prepared = await h.extension.prepareRosLaunchEnvironment();
+    assert.deepEqual(h.sourced, [underlay, overlay]);
+    assert.equal(h.sourceCalls[1].baseEnv.AMENT_PREFIX_PATH, "/opt/ros/lyrical");
+    assert.equal(prepared.AMENT_PREFIX_PATH, `${workspace}/install:/opt/ros/lyrical`);
+    assert.deepEqual(h.probes, []);
+  });
+}
+
+test("launch preparation waits for an in-progress activation before sourcing again", async () => {
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const h = activationHarness({ files: [cachedSetup], configured: "lyrical", source: async () => {
+    await pending;
+    return { ROS_VERSION: "2", ROS_DISTRO: "lyrical" };
+  } });
+  const activation = h.extension.activateEnvironment(h.context);
+  const preparing = h.extension.prepareRosLaunchEnvironment();
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(h.sourced, [cachedSetup], "Do not race the active environment setup");
+  } finally {
+    release();
+    await activation;
+  }
+  assert.equal((await preparing).ROS_VERSION, "2");
+  assert.deepEqual(h.sourced, [cachedSetup, cachedSetup, cachedSetup]);
+});
+
+for (const failureAt of ["underlay", "overlay", "missing ROS"]) {
+  test(`launch preparation rejects ${failureAt} failures rather than using a partial or stale env`, async () => {
+    const workspace = "C:\\fixture workspace";
+    const overlay = path.win32.join(workspace, "install", "setup.bat");
+    const h = activationHarness({ workspace, files: [cachedSetup, overlay],
+      configured: failureAt === "missing ROS" ? "missing" : "lyrical",
+      source: async (script, base) => {
+        if (script === (failureAt === "underlay" ? cachedSetup : overlay)) {
+          throw new Error(`${failureAt} setup failed`);
+        }
+        return { ...base, ROS_VERSION: "2", ROS_DISTRO: "lyrical" };
+      },
+    });
+    const previous = { ROS_VERSION: "2", ROS_DISTRO: "old" };
+    h.extension.env = previous;
+    await assert.rejects(h.extension.prepareRosLaunchEnvironment(), /setup failed|No ROS 2 setup script/);
+    assert.equal(h.extension.env, previous, "Do not publish a partial runtime environment");
+    assert.deepEqual(h.probes, []);
+  });
+}
 
 test("postbuild runtime sources local hooks strictly, not the contaminated prefix chain", async () => {
   const workspace = "C:\\fixture workspace";

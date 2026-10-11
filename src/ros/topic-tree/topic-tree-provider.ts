@@ -20,7 +20,8 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
     updatedAt: number
   }>();
   private topicMetricsRequests = new Map<string, Promise<void>>();
-  private topics: TopicInfo[] | undefined;
+  // undefined: not queried; null: failed, awaiting a timer or explicit refresh.
+  private topics: TopicInfo[] | null | undefined;
   private topicListRequest?: Promise<void>;
   private environmentVersion = 0;
   private refreshInterval?: NodeJS.Timeout;
@@ -118,7 +119,7 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
         const errorMessage = error instanceof Error ? error.message : String(error);
         this.outputChannel.appendLine(`Error getting topics: ${errorMessage}`);
         if (version === this.environmentVersion) {
-          this.topics = undefined;
+          this.topics = null;
         }
       } finally {
         if (version === this.environmentVersion) {
@@ -154,11 +155,11 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
       return [];
     }
 
-    if (!this.topics && !this.watchState.consumeQueryPermission()) {
+    if (this.topics === undefined && !this.watchState.consumeQueryPermission()) {
       return [TopicTreeItem.createEmptyStateItem('Topic watcher paused. Press Play or Refresh.')];
     }
 
-    if (!this.topics) {
+    if (this.topics === undefined) {
       await this.refreshTopics();
     }
 

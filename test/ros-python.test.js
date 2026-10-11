@@ -82,13 +82,15 @@ function launchHarness() {
   const env = { CONDA_PREFIX: prefix, Path: prefix, ROS_DISTRO: "lyrical", PYTHONPATH: "ROS packages",
     LD_DEBUG: "libs", LD_DEBUG_OUTPUT: "debug.log", SECRET: "must-not-log" };
   const logs = [], calls = [], debug = [];
+  const result = { processes: [], lifecycle_nodes: [] };
   const r = resolver([python]);
   const execFile = () => assert.fail("Use promisified execFile");
   execFile[promisify.custom] = async (command, args, options) => {
     calls.push({ command, args, options });
-    return { stdout: JSON.stringify({ processes: [], lifecycle_nodes: [] }), stderr: "" };
+    return { stdout: JSON.stringify(result), stderr: "" };
   };
   const extension = { env, extPath: "C:\\Extension path & tools", resolvedEnv: async () => env,
+    prepareRosLaunchEnvironment: async () => env,
     outputChannel: { appendLine: text => logs.push(text) } };
   const vscode = { workspace: { getConfiguration: () => ({ get: () => false }) },
     debug: { startDebugging: async (_folder, config) => { debug.push(config); return true; } } };
@@ -105,7 +107,7 @@ function launchHarness() {
     "../../../../ros/python": { resolveRosPython: r.resolve },
     "../python": { resolveRosPython: r.resolve },
   };
-  return { env, logs, calls, debug, extension, mocks };
+  return { env, logs, calls, debug, extension, mocks, result };
 }
 
 test("launch debugger invokes Pixi Python with separate paths/arguments and retains ROS environment", async () => {
@@ -142,6 +144,102 @@ test("launch tree uses the same interpreter and preserves its timeout/buffer lim
   assert.equal(h.calls[0].options.maxBuffer, 10 * 1024 * 1024);
   await parser.parseLaunchFile(target);
   assert.equal(h.calls.length, 1, "Successful parsing is still cached");
+});
+
+test("launch tree waits for fresh workspace sourcing instead of the cached underlay", async () => {
+  const h = launchHarness();
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const overlay = { ...h.env, AMENT_PREFIX_PATH: "C:\\workspace\\install",
+    PYTHONPATH: "C:\\workspace\\install\\Lib\\site-packages;ROS packages" };
+  h.extension.resolvedEnv = () => assert.fail("Cached runtime environment is not a launch preflight");
+  h.extension.prepareRosLaunchEnvironment = () => pending;
+  const { LaunchFileParser } = load("../out/src/ros/launch-tree/launch-parser", h.mocks);
+  const parser = new LaunchFileParser(h.extension.outputChannel, h.extension.extPath);
+  const parsing = parser.parseLaunchFile("C:\\workspace\\camera.launch.py");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.calls, [], "Do not run the dumper before workspace sourcing completes");
+  release(overlay);
+  assert.deepEqual((await parsing).errors, []);
+  assert.equal(h.calls[0].options.env, overlay);
+});
+
+test("launch tree reports setup failures without running the dumper, and allows retry", async () => {
+  const h = launchHarness();
+  h.extension.prepareRosLaunchEnvironment = async () => { throw new Error("workspace setup failed"); };
+  const { LaunchFileParser } = load("../out/src/ros/launch-tree/launch-parser", h.mocks);
+  const parser = new LaunchFileParser(h.extension.outputChannel, h.extension.extPath);
+  const target = "C:\\workspace\\camera.launch.py";
+  assert.match((await parser.parseLaunchFile(target)).errors.join("\n"), /workspace setup failed/);
+  assert.deepEqual(h.calls, []);
+  h.extension.prepareRosLaunchEnvironment = async () => h.env;
+  assert.deepEqual((await parser.parseLaunchFile(target)).errors, []);
+  assert.equal(h.calls.length, 1);
+});
+
+test("launch tree does not cache dumper validation errors after a missing package is built", async () => {
+  const h = launchHarness();
+  h.result.errors = ["package 'camera' not found"];
+  const { LaunchFileParser } = load("../out/src/ros/launch-tree/launch-parser", h.mocks);
+  const parser = new LaunchFileParser(h.extension.outputChannel, h.extension.extPath);
+  const target = "C:\\workspace\\camera.launch.xml";
+  assert.equal((await parser.parseLaunchFile(target)).errors.length, 1);
+  h.result.errors = [];
+  assert.deepEqual((await parser.parseLaunchFile(target)).errors, []);
+  assert.equal(h.calls.length, 2);
+});
+
+for (const invalidate of ["clearCache", "invalidateCache"]) {
+  test(`launch tree ${invalidate} prevents pending parsing from restoring stale results`, async () => {
+    const h = launchHarness();
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    h.extension.prepareRosLaunchEnvironment = () => pending;
+    const { LaunchFileParser } = load("../out/src/ros/launch-tree/launch-parser", h.mocks);
+    const parser = new LaunchFileParser(h.extension.outputChannel, h.extension.extPath);
+    const target = "C:\\workspace\\camera.launch.py";
+    const parsing = parser.parseLaunchFile(target);
+    parser[invalidate](target);
+    release(h.env);
+    await parsing;
+    await parser.parseLaunchFile(target);
+    assert.equal(h.calls.length, 2, "A refresh during parsing must leave the cache invalidated");
+  });
+}
+
+test("launch tree provider refreshes on environment changes and disposes its listener", async () => {
+  const h = launchHarness();
+  class EventEmitter {
+    listeners = new Set();
+    event = listener => { this.listeners.add(listener); return { dispose: () => this.listeners.delete(listener) }; };
+    fire() { for (const listener of this.listeners) { listener(); } }
+    dispose() { this.listeners.clear(); }
+  }
+  const changed = new EventEmitter();
+  h.extension.onDidChangeEnv = changed.event;
+  const { LaunchFileParser } = load("../out/src/ros/launch-tree/launch-parser", h.mocks);
+  const { LaunchTreeDataProvider } = load("../out/src/ros/launch-tree/launch-tree-provider", {
+    vscode: { EventEmitter, workspace: { createFileSystemWatcher: () => ({
+      onDidChange() {}, onDidCreate() {}, onDidDelete() {}, dispose() {},
+    }) } },
+    "../../extension": h.extension,
+    "./launch-parser": { LaunchFileParser },
+    "./launch-tree-item": {},
+  });
+  const provider = new LaunchTreeDataProvider({}, h.extension.outputChannel, h.extension.extPath);
+  let refreshes = 0;
+  provider.onDidChangeTreeData(() => { refreshes++; });
+  const target = "C:\\workspace\\camera.launch.py";
+  try {
+    await provider.parser.parseLaunchFile(target);
+    changed.fire();
+    assert.equal(refreshes, 1);
+    await provider.parser.parseLaunchFile(target);
+    assert.equal(h.calls.length, 2);
+  } finally {
+    provider.dispose();
+  }
+  assert.equal(changed.listeners.size, 0);
 });
 
 test("debug_launch pins the Python adapter interpreter and never logs environment secrets", async () => {
