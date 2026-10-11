@@ -84,7 +84,8 @@
             { "path": "./assets/skills/ros2-omniverse/SKILL.md" },
             { "path": "./assets/skills/ros2-mujoco/SKILL.md" },
             { "path": "./assets/skills/ros2-launch/SKILL.md" },
-            { "path": "./assets/skills/ros2-performance/SKILL.md" }
+            { "path": "./assets/skills/ros2-performance/SKILL.md" },
+            { "path": "./assets/skills/ros2-rosidl-buffers/SKILL.md" }
         ],
         "commands": [
             {

@@ -88,12 +88,12 @@ Simulation, and operating systems (Windows, macOS, Ubuntu, and NVIDIA Jetson). A
 specialists are hidden from the agent picker and invoked through the top-level
 **ROS 2 Expert** orchestration agent: eleven agents in total.
 
-Type `/ros2-` in Chat to discover seventeen workflows, including shared development
+Type `/ros2-` in Chat to discover eighteen workflows, including shared development
 guidance (`/ros2-development`) and installation diagnostics
 (`/ros2-install-troubleshooting`), Pixi environments (`/ros2-pixi`), meaningful
 testing (`/ros2-test`), plus build, packaging,
 actions/services/lifecycle, networking, debugging, perception, manipulation,
-navigation, launch, performance, Gazebo, Omniverse Isaac Sim, and MuJoCo.
+navigation, launch, performance, ROSIDL buffers, Gazebo, Omniverse Isaac Sim, and MuJoCo.
 Relevant skills can also load automatically. No workspace copying
 or MCP server is required for static development help; runtime inspection needs
 available ROS tooling. These VS Code contributions may not be supported by Cursor.
@@ -102,6 +102,13 @@ Use `/ros2-pixi` for Pixi/RoboStack setup, lockfiles, activation, and
 `pixi-ros` workspace initialization from package.xml files. It reviews generated
 tasks and unresolved dependencies before installation or builds; the external
 `pixi-ros` tool is not bundled. Use `/rosdep` for one missing dependency instead.
+
+Use `/ros2-rosidl-buffers` for Linux and Windows lifetime-managed buffers,
+shared-memory IPC, and native camera paths. For example: "/ros2-rosidl-buffers
+Evaluate a native Windows Media Foundation ROS camera using CPU shared mappings
+or D3D11 textures, with CPU fallback and measured copy boundaries." It distinguishes
+native OS capabilities from verified ROSIDL backend support; no camera driver or
+buffer backend is installed by the skill.
 
 **ROS 2 Core** owns general launch orchestration with `/ros2-launch` and uses
 `/ros2-performance` for measurement-driven optimization. **ROS 2 Simulation**

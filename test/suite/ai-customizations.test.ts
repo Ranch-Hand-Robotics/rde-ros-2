@@ -27,7 +27,7 @@ const expectedSkills = [
   'ros2-build', 'ros2-packaging', 'ros2-actions-services-lifecycle', 'ros2-networking',
   'ros2-debugging', 'ros2-perception', 'ros2-manipulation', 'ros2-navigation',
   'ros2-test', 'ros2-gazebo', 'ros2-omniverse', 'ros2-mujoco', 'ros2-launch',
-  'ros2-performance', 'ros2-pixi',
+  'ros2-performance', 'ros2-pixi', 'ros2-rosidl-buffers',
 ];
 const commonRules = 'assets/skills/ros2-development/SKILL.md';
 
@@ -75,7 +75,7 @@ describe('Bundled ROS 2 AI customizations', () => {
     skills = manifest.contributes.chatSkills.map(readCustomization);
   });
 
-  it('registers the coordinator, all ten specialists, and all eighteen skills exactly once', () => {
+  it('registers the coordinator, all ten specialists, and all nineteen skills exactly once', () => {
     assert.deepStrictEqual(agents.map(a => a.metadata.name).sort(), [...expectedAgents].sort());
     assert.deepStrictEqual(skills.map(s => s.metadata.name).sort(), [...expectedSkills].sort());
     const paths = [...agents, ...skills].map(c => c.file);
@@ -194,11 +194,11 @@ describe('Bundled ROS 2 AI customizations', () => {
   for (const { agentName, skillNames } of [
     {
       agentName: 'ROS 2 Expert',
-      skillNames: ['ros2-gazebo', 'ros2-omniverse', 'ros2-mujoco', 'ros2-launch', 'ros2-performance', 'ros2-pixi'],
+      skillNames: ['ros2-gazebo', 'ros2-omniverse', 'ros2-mujoco', 'ros2-launch', 'ros2-performance', 'ros2-pixi', 'ros2-rosidl-buffers'],
     },
     {
       agentName: 'ROS 2 OS',
-      skillNames: ['ros2-pixi'],
+      skillNames: ['ros2-pixi', 'ros2-rosidl-buffers'],
     },
     {
       agentName: 'ROS 2 Packaging',
@@ -206,7 +206,11 @@ describe('Bundled ROS 2 AI customizations', () => {
     },
     {
       agentName: 'ROS 2 Core',
-      skillNames: ['ros2-launch', 'ros2-performance'],
+      skillNames: ['ros2-launch', 'ros2-performance', 'ros2-rosidl-buffers'],
+    },
+    {
+      agentName: 'ROS 2 Hardware',
+      skillNames: ['ros2-rosidl-buffers'],
     },
     {
       agentName: 'ROS 2 Simulation',
@@ -258,7 +262,66 @@ describe('Bundled ROS 2 AI customizations', () => {
     }
   });
 
-  it('documents all registered skills and offers Pixi invocation in the guide and walkthrough', () => {
+  it('exposes ROSIDL buffer discovery and links platform resources from one focused workflow', () => {
+    const buffers = skills.find(s => s.metadata.name === 'ros2-rosidl-buffers');
+    assert.ok(buffers, 'Missing registered ROSIDL buffer workflow');
+    for (const trigger of ['rosidl::Buffer', 'Linux', 'Windows', 'Media Foundation', 'D3D11', 'DMA-BUF', 'managed buffers']) {
+      assert.ok((buffers.metadata.description as string).includes(trigger), `Missing buffer trigger: ${trigger}`);
+    }
+    for (const name of ['ros2-perception', 'ros2-performance']) {
+      const entry = skills.find(s => s.metadata.name === name)!;
+      assert.ok(localLinks(entry).includes(buffers.file), `Buffer workflow unreachable from ${entry.file}`);
+    }
+    const links = localLinks(buffers);
+    for (const name of ['ros2-test', 'ros2-pixi']) {
+      assert.ok(links.includes(skills.find(s => s.metadata.name === name)!.file), `Missing related workflow: ${name}`);
+    }
+    const references = [
+      'rosidl-contract.md', 'linux-buffers.md', 'windows-media-foundation.md',
+    ].map(name => `assets/skills/ros2-rosidl-buffers/references/${name}`);
+    assert.deepStrictEqual(links.filter(file => file.includes('/references/')).sort(), [...references].sort());
+    for (const file of references) {
+      const body = fs.readFileSync(path.join(root, file), 'utf8');
+      assert.ok(body.trim().length > 500, `Missing substantive buffer reference: ${file}`);
+      assert.ok(/https:\/\//.test(body), `Missing source evidence: ${file}`);
+      assert.ok(!/\bTODO\b|\bTBD\b|nitros/i.test(body), `Out-of-scope or unfinished guidance: ${file}`);
+      localLinks({ file, metadata: {}, body });
+    }
+    assert.ok(!/nitros/i.test(buffers.body), 'Keep this workflow focused on ROSIDL buffers');
+  });
+
+  it('documents buffer ownership, native platform boundaries, and fallback validation', () => {
+    // Documentation coverage contracts, not execution tests of a camera or buffer backend.
+    const base = 'assets/skills/ros2-rosidl-buffers/';
+    for (const [file, requirements] of [
+      ['SKILL.md', ['CPU fallback', 'RMW', 'copy ledger', 'slow subscriber', 'not .NET', 'unverified']],
+      ['references/rosidl-contract.md', [
+        'BufferImplBase', 'BufferBackend', 'clone()', 'to_cpu()', 'to_vector()',
+        'create_descriptor_with_endpoint', 'kMaxBufferDescriptorSize', 'ABI',
+        'whose contract is a deep copy', '`.data()`',
+        'recognized CPU implementation and throw for other implementations',
+      ]],
+      ['references/linux-buffers.md', [
+        'shm_open', 'mmap', 'V4L2_MEMORY_MMAP', 'V4L2_MEMORY_DMABUF',
+        'VIDIOC_EXPBUF', 'VIDIOC_QBUF', 'DMA_BUF_IOCTL_SYNC', 'SCM_RIGHTS',
+      ]],
+      ['references/windows-media-foundation.md', [
+        'not a shipped Windows ROSIDL backend', 'IMFSample', 'Lock2DSize',
+        'MF_SOURCE_READER_D3D_MANAGER', 'IMFDXGIBuffer', 'GetSubresourceIndex',
+        'CreateSharedHandle', 'OpenSharedResource1', 'AcquireSync', 'WAIT_TIMEOUT',
+        'CreateFileMapping', 'MapViewOfFile', 'DuplicateHandle', 'DACL',
+        'NV12', 'OnFlush', 'CPU fallback', 'WAIT_ABANDONED',
+        'No CUDA dependency is required',
+      ]],
+    ] as Array<[string, string[]]>) {
+      const text = fs.readFileSync(path.join(root, base, file), 'utf8').replace(/\s+/g, ' ');
+      for (const requirement of requirements) {
+        assert.ok(text.includes(requirement), `Missing ${requirement} guidance in ${file}`);
+      }
+    }
+  });
+
+  it('documents all registered skills and offers Pixi and buffer invocation examples', () => {
     const guide = fs.readFileSync(path.join(root, 'docs/ai-agents-and-skills.md'), 'utf8');
     const documentedSkills = Array.from(guide.matchAll(/^\| `([a-z0-9-]+)` \|/gm), match => match[1]);
     assert.deepStrictEqual(documentedSkills.sort(), [...expectedSkills].sort());
@@ -266,6 +329,12 @@ describe('Bundled ROS 2 AI customizations', () => {
       const text = fs.readFileSync(path.join(root, file), 'utf8');
       assert.ok(text.includes('/ros2-pixi'), `Missing Pixi invocation in ${file}`);
       assert.ok(text.includes('pixi-ros'), `Missing project guidance in ${file}`);
+    }
+    for (const file of ['docs/ai-agents-and-skills.md', 'media/walkthroughs/ai-features.md']) {
+      const text = fs.readFileSync(path.join(root, file), 'utf8');
+      assert.ok(text.includes('/ros2-rosidl-buffers'), `Missing buffer invocation in ${file}`);
+      assert.ok(text.includes('Media Foundation'), `Missing native Windows camera example in ${file}`);
+      assert.ok(text.includes('Linux'), `Missing cross-platform buffer scope in ${file}`);
     }
   });
 

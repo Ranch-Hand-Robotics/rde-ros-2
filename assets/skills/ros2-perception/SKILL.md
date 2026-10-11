@@ -32,6 +32,11 @@ user-invocable: true
 8. For point clouds, inspect field offsets/types, endianness, organized layout, NaNs, and frame before filtering or conversion.
 9. Bound memory and processing queues; decide explicitly whether to drop stale frames or reduce input rate.
 
+For buffer ownership, shared-memory IPC, and zero-copy camera paths, use
+[ROSIDL buffers](../ros2-rosidl-buffers/SKILL.md). It covers Linux V4L2/DMA-BUF
+and native Windows Media Foundation/D3D11, including CPU fallback and the
+distinction between available OS primitives and implemented ROS backends.
+
 ## GPU and Jetson paths
 - Establish a CPU reference result before enabling acceleration; compare output accuracy as well as throughput.
 - Verify architecture, OS/vendor stack, driver, CUDA/runtime, and acceleration package compatibility from installed versions.

@@ -80,6 +80,8 @@ another performance specialist. Use [launch](../ros2-launch/SKILL.md) for startu
 3. Verify intra-process/loaned-message support for the specific client library,
    RMW, message type, and topology before claiming zero-copy benefits. Measure
    actual copies/allocations rather than inferring them from a configuration flag.
+   Use [ROSIDL buffers](../ros2-rosidl-buffers/SKILL.md) for Linux/Windows storage
+   backends, native camera buffers, ownership, and a per-edge copy ledger.
 4. Report simulator real-time factor as simulation-time advance divided by wall
    elapsed time over a stated non-paused interval. Separate physics, rendering,
    sensor and control rates. Faster-than-real-time throughput does not establish
