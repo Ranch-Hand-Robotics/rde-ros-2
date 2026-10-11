@@ -1,7 +1,7 @@
 # ROS 2 AI agents and skills
 
 The extension bundles eleven agents (a ROS 2 expert coordinator and ten hidden
-specialists) and eighteen reusable skills: seventeen `/ros2-` workflows plus
+specialists) and nineteen reusable skills: eighteen `/ros2-` workflows plus
 `/rosdep`. They provide development workflows, not an autonomous robot controller
 or a replacement for validating generated code.
 
@@ -60,6 +60,7 @@ vendor or subscription tier is pinned.
 | `ros2-mujoco` | MuJoCo models, stepping, control, and integration through an explicit ROS adapter |
 | `ros2-launch` | Launch arguments, substitutions, includes, namespaces, composition, event handling, and installed launch resources |
 | `ros2-performance` | Evidence-based profiling, latency/throughput measurements, executors, tracing, and regression comparisons |
+| `ros2-rosidl-buffers` | ROSIDL buffer ownership/backends, Linux and Windows managed storage, native camera capture, CPU fallback, and copy measurement |
 
 ### Pixi and pixi-ros
 
@@ -77,6 +78,24 @@ initializer writes files and can comment out unresolved dependencies; review its
 output rather than treating successful generation as a complete environment.
 The skill distinguishes it from the separate `pixi-build-ros` backend and retains
 `/rosdep` for focused missing-dependency recovery. See [Pixi for ROS 2](pixi.md).
+
+### ROSIDL buffers and native cameras
+
+Use `/ros2-rosidl-buffers` for `rosidl::Buffer` integration and lifetime-managed
+native buffers on Linux and Windows. It covers Linux shared memory/V4L2/DMA-BUF
+and native Windows Media Foundation, CPU shared mappings, and D3D11/DXGI textures.
+The Expert, Core, Hardware, and OS agents can load it, as can the perception and
+performance skills.
+
+Try: "/ros2-rosidl-buffers Help design a native Windows Media Foundation ROS
+camera with a correct CPU path first, then evaluate shared buffers. Identify
+which ROSIDL backend and RMW features exist versus need implementation."
+
+The skill includes separate ROSIDL API, Linux, and Windows references. It checks
+the installed ROS version, ownership, synchronization, CPU fallback, and actual
+copy boundaries. It does not install or implement a camera/backend, promise
+end-to-end zero-copy, or assume Windows native primitives already have a ROSIDL
+plugin. Here managed buffers means native lifetime management, not .NET arrays.
 
 ### Launch, simulation, and performance
 

@@ -1,6 +1,6 @@
 ---
 name: ROS 2 Hardware
-description: "ROS 2 hardware integration specialist. Use for ros2_control, controller_manager, sensor drivers, serial/CAN/Ethernet buses, device permissions, calibration, timing, and robot hardware bringup."
+description: "ROS 2 hardware integration specialist. Use for ros2_control, controller_manager, sensor drivers, serial/CAN/Ethernet buses, device permissions, calibration, timing, robot hardware bringup, and Media Foundation/V4L2 camera buffer lifetimes."
 tools: [read, edit, search, execute, web]
 agents: []
 user-invocable: false
@@ -33,6 +33,7 @@ before work; stop execution if unavailable. Never infer permission to move hardw
    No implicit firmware flashing, calibration motion, or controller activation.
 
 Use [debugging](../skills/ros2-debugging/SKILL.md),
+[ROSIDL and native camera buffers](../skills/ros2-rosidl-buffers/SKILL.md),
 [perception](../skills/ros2-perception/SKILL.md), and
 [actions/services/lifecycle](../skills/ros2-actions-services-lifecycle/SKILL.md)
 when relevant. Return interface/timing evidence, changes, tests, and unresolved

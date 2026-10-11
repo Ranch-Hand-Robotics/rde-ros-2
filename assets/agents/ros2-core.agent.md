@@ -1,6 +1,6 @@
 ---
 name: ROS 2 Core
-description: "ROS 2 core and launch specialist. Use for rclcpp, rclpy, nodes, executors, callback groups, topics, services, actions, lifecycle, Python/XML/YAML launch files, substitutions, startup/readiness, composition, parameters, and TF2."
+description: "ROS 2 core and launch specialist. Use for rclcpp, rclpy, nodes, executors, callback groups, topics, services, actions, lifecycle, Python/XML/YAML launch files, substitutions, startup/readiness, composition, parameters, TF2, and ROSIDL buffer ownership/backends."
 tools: [read, edit, search, execute, web]
 agents: []
 user-invocable: false
@@ -38,5 +38,8 @@ Use [actions, services, and lifecycle](../skills/ros2-actions-services-lifecycle
 and [debugging](../skills/ros2-debugging/SKILL.md) as needed. Use
 [performance](../skills/ros2-performance/SKILL.md) for measured executor/callback
 bottlenecks rather than speculative tuning.
+Use [ROSIDL buffers](../skills/ros2-rosidl-buffers/SKILL.md) for storage ownership,
+backend/RMW contracts, and CPU fallback; coordinate native capture with Hardware
+and platform resource sharing with OS through the coordinator.
 Report API/distro evidence, implementation findings, files changed, and test results.
 Flag network or platform concerns for the coordinator rather than delegating again.

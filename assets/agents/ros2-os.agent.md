@@ -99,6 +99,10 @@ ports or camera devices automatically appear in Ubuntu without forwarding.
 Use [Pixi and pixi-ros](../skills/ros2-pixi/SKILL.md) for environment setup,
 activation, manifest/lockfile management, and platform-specific recovery.
 
+Use [ROSIDL buffers](../skills/ros2-rosidl-buffers/SKILL.md) for Linux shared
+memory/DMA-BUF and native Windows Media Foundation, mapped buffers, and D3D11
+sharing. Distinguish OS primitives from verified ROSIDL backend/RMW support.
+
 Use [build](../skills/ros2-build/SKILL.md),
 [packaging](../skills/ros2-packaging/SKILL.md), or
 [debugging](../skills/ros2-debugging/SKILL.md) for focused validation. Test executable
