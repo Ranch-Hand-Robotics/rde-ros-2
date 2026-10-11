@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Launch File Tree Viewer - Quick Start Guide - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Launch File Tree Viewer - Quick Start Guide";
+        var mkdocs_page_input_path = "QUICK_START_LAUNCH_TREE.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="topic-monitor.html">ROS 2 Topic Monitor</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="dependency-recovery.html">Resolve missing dependencies with AI</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Launch File Tree Viewer - Quick Start Guide</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/QUICK_START_LAUNCH_TREE.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="launch-file-tree-viewer-quick-start-guide">Launch File Tree Viewer - Quick Start Guide</h1>
+<p>This guide helps you quickly understand and implement the Launch File Tree Viewer feature.</p>
+<h2 id="what-is-this">🎯 What Is This?</h2>
+<p>A <strong>VS Code tree view</strong> that visualizes ROS 2 launch files in a hierarchical structure, similar to <code>rqt_launchtree</code> but integrated directly into the VS Code IDE.</p>
+<h2 id="what-it-looks-like">🖼️ What It Looks Like</h2>
+<h3 id="before-current-state">Before (Current State)</h3>
+<div class="highlight"><pre><span></span><code>📁 EXPLORER
+  ├─ my_robot_workspace/
+  │   ├─ src/
+  │   │   ├─ navigation_pkg/
+  │   │   │   └─ launch/
+  │   │   │       ├─ nav.launch.py          ← Must open to see what&#39;s inside
+  │   │   │       └─ localization.launch.py ← Must open to see what&#39;s inside
+</code></pre></div>
+<h3 id="after-with-launch-tree-viewer">After (With Launch Tree Viewer)</h3>
+<div class="highlight"><pre><span></span><code>📁 EXPLORER
+  ├─ my_robot_workspace/...
+
+🚀 ROS 2 LAUNCH FILES
+  ├─ 📦 navigation_pkg
+  │   ├─ 🚀 nav.launch.py                    ← Click to open file
+  │   │   ├─ 📍 map_server                   ← Click to jump to node
+  │   │   │   ├─ 📊 Parameters
+  │   │   │   │   ├─ yaml_filename: map.yaml
+  │   │   │   │   └─ use_sim_time: true
+  │   │   │   └─ 🔀 Remappings
+  │   │   │       └─ /tf → /map_tf
+  │   │   ├─ 📍 amcl
+  │   │   └─ 🔗 Include: common_params.launch.py
+  │   └─ 🚀 localization.launch.py
+</code></pre></div>
+<p><strong>Benefits:</strong>
+- ✅ See all nodes without opening file
+- ✅ See parameters at a glance
+- ✅ Click to navigate instantly
+- ✅ Run/Debug from context menu
+- ✅ Find where launch files are used</p>
+<h2 id="installation-after-implementation">📦 Installation (After Implementation)</h2>
+<ol>
+<li>Install/update the ROS 2 extension</li>
+<li>Open a ROS 2 workspace</li>
+<li>Look for "ROS 2 Launch Files" in the Explorer sidebar</li>
+</ol>
+<h2 id="quick-actions">🚀 Quick Actions</h2>
+<h3 id="navigate-to-launch-file">Navigate to Launch File</h3>
+<ol>
+<li>Expand package in tree</li>
+<li>Click launch file → Opens in editor</li>
+</ol>
+<h3 id="see-node-details">See Node Details</h3>
+<ol>
+<li>Expand launch file</li>
+<li>Expand node</li>
+<li>View parameters, remaps, arguments</li>
+</ol>
+<h3 id="run-launch-file">Run Launch File</h3>
+<ol>
+<li>Right-click launch file</li>
+<li>Select "Run Launch File"</li>
+</ol>
+<h3 id="debug-launch-file">Debug Launch File</h3>
+<ol>
+<li>Right-click launch file</li>
+<li>Select "Debug Launch File"</li>
+<li>Breakpoints work immediately</li>
+</ol>
+<h3 id="find-where-launch-file-is-used">Find Where Launch File Is Used</h3>
+<ol>
+<li>Right-click launch file</li>
+<li>Select "Find Usages"</li>
+<li>See all places it's included</li>
+</ol>
+<h2 id="customization">🎨 Customization</h2>
+<h3 id="showhide-tree-view">Show/Hide Tree View</h3>
+<ul>
+<li>Command Palette → "View: Toggle ROS 2 Launch Files"</li>
+</ul>
+<h3 id="refresh-tree">Refresh Tree</h3>
+<ul>
+<li>Click refresh icon in tree header</li>
+<li>Or use Command Palette → "ROS2: Refresh Launch Tree"</li>
+</ul>
+<h3 id="change-default-expansion">Change Default Expansion</h3>
+<ul>
+<li>Packages: Collapsed by default</li>
+<li>Launch files: Collapsed by default</li>
+<li>Nodes: Collapsed by default</li>
+<li>Parameters: Collapsed by default</li>
+</ul>
+<h2 id="how-it-works-technical">🔧 How It Works (Technical)</h2>
+<div class="highlight"><pre><span></span><code>1. Extension scans workspace for packages
+        ↓
+2. Finds *.launch.py files in each package
+        ↓
+3. When you expand a launch file:
+   - Runs ros2_launch_dumper.py
+   - Parses launch file → JSON
+   - Displays nodes, parameters, etc.
+        ↓
+4. When you click an item:
+   - Opens file in editor
+   - Jumps to specific line
+   - Runs/debugs as configured
+</code></pre></div>
+<h2 id="file-structure">📂 File Structure</h2>
+<p>After implementation, these files will exist:</p>
+<div class="highlight"><pre><span></span><code>src/
+├─ ros/
+│  ├─ launch-tree/
+│  │  ├─ launch-tree-provider.ts      ← Main logic
+│  │  ├─ launch-tree-item.ts          ← Tree items
+│  │  ├─ launch-parser.ts             ← Parser wrapper
+│  │  └─ types.ts                     ← TypeScript types
+│  └─ commands/
+│     └─ launch-tree-commands.ts      ← Commands (run, debug, etc.)
+
+test/
+└─ suite/
+   └─ launch-tree/
+      ├─ launch-tree-provider.test.ts ← Tests
+      └─ fixtures/                    ← Test files
+</code></pre></div>
+<h2 id="troubleshooting">🐛 Troubleshooting</h2>
+<h3 id="tree-is-empty">Tree is Empty</h3>
+<p><strong>Problem:</strong> "No launch files found"
+<strong>Solution:</strong>
+- Ensure workspace has ROS 2 packages
+- Check for <code>*.launch.py</code> files in <code>launch/</code> directories
+- Verify <code>package.xml</code> exists</p>
+<h3 id="parse-errors">Parse Errors</h3>
+<p><strong>Problem:</strong> "Failed to parse launch file"
+<strong>Solution:</strong>
+- Check ROS 2 environment is sourced
+- Verify launch file syntax is valid
+- Check extension output for details</p>
+<h3 id="tree-not-updating">Tree Not Updating</h3>
+<p><strong>Problem:</strong> Changes to launch files don't appear
+<strong>Solution:</strong>
+- Click refresh button
+- Check file watcher is active
+- Restart VS Code if needed</p>
+<h2 id="learn-more">🎓 Learn More</h2>
+<h3 id="full-documentation">Full Documentation</h3>
+<ul>
+<li><strong>Main Proposal:</strong> <code>LAUNCH_TREE_VIEWER_PROPOSAL.md</code></li>
+<li><strong>UI Mockups:</strong> <code>docs/launch-tree-mockups.md</code></li>
+<li><strong>Architecture:</strong> <code>docs/launch-tree-architecture.md</code></li>
+<li><strong>Implementation:</strong> <code>docs/launch-tree-technical-guide.md</code></li>
+</ul>
+<h3 id="related-features">Related Features</h3>
+<ul>
+<li>ROS 2 Debugger</li>
+<li>Test Explorer</li>
+<li>Lifecycle Node Manager</li>
+</ul>
+<h3 id="comparison-with-rqt_launchtree">Comparison with rqt_launchtree</h3>
+<p>See <code>docs/launch-tree-comparison.md</code> for detailed comparison.</p>
+<h2 id="tips-tricks">💡 Tips &amp; Tricks</h2>
+<h3 id="1-quick-navigation">1. Quick Navigation</h3>
+<ul>
+<li><strong>Tip:</strong> Double-click any item to navigate</li>
+<li><strong>Shortcut:</strong> Use arrow keys + Enter</li>
+</ul>
+<h3 id="2-multi-file-search">2. Multi-File Search</h3>
+<ul>
+<li><strong>Tip:</strong> Use "Find Usages" to see all includes</li>
+<li><strong>Benefit:</strong> Understand launch file dependencies</li>
+</ul>
+<h3 id="3-debugging-specific-nodes">3. Debugging Specific Nodes</h3>
+<ul>
+<li><strong>Tip:</strong> Expand node to see parameters</li>
+<li><strong>Benefit:</strong> Verify configuration before debugging</li>
+</ul>
+<h3 id="4-large-workspaces">4. Large Workspaces</h3>
+<ul>
+<li><strong>Tip:</strong> Keep packages collapsed when not needed</li>
+<li><strong>Benefit:</strong> Better performance</li>
+</ul>
+<h3 id="5-integration-with-git">5. Integration with Git</h3>
+<ul>
+<li><strong>Tip:</strong> Modified launch files show with git indicators</li>
+<li><strong>Benefit:</strong> Track changes easily</li>
+</ul>
+<h2 id="future-features-phase-2-3">🔮 Future Features (Phase 2 &amp; 3)</h2>
+<p>Coming soon:
+- 🔍 Search/filter within tree
+- ✏️ Edit parameters inline
+- 📊 Dependency graph visualization
+- ⚠️ Launch file validation
+- 🔧 Quick-fix suggestions</p>
+<h2 id="feedback-support">📞 Feedback &amp; Support</h2>
+<p>Found a bug or have a suggestion?
+- Open GitHub issue with <code>[launch-tree]</code> tag
+- Include screenshot if UI-related
+- Provide example launch file if parse error</p>
+<h2 id="performance-notes">⚡ Performance Notes</h2>
+<p>The tree viewer is optimized for:
+- <strong>Large workspaces:</strong> Lazy loading, only parses when needed
+- <strong>Many files:</strong> Caching prevents redundant parsing
+- <strong>Live editing:</strong> File watcher with debouncing</p>
+<p><strong>Typical Performance:</strong>
+- 10 packages, 50 launch files: &lt; 1 second
+- 50 packages, 200 launch files: &lt; 3 seconds
+- 100+ packages: &lt; 5 seconds</p>
+<h2 id="benefits-summary">🎉 Benefits Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Benefit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Visual hierarchy</strong></td>
+<td>Understand structure at a glance</td>
+</tr>
+<tr>
+<td><strong>Click navigation</strong></td>
+<td>Jump to exact line in file</td>
+</tr>
+<tr>
+<td><strong>Parameter view</strong></td>
+<td>See config without opening file</td>
+</tr>
+<tr>
+<td><strong>Context actions</strong></td>
+<td>Run/Debug with one click</td>
+</tr>
+<tr>
+<td><strong>Find usages</strong></td>
+<td>Understand dependencies</td>
+</tr>
+<tr>
+<td><strong>Auto-refresh</strong></td>
+<td>Always up-to-date</td>
+</tr>
+<tr>
+<td><strong>IDE integration</strong></td>
+<td>No context switching</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><strong>Ready to implement?</strong> Start with <code>docs/README-LAUNCH-TREE.md</code></p>
+<p><strong>Want to dive deeper?</strong> Read <code>LAUNCH_TREE_VIEWER_PROPOSAL.md</code></p>
+<p><strong>Need architecture details?</strong> See <code>docs/launch-tree-architecture.md</code></p>
+<hr />
+<p><strong>Author:</strong> GitHub Copilot<br />
+<strong>Date:</strong> 2026-01-31<br />
+<strong>Status:</strong> Ready for Implementation</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

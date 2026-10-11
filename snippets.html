@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Code Snippets - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Code Snippets";
+        var mkdocs_page_input_path = "snippets.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="topic-monitor.html">ROS 2 Topic Monitor</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="dependency-recovery.html">Resolve missing dependencies with AI</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Code Snippets</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/snippets.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="code-snippets">Code Snippets</h1>
+<p>The ROS 2 extension includes comprehensive code snippets to accelerate development in Python, C++, and launch files.</p>
+<h2 id="how-to-use-snippets">How to Use Snippets</h2>
+<ol>
+<li>In your code editor, start typing the snippet prefix</li>
+<li>Press <code>Tab</code> or <code>Enter</code> to expand the snippet</li>
+<li>Use <code>Tab</code> to navigate between placeholders</li>
+<li>Fill in the required values</li>
+</ol>
+<h2 id="python-rclpy-snippets">Python (rclpy) Snippets</h2>
+<h3 id="node-development">Node Development</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2node</code></td>
+<td>Complete ROS 2 Python node class template with main function</td>
+</tr>
+<tr>
+<td><code>ros2pub</code></td>
+<td>Create a publisher</td>
+</tr>
+<tr>
+<td><code>ros2pubtimer</code></td>
+<td>Create a publisher with timer callback</td>
+</tr>
+<tr>
+<td><code>ros2sub</code></td>
+<td>Create a subscriber with callback method</td>
+</tr>
+<tr>
+<td><code>ros2timer</code></td>
+<td>Create a timer with callback</td>
+</tr>
+</tbody>
+</table>
+<h3 id="services">Services</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2srv</code></td>
+<td>Create a service server</td>
+</tr>
+<tr>
+<td><code>ros2client</code></td>
+<td>Create a service client</td>
+</tr>
+<tr>
+<td><code>ros2call</code></td>
+<td>Make an async service call</td>
+</tr>
+</tbody>
+</table>
+<h3 id="actions">Actions</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2actionserver</code></td>
+<td>Create an action server</td>
+</tr>
+<tr>
+<td><code>ros2actionclient</code></td>
+<td>Create an action client</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters">Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2param</code></td>
+<td>Declare a parameter</td>
+</tr>
+<tr>
+<td><code>ros2getparam</code></td>
+<td>Get a parameter value</td>
+</tr>
+<tr>
+<td><code>ros2declgetparam</code></td>
+<td>Declare and get a parameter</td>
+</tr>
+</tbody>
+</table>
+<h3 id="logging">Logging</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2debug</code></td>
+<td>Log a debug message</td>
+</tr>
+<tr>
+<td><code>ros2info</code></td>
+<td>Log an info message</td>
+</tr>
+<tr>
+<td><code>ros2warn</code></td>
+<td>Log a warning message</td>
+</tr>
+<tr>
+<td><code>ros2error</code></td>
+<td>Log an error message</td>
+</tr>
+<tr>
+<td><code>ros2fatal</code></td>
+<td>Log a fatal message</td>
+</tr>
+</tbody>
+</table>
+<h3 id="quality-of-service">Quality of Service</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2qos</code></td>
+<td>Create a QoS profile</td>
+</tr>
+</tbody>
+</table>
+<h2 id="c-rclcpp-snippets">C++ (rclcpp) Snippets</h2>
+<h3 id="node-development_1">Node Development</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2node</code></td>
+<td>Complete ROS 2 C++ node class template with main function</td>
+</tr>
+<tr>
+<td><code>ros2component</code></td>
+<td>ROS 2 component node template with registration macro</td>
+</tr>
+<tr>
+<td><code>ros2pub</code></td>
+<td>Create a publisher</td>
+</tr>
+<tr>
+<td><code>ros2pubtimer</code></td>
+<td>Create a publisher with timer callback</td>
+</tr>
+<tr>
+<td><code>ros2sub</code></td>
+<td>Create a subscriber with callback method</td>
+</tr>
+<tr>
+<td><code>ros2sublambda</code></td>
+<td>Create a subscriber with lambda callback</td>
+</tr>
+<tr>
+<td><code>ros2timer</code></td>
+<td>Create a timer with callback</td>
+</tr>
+</tbody>
+</table>
+<h3 id="services_1">Services</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2srv</code></td>
+<td>Create a service server</td>
+</tr>
+<tr>
+<td><code>ros2client</code></td>
+<td>Create a service client</td>
+</tr>
+<tr>
+<td><code>ros2call</code></td>
+<td>Make an async service call</td>
+</tr>
+</tbody>
+</table>
+<h3 id="actions_1">Actions</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2actionserver</code></td>
+<td>Create an action server</td>
+</tr>
+<tr>
+<td><code>ros2actionclient</code></td>
+<td>Create an action client</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters_1">Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2param</code></td>
+<td>Declare a parameter</td>
+</tr>
+<tr>
+<td><code>ros2getparam</code></td>
+<td>Get a parameter value</td>
+</tr>
+<tr>
+<td><code>ros2declgetparam</code></td>
+<td>Declare and get a parameter</td>
+</tr>
+</tbody>
+</table>
+<h3 id="logging_1">Logging</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2debug</code></td>
+<td>Log a debug message (RCLCPP_DEBUG)</td>
+</tr>
+<tr>
+<td><code>ros2info</code></td>
+<td>Log an info message (RCLCPP_INFO)</td>
+</tr>
+<tr>
+<td><code>ros2warn</code></td>
+<td>Log a warning message (RCLCPP_WARN)</td>
+</tr>
+<tr>
+<td><code>ros2error</code></td>
+<td>Log an error message (RCLCPP_ERROR)</td>
+</tr>
+<tr>
+<td><code>ros2fatal</code></td>
+<td>Log a fatal message (RCLCPP_FATAL)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="component-registration">Component Registration</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2register</code></td>
+<td>Register a component node with RCLCPP_COMPONENTS_REGISTER_NODE</td>
+</tr>
+</tbody>
+</table>
+<h3 id="quality-of-service_1">Quality of Service</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2qos</code></td>
+<td>Create a QoS profile</td>
+</tr>
+</tbody>
+</table>
+<h2 id="python-launch-file-snippets">Python Launch File Snippets</h2>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2launch</code></td>
+<td>Complete launch file template</td>
+</tr>
+<tr>
+<td><code>ros2launchnode</code></td>
+<td>Launch a node with full options</td>
+</tr>
+<tr>
+<td><code>ros2node</code></td>
+<td>Simple launch node</td>
+</tr>
+<tr>
+<td><code>ros2launchremap</code></td>
+<td>Launch node with topic remappings</td>
+</tr>
+<tr>
+<td><code>ros2launchinclude</code></td>
+<td>Include another launch file</td>
+</tr>
+<tr>
+<td><code>ros2launcharg</code></td>
+<td>Declare a launch argument</td>
+</tr>
+<tr>
+<td><code>ros2launchgetarg</code></td>
+<td>Get a launch argument value</td>
+</tr>
+<tr>
+<td><code>ros2launchexec</code></td>
+<td>Execute a process</td>
+</tr>
+<tr>
+<td><code>ros2composable</code></td>
+<td>Create a composable node container</td>
+</tr>
+<tr>
+<td><code>ros2launchgroup</code></td>
+<td>Create a group action with namespace</td>
+</tr>
+<tr>
+<td><code>ros2launchparam</code></td>
+<td>Set a parameter</td>
+</tr>
+<tr>
+<td><code>ros2lifecycle</code></td>
+<td>Launch a lifecycle node</td>
+</tr>
+</tbody>
+</table>
+<h2 id="xml-launch-file-snippets">XML Launch File Snippets</h2>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2launch</code></td>
+<td>Complete XML launch file template</td>
+</tr>
+<tr>
+<td><code>ros2node</code></td>
+<td>Simple launch node</td>
+</tr>
+<tr>
+<td><code>ros2nodens</code></td>
+<td>Launch node with namespace</td>
+</tr>
+<tr>
+<td><code>ros2nodeblock</code></td>
+<td>Launch node as block element</td>
+</tr>
+<tr>
+<td><code>ros2arg</code></td>
+<td>Declare launch argument with default</td>
+</tr>
+<tr>
+<td><code>ros2argnodefault</code></td>
+<td>Declare launch argument without default</td>
+</tr>
+<tr>
+<td><code>ros2include</code></td>
+<td>Include another launch file</td>
+</tr>
+<tr>
+<td><code>ros2includeargs</code></td>
+<td>Include launch file with arguments</td>
+</tr>
+<tr>
+<td><code>ros2param</code></td>
+<td>Set a parameter</td>
+</tr>
+<tr>
+<td><code>ros2paramfile</code></td>
+<td>Load parameters from YAML file</td>
+</tr>
+<tr>
+<td><code>ros2remap</code></td>
+<td>Remap a topic</td>
+</tr>
+<tr>
+<td><code>ros2group</code></td>
+<td>Create a group block</td>
+</tr>
+<tr>
+<td><code>ros2namespace</code></td>
+<td>Push ROS namespace</td>
+</tr>
+<tr>
+<td><code>ros2env</code></td>
+<td>Set environment variable in node</td>
+</tr>
+<tr>
+<td><code>ros2setenv</code></td>
+<td>Set environment variable globally</td>
+</tr>
+<tr>
+<td><code>ros2let</code></td>
+<td>Define a variable</td>
+</tr>
+<tr>
+<td><code>ros2var</code></td>
+<td>Get a variable value</td>
+</tr>
+<tr>
+<td><code>ros2getenv</code></td>
+<td>Get an environment variable</td>
+</tr>
+<tr>
+<td><code>ros2findpkg</code></td>
+<td>Find package share directory</td>
+</tr>
+<tr>
+<td><code>ros2exec</code></td>
+<td>Execute a command</td>
+</tr>
+</tbody>
+</table>
+<h2 id="examples">Examples</h2>
+<h3 id="python-node-example">Python Node Example</h3>
+<p>Type <code>ros2node</code> and press Tab to get:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">rclpy</span>
+<span class="kn">from</span> <span class="nn">rclpy.node</span> <span class="kn">import</span> <span class="n">Node</span>
+
+
+<span class="k">class</span> <span class="nc">MyNode</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;my_node&#39;</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">node</span> <span class="o">=</span> <span class="n">MyNode</span><span class="p">()</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">spin</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+    <span class="n">node</span><span class="o">.</span><span class="n">destroy_node</span><span class="p">()</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="c-node-example">C++ Node Example</h3>
+<p>Type <code>ros2node</code> and press Tab to get:</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;rclcpp/rclcpp.hpp&quot;</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyNode</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">rclcpp</span><span class="o">::</span><span class="n">Node</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">MyNode</span><span class="p">()</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Node</span><span class="p">(</span><span class="s">&quot;my_node&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+
+<span class="p">};</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">rclcpp</span><span class="o">::</span><span class="n">init</span><span class="p">(</span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="n">argv</span><span class="p">);</span>
+<span class="w">    </span><span class="n">rclcpp</span><span class="o">::</span><span class="n">spin</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">MyNode</span><span class="o">&gt;</span><span class="p">());</span>
+<span class="w">    </span><span class="n">rclcpp</span><span class="o">::</span><span class="n">shutdown</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="python-launch-file-example">Python Launch File Example</h3>
+<p>Type <code>ros2launch</code> and press Tab to get:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">launch</span> <span class="kn">import</span> <span class="n">LaunchDescription</span>
+<span class="kn">from</span> <span class="nn">launch_ros.actions</span> <span class="kn">import</span> <span class="n">Node</span>
+
+
+<span class="k">def</span> <span class="nf">generate_launch_description</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">LaunchDescription</span><span class="p">([</span>
+
+    <span class="p">])</span>
+</code></pre></div>
+<h2 id="tips">Tips</h2>
+<ul>
+<li>All snippets use tab stops to navigate between placeholder values</li>
+<li>Press <code>Tab</code> to move to the next placeholder</li>
+<li>Press <code>Shift+Tab</code> to move to the previous placeholder</li>
+<li>Some snippets include choice placeholders - use arrow keys to select options</li>
+<li>Snippets work in both VS Code and VSCodium</li>
+</ul>
+<h2 id="snippet-design-philosophy">Snippet Design Philosophy</h2>
+<p>These snippets are designed to:</p>
+<ol>
+<li><strong>Accelerate development</strong> - Reduce boilerplate typing</li>
+<li><strong>Promote best practices</strong> - Follow ROS 2 conventions</li>
+<li><strong>Be discoverable</strong> - Use intuitive prefixes starting with <code>ros2</code></li>
+<li><strong>Be comprehensive</strong> - Cover common ROS 2 patterns</li>
+<li><strong>Be ergonomic</strong> - Use consistent tab stop ordering and sensible defaults</li>
+</ol>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>ROS 2 Topic Monitor - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "ROS 2 Topic Monitor";
+        var mkdocs_page_input_path = "topic-monitor.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">ROS 2 Topic Monitor</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#features">Features</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#how-to-use">How to Use</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#accessing-the-topic-monitor">Accessing the Topic Monitor</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#subscribing-to-topics">Subscribing to Topics</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#topic-information">Topic Information</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#controlling-topic-monitoring">Controlling Topic Monitoring</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#topic-types">Topic Types</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#generic-messages">Generic Messages</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#image-messages">Image Messages</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#pointcloud2-preview">PointCloud2 preview</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#tips">Tips</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#troubleshooting">Troubleshooting</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#no-topics-shown">No Topics Shown</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#topics-not-updating">Topics Not Updating</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#webview-not-opening">Webview Not Opening</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#known-limitations">Known Limitations</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#related-commands">Related Commands</a>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="dependency-recovery.html">Resolve missing dependencies with AI</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">ROS 2 Topic Monitor</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/topic-monitor.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="ros-2-topic-monitor">ROS 2 Topic Monitor</h1>
+<p>The ROS 2 Topic Monitor feature provides an RQT-like interface for monitoring topics directly within VS Code, eliminating the need for external terminals or separate RQT windows.</p>
+<h2 id="features">Features</h2>
+<ul>
+<li><strong>Topic Tree View</strong>: Browse all available ROS 2 topics in your system</li>
+<li><strong>Live Monitoring</strong>: Subscribe to topics and view messages in real-time</li>
+<li><strong>Multiple Topics</strong>: Monitor multiple topics simultaneously in separate webview panels</li>
+<li><strong>Message Display</strong>: </li>
+<li>Generic messages shown as formatted JSON</li>
+<li>Raw and compressed image topics displayed as images</li>
+<li>PointCloud2 topics displayed as interactive 3D point clouds using raw WebGPU</li>
+<li><strong>Metrics</strong>: View publisher count, subscriber count, and QoS details in tooltips</li>
+<li><strong>Play/Pause Controls</strong>: Pause and resume topic monitoring per topic or all at once</li>
+</ul>
+<h2 id="how-to-use">How to Use</h2>
+<h3 id="accessing-the-topic-monitor">Accessing the Topic Monitor</h3>
+<ol>
+<li>Open the <strong>Explorer</strong> sidebar in VS Code</li>
+<li>Find the <strong>ROS 2 Topics</strong> view panel (below ROS 2 Launch Files)</li>
+<li>The panel will automatically list all available topics from your ROS 2 system</li>
+</ol>
+<h3 id="subscribing-to-topics">Subscribing to Topics</h3>
+<p>To monitor a topic:</p>
+<ol>
+<li>Find the topic you want to monitor in the ROS 2 Topics tree</li>
+<li>Click the checkbox next to the topic name</li>
+<li>A new webview panel will open showing live messages from that topic</li>
+</ol>
+<h3 id="topic-information">Topic Information</h3>
+<p>Hover over any topic in the tree to see:
+- Topic type (message type)
+- Number of publishers
+- Number of subscribers
+- <strong>QoS (Quality of Service) settings:</strong>
+  - Reliability (RELIABLE, BEST_EFFORT)
+  - Durability (VOLATILE, TRANSIENT_LOCAL)
+  - Deadline (time constraint)
+  - Lifespan (message validity duration)
+  - Liveliness (node liveness policy)
+  - Liveliness Lease Duration (timeout for liveliness)</p>
+<h3 id="controlling-topic-monitoring">Controlling Topic Monitoring</h3>
+<p><strong>Individual Topic Controls</strong> (in webview):
+- <strong>Pause/Resume</strong>: Click the pause button to temporarily stop receiving new messages
+- <strong>Clear</strong>: Click the clear button to remove all displayed messages from the view
+- <strong>Refresh</strong>: Images use 1–30 Hz (default 5 Hz); PointCloud2 uses 0.2–5 Hz (default 1 Hz), with a size-based limit for large clouds
+- <strong>Buffer</strong>: Adjust retained message history from 1–500 messages</p>
+<p><strong>All Topics Controls</strong> (in tree view toolbar):
+- <strong>Play/Pause</strong>: Start or pause the watcher and selected topic subscriptions. Play does not wait for the topic-list query before starting ready subscriptions.
+- <strong>Refresh</strong>: Click the refresh icon to update the topic list
+- <strong>Stop All</strong>: Click the stop icon to unsubscribe from all topics and close all monitoring windows</p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li>ROS 2 Humble or newer installed and sourced</li>
+<li>ROS 2 daemon must be running for topic discovery</li>
+<li>Active ROS 2 nodes publishing to topics you want to monitor</li>
+</ul>
+<h2 id="topic-types">Topic Types</h2>
+<h3 id="generic-messages">Generic Messages</h3>
+<p>Most ROS 2 message types are displayed as formatted JSON with syntax highlighting:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;stamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;sec&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1234567890</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;nanosec&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">123456789</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;frame_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;base_link&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">42.0</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="image-messages">Image Messages</h3>
+<p>Raw <code>sensor_msgs/msg/Image</code> and compressed <code>sensor_msgs/msg/CompressedImage</code> topics are rendered in the webview. Raw previews support common RGB/BGR and monochrome encodings, including 16-bit depth images, with row stride and endianness preserved.</p>
+<p>Image monitoring uses a direct <code>rclpy</code> subscription in the selected ROS/Pixi Python environment, rather than converting every image byte to YAML through <code>ros2 topic echo</code>. The subscriber uses best-effort, volatile QoS with a depth-one queue and throttles before serialization. The refresh slider controls this source-side preview rate without restarting the subscription. Pausing or closing the monitor stops its subscriber process.</p>
+<p>Images and PointCloud2 share a binary-framed stdout pipe: a 12-byte header carries
+the <code>RDEB</code> magic and little-endian metadata/payload lengths, followed by UTF-8 JSON
+metadata and raw sensor bytes. Python does not base64-encode the payload. Node
+checks the 64 KiB metadata and 32 MiB payload limits before allocating buffers and
+handles partial frames. Diagnostics use stderr; synchronous writes provide pipe
+backpressure. Point-cloud payloads stay binary through VS Code's typed-array
+webview transport into the renderer, without base64 conversion. Images retain
+their existing base64 webview boundary.</p>
+<h3 id="pointcloud2-preview">PointCloud2 preview</h3>
+<p>Subscribe to a <code>sensor_msgs/msg/PointCloud2</code> topic to open the WebGPU preview:</p>
+<ul>
+<li><strong>Orbit:</strong> drag with the left mouse button, or focus the canvas and use arrow keys.</li>
+<li><strong>Zoom:</strong> scroll, or use <code>+</code> / <code>-</code>. <strong>Fit view</strong> (or <code>F</code>) fits the latest cloud.
+  Zoom can move inside the cloud for millimeter and submillimeter close-ups around
+  its center. Camera clipping follows the zoom distance; only a one-micrometer
+  minimum camera-to-center distance remains. Detail is limited by the source
+  point spacing and coordinate precision, not the cloud's overall size.</li>
+<li><strong>Frame rotation:</strong> enter X, Y, and Z angles in degrees, applied in that order.
+  These fields also update when dragging or using the arrow keys, so they describe
+  the current preview orientation. The initial view uses ROS's +Z-up convention.
+  <strong>Reset</strong> restores the initial view and zeroes all three angles; <strong>Fit view</strong> and
+  zoom do not change them. These are preview rotations, not ROS TF transforms.</li>
+<li><strong>Color:</strong> choose <strong>Depth</strong>, <strong>RGB</strong>, or <strong>RGB + depth</strong>. The blend slider mixes
+  embedded color with a depth ramp. Without RGB fields, depth is used automatically.</li>
+<li><strong>Depth:</strong> distance in meters from the message's sensor-frame origin (not the
+  orbit camera). Auto depth uses the rendered cloud's range; turn it off and set
+  Near/Far to keep the same color scale across messages. Far must exceed Near.</li>
+<li><strong>Point size:</strong> adjust screen-space point diameter. The depth buffer hides points
+  behind closer points. Optional RGB frame axes are drawn at the cloud center as
+  an orientation aid, not a TF origin marker.</li>
+</ul>
+<p>The preview supports numeric XYZ fields, packed FLOAT32/UINT32 <code>rgb</code> or <code>rgba</code>,
+and separate <code>r</code>, <code>g</code>, <code>b</code> channels (integer 0–255 or floating-point 0–1).
+Endianness, field offsets, and organized-cloud row padding are respected.
+Unused padding after the final row may be omitted (including compact camera
+clouds with a larger declared row stride); missing point records are still rejected.
+Invalid XYZ points are skipped. The latest cloud replaces the previous one;
+the default refresh is 1 Hz and can be adjusted from 0.2–5 Hz. Camera orientation is retained
+as messages arrive; use <strong>Fit view</strong> when the scene bounds change.</p>
+<p>To bound preview memory and GPU work, payloads are limited to 32 MiB and clouds
+over 200,000 points are evenly sampled. Counts and sampling are shown below the
+canvas. This is a lightweight preview: it does not resolve TF transforms, accumulate
+cloud history, or reproduce all RViz display features.</p>
+<p>PointCloud2 uses the same direct, latest-only binary subscription as images, not
+<code>ros2 topic echo</code>. Frames are throttled before metadata serialization or pipe
+writes. In addition to the selected rate, each delivered frame reserves an interval
+of at least its raw byte size divided by 8 MiB/s (for example, a 32 MiB cloud at
+most once every four seconds). This per-subscription budget limits preview traffic,
+not the publisher's DDS traffic. Large clouds may therefore update more slowly
+than the slider setting. Changing the rate cannot reset this size-based delay.</p>
+<p>WebGPU requires a compatible GPU/driver and a recent VS Code with hardware
+acceleration. An explicit notice is shown when WebGPU is unavailable or the GPU
+device is lost; close and reopen the topic after correcting the issue. There is
+no WebGL fallback or external rendering-library dependency.</p>
+<h2 id="tips">Tips</h2>
+<ul>
+<li><strong>Performance</strong>: Monitoring many high-frequency topics may impact performance. Use pause controls when not actively viewing messages.</li>
+<li><strong>Message History</strong>: Generic topics retain 100 messages by default; image previews retain only the latest frame.</li>
+<li><strong>Auto-refresh</strong>: The topic list automatically refreshes every 5 seconds to show new topics.</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="no-topics-shown">No Topics Shown</h3>
+<p>If no topics appear in the list:
+1. Verify ROS 2 is properly sourced in your environment
+2. Check that the ROS 2 daemon is running: <code>ros2 daemon status</code>
+3. Start the daemon if needed: <code>ros2 daemon start</code>
+4. Click the refresh button in the topic tree toolbar</p>
+<h3 id="topics-not-updating">Topics Not Updating</h3>
+<p>If topic messages aren't updating:
+1. Check that the topic is actually publishing: <code>ros2 topic hz &lt;topic_name&gt;</code>
+2. Verify publishers exist: <code>ros2 topic info &lt;topic_name&gt;</code>
+3. Try unchecking and rechecking the topic checkbox
+4. For images or PointCloud2, check the <strong>ROS 2</strong> Output channel for subscriber or Python environment errors. The selected ROS Python environment must include <code>rclpy</code> and <code>sensor_msgs</code>.</p>
+<h3 id="webview-not-opening">Webview Not Opening</h3>
+<p>If clicking a topic checkbox doesn't open a webview:
+1. Check the Output panel (View → Output) and select "ROS 2" for error messages
+2. Try refreshing the topic list
+3. Restart VS Code if the issue persists</p>
+<h2 id="known-limitations">Known Limitations</h2>
+<ul>
+<li>Image previews accept payloads up to 32 MiB per frame</li>
+<li>Unsupported raw image encodings display an explanatory notice instead of a preview</li>
+<li>Cannot filter or search within messages</li>
+</ul>
+<h2 id="related-commands">Related Commands</h2>
+<p>All commands are available via the Command Palette (Ctrl+Shift+P / Cmd+Shift+P):</p>
+<ul>
+<li><code>ROS2: Refresh Topic List</code> - Manually refresh the topic tree</li>
+<li><code>ROS2: Stop All Topic Monitors</code> - Stop monitoring all topics</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="test-explorer.html" class="btn btn-neutral float-left" title="Test Explorer"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="configuration.html" class="btn btn-neutral float-right" title="Configuration">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="test-explorer.html" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="configuration.html" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

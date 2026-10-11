@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Resolve missing dependencies with AI - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Resolve missing dependencies with AI";
+        var mkdocs_page_input_path = "dependency-recovery.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="topic-monitor.html">ROS 2 Topic Monitor</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Resolve missing dependencies with AI</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#what-the-skill-does">What the skill does</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#scope-and-limitations">Scope and limitations</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#seeded-source-recipes">Seeded source recipes</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#other-editors">Other editors</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">Resolve missing dependencies with AI</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/dependency-recovery.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="resolve-missing-dependencies-with-ai">Resolve missing dependencies with AI</h1>
+<p>The extension bundles a <strong>rosdep</strong> agent skill for cases where rosdep cannot
+resolve a dependency or the needed binary is unavailable in Pixi/RoboStack.
+It includes guidance for NVIDIA Jetson, Windows, and macOS.</p>
+<p>In a VS Code/Copilot version that supports extension-contributed skills, type
+<code>/rosdep</code> in Chat and paste the dependency error. The agent infers the requesting
+package, ROS distro, and target platform from the workspace, asking only for
+missing essentials. It can also select the skill for relevant dependency questions.
+Discovery does not guarantee automatic invocation; use the slash command when
+you specifically want this workflow. No MCP server is required.</p>
+<p>Example requests:</p>
+<blockquote>
+<p>/rosdep This package fails to find a dependency on Windows with Pixi.
+Check available binaries and propose compatible source repositories before
+changing anything.</p>
+<p>/rosdep Help resolve this rosdep key on my Jetson. Inspect the JetPack and
+ROS versions first, and do not change CUDA or system packages.</p>
+<p>/rosdep This dependency is missing from RoboStack on Apple Silicon.
+Find its canonical upstream and a compatible revision, then ask before cloning.</p>
+</blockquote>
+<h2 id="what-the-skill-does">What the skill does</h2>
+<ol>
+<li>Identifies the missing dependency, requesting package, and target platform.</li>
+<li>Queries the appropriate package index. If a compatible binary exists, offers
+    to install it in the selected environment and stops the source search.</li>
+<li>If no compatible binary is found, identifies the upstream repository and a
+    distro-appropriate revision containing the package.</li>
+<li>Offers to clone into a <strong>peer directory of the requesting package</strong>.</li>
+<li>After approval, clones and verifies the checkout, then reports its location.</li>
+</ol>
+<p>For example, a failure in <code>/ws/src/camera/package.xml</code> produces a proposed
+<code>/ws/src/diagnostics</code> checkout. A failure in <code>/ws/camera/package.xml</code> produces
+<code>/ws/diagnostics</code>; the skill does not create <code>src/</code> inside the camera package.
+Existing destinations are never overwritten. Peer locations outside the open
+workspace or inside another repository are called out for confirmation.</p>
+<p>The default response is the binary result, source/ref if needed, and a short
+"Clone into this directory?" question. No environment audit, recursive dependency
+survey, <code>.repos</code> file, or build is required to reach that offer. Build/install
+follow-ups happen only when requested. Failed index queries are reported as
+unknown availability, not as proof that binaries are missing.</p>
+<h2 id="scope-and-limitations">Scope and limitations</h2>
+<p>This is AI guidance, not a deterministic dependency resolver, new package manager,
+or guarantee of platform support. It does not change the existing <strong>ROS2: Install
+ROS Dependencies for this workspace using rosdep</strong> command, intercept failures,
+or automatically clone repositories. Normal agent tool approvals still apply.</p>
+<h2 id="seeded-source-recipes">Seeded source recipes</h2>
+<p>The skill includes a common-package catalog, starting with <code>diagnostic_updater</code>,
+<code>diagnostic_aggregator</code>, and <code>self_test</code> from <code>ros/diagnostics</code>. It supplies
+distro-specific branch candidates, dependency checks, and targeted-build guidance.
+It also flags conflicting metadata, such as Lyrical's recorded source ref
+pointing at the branch upstream identifies as Rolling.</p>
+<blockquote>
+<p>/rosdep diagnostic_updater is missing from my Pixi environment. Use the seeded
+diagnostics recipe, check binaries for my distro and platform, and propose a
+pinned source checkout only if needed.</p>
+</blockquote>
+<p>These are fallback recipes, not a fixed list to clone or a claim that RoboStack
+never provides those packages. Binary availability and source compatibility are
+rechecked before use. The catalog does not bypass approval or guarantee a build;
+its initial entries have verified source metadata, not platform build results.</p>
+<h2 id="other-editors">Other editors</h2>
+<p>Older VS Code versions and other editors may not expose <code>chatSkills</code>. They can
+still use the extension's normal ROS features. To use this guidance in another
+skills-capable client, copy the complete <code>assets/skills/rosdep</code> directory from
+the extension into that client's supported skills location (for example,
+<code>.github/skills/rosdep</code> in a workspace). Review it first and avoid maintaining
+duplicate copies under the same skill name.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="pixi.html" class="btn btn-neutral float-left" title="Pixi for ROS 2"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="debug-support.html" class="btn btn-neutral float-right" title="Debug ROS Nodes">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="pixi.html" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="debug-support.html" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

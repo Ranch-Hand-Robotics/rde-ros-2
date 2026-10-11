@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>ROS 2 Installation Guide - Robot Developer Extensions for ROS 2</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "ROS 2 Installation Guide";
+        var mkdocs_page_input_path = "installation.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="index.html" class="icon icon-home"> Robot Developer Extensions for ROS 2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="index.html">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="test-explorer.html">Test Explorer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="topic-monitor.html">ROS 2 Topic Monitor</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="intellisense.html">IntelliSense Support</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="openvsx.html">Available on Open-VSX.org</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="pixi.html">Pixi for ROS 2</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="dependency-recovery.html">Resolve missing dependencies with AI</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Debugging</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="debug-support.html">Debug ROS Nodes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="launchdebugging.html">Launchdebugging</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="ModelContextProtocol.html">Model Context Protocol (MCP) Server</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Robot Developer Extensions for ROS 2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html" class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">ROS 2 Installation Guide</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2/edit/master/docs/installation.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="ros-2-installation-guide">ROS 2 Installation Guide</h1>
+<p>The Robot Developer Extensions for ROS 2 includes an integrated ROS 2 installer that simplifies the process of setting up ROS 2 on your development machine.</p>
+<h2 id="features">Features</h2>
+<ul>
+<li><strong>Automatic Detection</strong>: The extension automatically detects when you're working in a ROS workspace (by finding <code>package.xml</code> files) and prompts you to install ROS 2 if it's not already installed.</li>
+<li><strong>Multiple Platforms</strong>: Supports installation on Linux, Windows, and macOS using the appropriate package manager for each platform.</li>
+<li><strong>Distro Selection</strong>: Choose from current ROS 2 distributions with clear marking of LTS (Long-Term Support) releases.</li>
+<li><strong>Pixi Integration</strong>: On Windows and macOS, the extension can automatically install and configure Pixi for ROS 2 development.</li>
+<li><strong>AI-Powered Troubleshooting</strong>: If installation fails, get help from GitHub Copilot to diagnose and fix issues.</li>
+</ul>
+<h2 id="installation-methods">Installation Methods</h2>
+<h3 id="linux-apt">Linux (APT)</h3>
+<p>On Linux systems, ROS 2 is installed using the APT package manager. This requires:</p>
+<ul>
+<li>Ubuntu (recommended versions depend on the ROS 2 distro)</li>
+<li>sudo privileges (you'll be prompted for your password)</li>
+<li>Internet connection</li>
+</ul>
+<p>The extension will:
+1. Set up the ROS 2 repository and GPG keys
+2. Install the <code>ros-&lt;distro&gt;-desktop</code> package
+3. Display all commands in a terminal so you can monitor progress</p>
+<h3 id="windows-pixi">Windows (Pixi)</h3>
+<p>On Windows, ROS 2 is installed using Pixi, a modern cross-platform package manager from prefix.dev.</p>
+<p>The extension will:
+1. Check if Pixi is installed
+2. If not, offer to install Pixi using Windows Package Manager (<code>winget</code>)
+3. Create a Pixi workspace for ROS 2
+4. Install the ROS 2 distribution via its distribution-specific RoboStack channel</p>
+<p><strong>Prerequisites</strong>:
+- Windows 10 or later
+- Visual Studio 2019 or later (for building C++ packages)
+- PowerShell execution policy that allows script execution</p>
+<h3 id="macos-pixi">macOS (Pixi)</h3>
+<p>On macOS, ROS 2 is installed using Pixi.</p>
+<p>The extension will:
+1. Check if Pixi is installed
+2. If not, offer to install Pixi using curl
+3. Create a Pixi workspace for ROS 2
+4. Install the ROS 2 distribution via its distribution-specific RoboStack channel</p>
+<h2 id="how-to-use">How to Use</h2>
+<h3 id="automatic-prompt">Automatic Prompt</h3>
+<p>When you open a ROS workspace (containing <code>package.xml</code> files) and ROS 2 is not detected, you'll see a prompt:</p>
+<blockquote>
+<p>"ROS 2 is not detected on this system, but this appears to be a ROS workspace. Would you like to install ROS 2?"</p>
+</blockquote>
+<p>You have three options:
+- <strong>Yes</strong>: Starts the installation process
+- <strong>No</strong>: Dismisses the prompt (you'll be asked again next time)
+- <strong>Never for this workspace</strong>: Remembers your choice and won't prompt again for this workspace</p>
+<h3 id="manual-installation">Manual Installation</h3>
+<p>You can also manually trigger the installation:</p>
+<ol>
+<li>Open the Command Palette (<code>Ctrl+Shift+P</code> or <code>Cmd+Shift+P</code>)</li>
+<li>Search for "ROS2: Install ROS 2"</li>
+<li>Select it and follow the prompts</li>
+</ol>
+<h3 id="readiness-preflight">Readiness preflight</h3>
+<p>Before Pixi bootstrap, writing the installation target, or changing system
+packages/repositories, the installer performs a non-destructive readiness scan.
+<strong>Any blocker aborts installation.</strong> There is no "install anyway" override for
+blockers and the extension does not repair the OS automatically.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Blocking conditions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Existing target</td>
+<td>A nonempty target, a target symlink/non-directory, or already installed packages for the selected APT ROS distribution. A Windows Pixi target containing only the matching generated <code>pixi.toml</code> and <code>pixi.lock</code> is recognized as incomplete and prompts before removal.</td>
+</tr>
+<tr>
+<td>Ubuntu compatibility</td>
+<td>Wrong Ubuntu codename, unsupported architecture, or inability to establish compatibility. Humble requires Jammy; Jazzy/Kilted require Noble. Newer distributions and Rolling are checked against ROS distribution metadata.</td>
+</tr>
+<tr>
+<td>APT/dpkg state</td>
+<td>Missing prerequisite tools, active package operations, incomplete package configuration, broken dependencies, or failure to inspect package-manager state.</td>
+</tr>
+<tr>
+<td>Restart state</td>
+<td>Ubuntu's reboot-required marker, Windows Update/component-servicing restart flags, or an active Windows Installer operation. Queued Windows file rename/deletion operations are logged as warnings but do not block installation.</td>
+</tr>
+<tr>
+<td>Windows filesystem features</td>
+<td>Developer Mode and Win32 long-path support are checked. If either is disabled or cannot be read, the installer recommends enabling it and asks whether to continue.</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>Less than 8 GiB on the target filesystem, 1 GiB of writable temporary space, 2 GiB on the APT cache filesystem, or fewer than 20,000 available target inodes where reported. These are conservative floors, not exact download/install-size estimates.</td>
+</tr>
+<tr>
+<td>Native host/Pixi</td>
+<td>Unsupported host architecture, failed host-readiness inspection, broken Pixi, or missing bootstrap prerequisites when Pixi is absent.</td>
+</tr>
+<tr>
+<td>Dependency plan</td>
+<td>An APT simulation that cannot resolve dependencies without removals, or a failed Pixi dependency solve.</td>
+</tr>
+</tbody>
+</table>
+<p>Most warnings are recorded in the Output channel and installation report without
+stopping installation. Disabled or unreadable Windows Developer Mode/long-path
+settings prompt <strong>Continue Now</strong> or <strong>Stop</strong>. These checks are read-only: the
+extension does not change system settings. Enabling Developer Mode may require
+administrator approval or may be restricted by organization policy. Enabling
+Win32 long paths changes a machine-wide setting, may require administrator
+rights, and may need VS Code and related tools restarted; only applications that
+opt in can use paths beyond the legacy limit.</p>
+<p>If a Windows Pixi target contains exactly the matching generated <code>pixi.toml</code>
+and <code>pixi.lock</code>, with no installed environment, it is treated as a recognized
+incomplete install. The installer asks <strong>Remove and Start Over</strong> or <strong>Stop</strong>;
+it removes that target only after confirmation and revalidates it before
+cleanup. Targets containing other files, symlinks, or a different manifest
+remain blocked and untouched.
+<strong>Install ROS 2 is a fresh-install command, not an upgrade or repair command.</strong>
+Use the independent health command for an existing installation. For Pixi, choose
+a different root rather than overwriting an existing or partial environment.</p>
+<p>When the ROS package is already present in local APT metadata, preflight runs an
+unprivileged simulation with removals disabled. On a fresh machine without the
+ROS repository, it reports that full dependency resolution must wait until
+repository setup; it does not claim to have solved the missing package.
+Installation itself also refuses package removals. Pending package updates alone
+are not classified as corruption, and no <code>upgrade</code>, <code>fix-broken</code>, package
+reconfiguration, lock deletion, or reboot is performed automatically.</p>
+<p>For Pixi, a candidate manifest is restricted to the selected distro and host.
+<code>pixi lock</code> resolves it in the run's diagnostic staging directory without
+installing packages. The resolved manifest and lockfile are copied exclusively
+to the new target, then installation uses the lockfile with <code>--locked</code>. If Pixi
+is missing, system readiness is checked first; the dependency solve follows
+explicit bootstrap approval, so a solver failure can leave Pixi itself installed
+but does not create the ROS workspace. Repository metadata caches may also change.</p>
+<p>Blocking checks include actionable guidance in the persistent report and
+<strong>Diagnose Step</strong> drafts. Fix the reported condition, then invoke installation
+again to run a fresh scan. Preflight cannot guarantee network availability or
+that another process will not change the system afterward; execution-time
+failure handling and post-install validation still apply.</p>
+<h2 id="selecting-a-ros-2-distribution">Selecting a ROS 2 Distribution</h2>
+<p>When installing, you'll be prompted to select a ROS 2 distribution:</p>
+<table>
+<thead>
+<tr>
+<th>Distribution</th>
+<th>Release Date</th>
+<th>Type</th>
+<th>Supported Platforms</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kilted Kaiju</td>
+<td>May 2024</td>
+<td>Latest</td>
+<td>Ubuntu 24.04, Windows, macOS</td>
+</tr>
+<tr>
+<td>Jazzy Jalisco</td>
+<td>May 2024</td>
+<td><strong>LTS</strong></td>
+<td>Ubuntu 24.04, Windows, macOS</td>
+</tr>
+<tr>
+<td>Iron Irwini</td>
+<td>November 2023</td>
+<td>Standard</td>
+<td>Ubuntu 22.04, Windows, macOS</td>
+</tr>
+<tr>
+<td>Humble Hawksbill</td>
+<td>May 2022</td>
+<td><strong>LTS</strong></td>
+<td>Ubuntu 22.04, Windows, macOS</td>
+</tr>
+</tbody>
+</table>
+<p><strong>LTS (Long-Term Support)</strong> releases receive 5 years of support and are recommended for production use.</p>
+<h2 id="configuration">Configuration</h2>
+<h3 id="pixi-root-directory">Pixi Root Directory</h3>
+<p>Pixi workspaces default to <code>c:\pixi_ws</code> on Windows and <code>~/pixi_ws</code> on macOS. The
+extension caches the chosen root under the current VS Code machine ID in
+<code>ROS2.pixiInstallLocationsByMachine</code>. If Settings Sync copies this map to another
+computer, that computer uses only its own entry and otherwise falls back to its
+own platform default.</p>
+<p>Each Windows/macOS install opens a folder picker before preflight or Pixi
+bootstrap. The selected folder is the Pixi root; the selected ROS distribution
+is installed into a subfolder named for that distro. The cached root is shown as
+the picker starting location, but you can choose a different folder each time.
+Canceling the picker starts no installation.</p>
+<ol>
+<li>Open Settings (<code>Ctrl+,</code> or <code>Cmd+,</code>)</li>
+<li>Search for "ROS2 Pixi Root"</li>
+<li>Set <code>ROS2.pixiRoot</code> to an absolute path to override the cached/default root on
+  this computer. This setting is machine-scoped and is not synchronized.</li>
+</ol>
+<h3 id="never-install-prompt">Never Install Prompt</h3>
+<p>If you selected "Never for this workspace", you can re-enable the prompt:</p>
+<ol>
+<li>Open workspace settings (<code>.vscode/settings.json</code>)</li>
+<li>Remove or set <code>"ROS2.neverInstallRos": false</code></li>
+</ol>
+<h2 id="troubleshooting-with-copilot">Troubleshooting with Copilot</h2>
+<p>Every installation records named steps, command output, host information, and
+a JSON result in the extension's persistent storage. Generated installer scripts
+are removed after the task ends; logs and reports are retained, and the terminal
+stays open for inspection. The Output channel prints the exact paths. Ubuntu release, architecture,
+WSL kernel detection, remote extension-host type, and Jetson L4T information help
+distinguish otherwise similar Linux installations.</p>
+<p>On failure, choose <strong>View Report</strong> or <strong>Diagnose Step</strong>. You can also run
+<strong>ROS2: Show ROS 2 Installation Report</strong> later, including after reloading VS Code.
+Choose a package-installation or health-check step to create an AI troubleshooting
+draft. It includes the step results, relevant log tail, and recovery limitations.
+An early step's log remains available even when subsequent output is lengthy.</p>
+<p>The draft opens locally for review and editing. Common credential patterns are
+redacted, but this is <strong>not a guarantee that all sensitive data is removed</strong>.
+Raw local logs are not redacted; they and the draft can include paths, repository
+addresses, and package-manager output. The full process environment is not
+collected. Review the draft before selecting <strong>Copy Reviewed Draft</strong> for any AI
+assistant or <strong>Copy and Open Copilot</strong>, then paste it yourself. Nothing is sent
+automatically and no AI-suggested repair commands are executed.</p>
+<p>Reports are retained until you remove their individual run directories from the
+reported storage location. A report left in <code>running</code> state after a reload is
+<strong>not evidence of success</strong>: the original process may still be running or may have
+been interrupted. Inspect the terminal and log before retrying.</p>
+<h2 id="common-issues">Common Issues</h2>
+<h3 id="linux">Linux</h3>
+<p><strong>Problem</strong>: "GPG key error"
+- <strong>Solution</strong>: The extension handles this automatically, but if you see this error, ensure you have internet connectivity and can reach ROS package servers.</p>
+<p><strong>Problem</strong>: "Permission denied"
+- <strong>Solution</strong>: The installation requires sudo privileges. Make sure you enter your password when prompted.</p>
+<p><strong>Problem</strong>: "Unsupported Ubuntu version"
+- <strong>Solution</strong>: Check the ROS 2 distro requirements. You may need to select a different distro or upgrade your Ubuntu version.</p>
+<h3 id="windows">Windows</h3>
+<p><strong>Problem</strong>: "Pixi installation failed - Execution Policy"
+- <strong>Solution</strong>: Run PowerShell as Administrator and execute: <code>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code></p>
+<p><strong>Problem</strong>: "Visual Studio not found"
+- <strong>Solution</strong>: Install Visual Studio 2019 or later with C++ development tools.</p>
+<h3 id="macos">macOS</h3>
+<p><strong>Problem</strong>: "Pixi installation fails"
+- <strong>Solution</strong>: Ensure you have <code>curl</code> installed and can access pixi.sh. Check your firewall settings.</p>
+<h2 id="manual-installation-alternative">Manual Installation Alternative</h2>
+<p>If automated installation doesn't work for your setup, you can install ROS 2 manually:</p>
+<ul>
+<li><strong>Linux</strong>: Follow the <a href="https://docs.ros.org/en/rolling/Installation.html">official ROS 2 documentation</a></li>
+<li><strong>Windows/macOS</strong>: Follow the <a href="https://pixi.sh/latest/">Pixi setup guide</a> and <a href="https://robostack.github.io/">RoboStack instructions</a></li>
+</ul>
+<p>After manual installation:
+1. Reload the VS Code window (<code>Ctrl+Shift+P</code> → "Developer: Reload Window")
+2. The extension should automatically detect your ROS 2 installation</p>
+<h2 id="post-installation">Post-Installation</h2>
+<p>Package-manager exit code zero is no longer sufficient for a successful install.
+The installer first runs the runtime health checks below against the exact target,
+then selects the installation and refreshes the extension's ROS environment without
+reloading VS Code. Reports remain available through <strong>ROS2: Show ROS 2 Installation Report</strong>
+and are not opened automatically. Existing terminals and running debug sessions keep
+their original environment; create a new ROS terminal or restart the debug session
+to use the new selection. If validation fails, installed packages remain in
+place and the report distinguishes runtime failure from package-installation failure.</p>
+<p>On Linux the target is <code>/opt/ros/&lt;distro&gt;/setup.bash</code>. On Windows and macOS it is
+the selected Pixi environment in <code>&lt;Pixi install root&gt;/&lt;distro&gt;</code> (default roots:
+<code>c:\pixi_ws</code> and <code>~/pixi_ws</code>, respectively). Installer-generated Pixi manifests do
+not activate a workspace's <code>install/setup.*</code> overlay before it has been built.</p>
+<h3 id="check-an-installation-independently">Check an installation independently</h3>
+<p>Run <strong>ROS2: Check ROS 2 Installation Health</strong>, select the expected ROS distribution,
+then choose the default installation, configured setup script, a custom setup
+script, or a <code>pixi.toml</code>. This also works for a partial installation that the
+extension cannot yet discover. Run the command in the target extension host:
+Remote-WSL for WSL and Remote-SSH for a Jetson, not in the desktop host's environment.
+Only run setup scripts and Pixi manifests you trust; activation executes their code.</p>
+<p>The bounded checks exercise activation of the selected environment, the expected
+ROS version/distribution, CLI availability, package discovery, Python/native ROS
+libraries, and an isolated local publish/subscribe exchange. They do not install
+or repair packages. The probe has a 45-second execution deadline and a 128-KiB
+output limit; CLI execution and message exchange each have an 8-second deadline.
+Timeouts terminate the probe process tree. The local message check supports Fast
+DDS and Cyclone DDS; other middleware produces an explicit unsupported result.
+A passed report does <strong>not</strong> establish C++ compiler/build
+health, cross-machine DDS connectivity, GPU/CUDA compatibility, or successful
+VS Code environment discovery after reload. <strong>ROS2: Doctor</strong> remains available
+for additional diagnostics.</p>
+<p>Other extensions or integration tests can call the same command with an explicit
+target to skip selection and receive a structured result without interactive
+result prompts:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">report</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">vscode</span><span class="p">.</span><span class="nx">commands</span><span class="p">.</span><span class="nx">executeCommand</span><span class="p">(</span><span class="s2">&quot;ROS2.checkInstallation&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">kind</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;setup&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">distro</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;jazzy&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">setupScript</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;/opt/ros/jazzy/setup.bash&quot;</span><span class="p">,</span>
+<span class="p">});</span>
+<span class="c1">// Pixi target: { kind: &quot;pixi&quot;, distro: &quot;jazzy&quot;, workspace: &quot;/path/to/pixi_ws/jazzy&quot; }</span>
+<span class="c1">// Result: { healthy, target, checks: [{ id, status, detail, durationMs }], ... }</span>
+</code></pre></div>
+<p>For a native Windows <code>.bat</code> setup, a compatible <code>python.exe</code> is resolved from
+the original PATH before the health environment is sanitized. A caller may set
+<code>pythonExecutable</code> on a <code>kind: "setup"</code> target to choose it explicitly. Pixi
+targets always use Python inside the named environment, never the system Python.
+Windows setup/probe/interpreter paths containing CMD expansion characters are
+rejected explicitly rather than interpolated into a shell command.</p>
+<p>The health-check module also exports <code>validateInstallation(target, probePath)</code>;
+the same function is used by post-install validation and the command. A runtime
+failure returns <code>healthy: false</code>; orchestration/reporting errors reject the command.</p>
+<h3 id="recovery-and-rollback-limitations">Recovery and rollback limitations</h3>
+<p><strong>The installer does not provide transactional rollback.</strong> A failed or interrupted
+installation must not be assumed to have restored the previous system.</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Changes that may remain</th>
+<th>Recovery considerations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ubuntu / Ubuntu in WSL</td>
+<td>APT packages and shared dependencies, locales, universe enablement, ROS repository and key</td>
+<td>Inspect the failed step and APT/dpkg history. Removing the desktop metapackage does not undo dependency upgrades or system configuration.</td>
+</tr>
+<tr>
+<td>Windows / macOS Pixi</td>
+<td>Pixi itself and PATH changes, caches, newly created manifest/lockfile and partial environment</td>
+<td>Existing nonempty targets are refused rather than overwritten. A failed newly created target needs manual assessment before retrying; there is no environment snapshot/rollback.</td>
+</tr>
+<tr>
+<td>Jetson</td>
+<td>The same APT changes, on top of an existing JetPack/L4T installation</td>
+<td>Preserve the device's JetPack baseline. Generic runtime validation does not prove CUDA or NVIDIA package compatibility.</td>
+</tr>
+<tr>
+<td>Reload / terminal interruption</td>
+<td>Any changes already performed; a process may outlive the extension host</td>
+<td>Inspect actual process state before retrying. The in-memory concurrent-install guard does not survive extension-host reloads.</td>
+</tr>
+</tbody>
+</table>
+<p>The active command uses one Linux APT path for Ubuntu, WSL and Jetson, rather
+than the older separate Jetson installer. It records the host distinction but
+does not add Jetson-specific packages or validate JetPack compatibility.
+Preflight checks the Ubuntu release and architecture; the distribution picker
+alone is not a compatibility guarantee.</p>
+<p>Before installing over a valuable existing environment, use a VM/disk snapshot
+or a separate Pixi workspace root. On failure, use the recorded step evidence to
+plan recovery rather than blindly running package purges, <code>autoremove</code>, or
+deleting an environment.</p>
+<h2 id="related-settings">Related Settings</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ROS2.distro</code></td>
+<td>ROS distribution to source</td>
+<td>(empty)</td>
+</tr>
+<tr>
+<td><code>ROS2.rosSetupScript</code></td>
+<td>Path to ROS setup script</td>
+<td>(auto-detected)</td>
+</tr>
+<tr>
+<td><code>ROS2.pixiRoot</code></td>
+<td>Optional computer-local Pixi workspace root override; not synchronized</td>
+<td><code>c:\pixi_ws</code> on Windows, <code>~/pixi_ws</code> on macOS</td>
+</tr>
+<tr>
+<td><code>ROS2.pixiInstallLocationsByMachine</code></td>
+<td>Automatically cached Pixi roots, keyed by VS Code machine ID; safe to sync</td>
+<td><code>{}</code></td>
+</tr>
+<tr>
+<td><code>ROS2.neverInstallRos</code></td>
+<td>Never prompt to install ROS for this workspace</td>
+<td><code>false</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="getting-help">Getting Help</h2>
+<p>If you encounter issues:</p>
+<ol>
+<li>Check the <strong>ROS 2 output channel</strong> in VS Code (View → Output → ROS 2)</li>
+<li>Use <strong>ROS2: Check ROS 2 Installation Health</strong> for runtime validation or <strong>ROS2: Doctor</strong> for additional diagnostics</li>
+<li>Use <strong>ROS2: Show ROS 2 Installation Report</strong> and <strong>Diagnose Step</strong> to review evidence for AI assistance</li>
+<li>Consult the <a href="troubleshooting.html">troubleshooting guide</a></li>
+<li>File an issue on <a href="https://github.com/ranchhandrobotics/rde-ros-2/issues">GitHub</a></li>
+</ol>
+<h2 id="next-steps">Next Steps</h2>
+<p>After installing ROS 2:</p>
+<ul>
+<li>Learn about <a href="debug-support.html">ROS 2 debugging features</a></li>
+<li>Set up <a href="intellisense.html">IntelliSense for ROS 2</a></li>
+<li>Explore <a href="launchdebugging.html">launch file debugging</a></li>
+<li>Try the <a href="tutorials.html">tutorials</a></li>
+</ul>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/ranch-hand-robotics/rde-ros-2" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
