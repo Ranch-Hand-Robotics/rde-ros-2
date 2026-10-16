@@ -41,6 +41,7 @@ function loadWithMocks(filename, mocks) {
 }
 
 const diagnosticModule = loadWithMocks(diagnosticsSource, {});
+const { pixiManifest } = loadWithMocks(path.join(root, "src/ros/installer/pixi.ts"), {});
 
 async function fixture(t, options = {}) {
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rde-toolchain-installer-"));
@@ -117,9 +118,9 @@ async function fixture(t, options = {}) {
         globalStorageUri: { fsPath: directory },
         globalState: { update: async (_key, value) => { reportPath = value; } },
       },
-      activateEnvironment: async () => {},
+      refreshRosEnvironment: async () => {},
     },
-    "./pixi": { pixiPlatform: () => "win-64" },
+    "./pixi": { pixiPlatform: () => "win-64", pixiManifest },
     "./install-diagnostics": diagnosticModule,
     "./pixi-location": { selectPixiInstallRoot: async () => directory, cachePixiInstallRoot: async () => {} },
     "../windows-toolchain": {
@@ -203,17 +204,17 @@ test("Pixi solver uses captured compiler env and the detected executable, not PA
   const f = await fixture(t);
   const staged = await f.installer.preflightPixiEnvironment({ name: "jazzy" }, f.diagnostics, f.activated);
   assert.deepEqual(f.solverCalls, [{ command: f.target.pixiExecutable,
-    args: ["lock", "--manifest-path", staged], cwd: path.dirname(staged), env: f.activated, timeout: 120000 }]);
+    args: ["lock", "--manifest-path", staged, "--quiet"], cwd: path.dirname(staged), env: f.activated, timeout: 120000 }]);
   assert.equal(f.solverCalls[0].env, f.activated);
   assert.equal(f.diagnostics.report.preflight.ready, true);
   assert.equal(fs.existsSync(f.target.workspace), false);
 });
 
-test("preflight without env retains the original mocked command path", async t => {
+test("preflight without env uses the command runner with the detected executable", async t => {
   const f = await fixture(t);
   await assert.rejects(f.installer.preflightPixiEnvironment({ name: "jazzy" }, f.diagnostics), /dependency preflight failed/);
   assert.equal(f.solverCalls[0].legacy, true);
-  assert.equal(f.solverCalls[0].command, "pixi");
+  assert.equal(f.solverCalls[0].command, f.target.pixiExecutable);
   assert.equal(f.solverCalls[0].timeout, 120000);
 });
 

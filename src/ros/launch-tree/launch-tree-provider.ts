@@ -3,6 +3,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as extension from '../../extension';
 import { LaunchTreeItem } from './launch-tree-item';
 import { LaunchFileParser } from './launch-parser';
 import {
@@ -18,6 +19,7 @@ export class LaunchTreeDataProvider implements vscode.TreeDataProvider<LaunchTre
   private parser: LaunchFileParser;
   private workspacePackages: IWorkspacePackage[] = [];
   private fileWatcher?: vscode.FileSystemWatcher;
+  private environmentListener: vscode.Disposable;
 
   constructor(
     private context: vscode.ExtensionContext,
@@ -25,6 +27,7 @@ export class LaunchTreeDataProvider implements vscode.TreeDataProvider<LaunchTre
     private extPath: string
   ) {
     this.parser = new LaunchFileParser(outputChannel, extPath);
+    this.environmentListener = extension.onDidChangeEnv(() => this.refresh());
     this.setupFileWatcher();
   }
 
@@ -318,6 +321,7 @@ export class LaunchTreeDataProvider implements vscode.TreeDataProvider<LaunchTre
    * Dispose resources
    */
   dispose(): void {
+    this.environmentListener.dispose();
     this.fileWatcher?.dispose();
     this._onDidChangeTreeData.dispose();
   }

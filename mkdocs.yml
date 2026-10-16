@@ -13,6 +13,7 @@ nav:
       - openvsx.md
       - pixi.md
       - dependency-recovery.md
+      - ai-agents-and-skills.md
   - Debugging:
       - debug-support.md
       - launchdebugging.md

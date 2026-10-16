@@ -1101,6 +1101,7 @@ async function activateEnvironmentImpl(context: vscode.ExtensionContext) {
 async function sourceRosAndWorkspace(
     notifyEnvironmentChange: boolean = true, baseEnv?: NodeJS.ProcessEnv, forBuild: boolean = false,
     buildPrefixes: string[] = [], onUnderlay?: (script: string) => void,
+    strictRuntime: boolean = false,
 ): Promise<NodeJS.ProcessEnv | undefined> {
 
     // Processing a new environment can take time which introduces a race condition. 
@@ -1116,7 +1117,7 @@ async function sourceRosAndWorkspace(
         if (forBuild && isWorkspaceInstall(script, buildPrefixes)) {
             throw new Error(`Selected ROS underlay is inside the current workspace install: ${script}. Select the external ROS/Pixi setup in ROS2.rosSetupScript before rebuilding.`);
         }
-        const sourced = await ros_utils.sourceSetupFile(script, baseEnv, forBuild);
+        const sourced = await ros_utils.sourceSetupFile(script, baseEnv, forBuild || strictRuntime);
         onUnderlay?.(script);
         return sourced;
     };
@@ -1161,11 +1162,11 @@ async function sourceRosAndWorkspace(
                 attemptWorkspaceDiscovery = false;
             } catch (err) {
                 reportFailure(rosSetupScript, err);
-                if (forBuild) { throw err; }
+                if (forBuild || strictRuntime) { throw err; }
                 vscode.window.setStatusBarMessage(`Could not source "${rosSetupScript}". See Output > ROS 2. Attempting discovery.`, kWorkspaceConfigTimeout);
             }
         } else {
-            if (forBuild) { throw new Error(`Configured ROS underlay is missing or inaccessible: ${rosSetupScript}. Select a working ROS 2 installation.`); }
+            if (forBuild || strictRuntime) { throw new Error(`Configured ROS underlay is missing or inaccessible: ${rosSetupScript}. Select a working ROS 2 installation.`); }
             outputChannel.appendLine(`Configured ROS setup script is missing or inaccessible: ${rosSetupScript}. Attempting discovery.`);
         }
     }
@@ -1187,7 +1188,7 @@ async function sourceRosAndWorkspace(
                 newEnv = await sourceUnderlay(setupScript);
             } catch (err) {
                 reportFailure(setupScript, err);
-                if (forBuild) { throw err; }
+                if (forBuild || strictRuntime) { throw err; }
                 vscode.window.setStatusBarMessage(`Could not source "${setupScript}". See Output > ROS 2 for the cause.`, kWorkspaceConfigTimeout);
             }
         } else {
@@ -1198,7 +1199,7 @@ async function sourceRosAndWorkspace(
                     ? "Multiple ROS 2 distros found. Select an installed distribution or configure ROS2.distro."
                     : "No ROS 2 setup scripts found. Use ROS2: Find ROS or install a ROS 2 distribution.";
             outputChannel.appendLine(message);
-            if (forBuild) { throw new Error(message); }
+            if (forBuild || strictRuntime) { throw new Error(message); }
             await vscode.window.setStatusBarMessage(message, kWorkspaceConfigTimeout);
         }
     }
@@ -1228,13 +1229,18 @@ async function sourceRosAndWorkspace(
         outputChannel.appendLine(`Workspace overlay path: ${wsSetupScript}`);
 
         try {
-            newEnv = await ros_utils.sourceSetupFile(wsSetupScript, newEnv);
+            newEnv = await ros_utils.sourceSetupFile(wsSetupScript, newEnv, strictRuntime);
         } catch (err) {
             reportFailure(wsSetupScript, err);
+            if (strictRuntime) { throw err; }
             vscode.window.showErrorMessage("Failed to source the workspace setup file. See Output > ROS 2 for the cause.");
         }
     } else if (workspaceOverlayPath) {
         outputChannel.appendLine(`Not sourcing workspace does not exist yet: ${wsSetupScript}. Need to build workspace.`);
+    }
+
+    if (strictRuntime && (newEnv?.ROS_VERSION !== "2" || !newEnv.ROS_DISTRO)) {
+        throw new Error("ROS setup did not provide ROS_VERSION=2 and ROS_DISTRO. Select a working ROS 2 installation.");
     }
 
     env = newEnv;
@@ -1245,6 +1251,15 @@ async function sourceRosAndWorkspace(
         onEnvChanged.fire();
     }
     return newEnv;
+}
+
+/** The launch panel can be opened before activation or after an external build.
+ * Source runtime overlays afresh; never validate against a cached underlay or
+ * continue after a broken setup hook. Do not reactivate providers from a parse.
+ */
+export async function prepareRosLaunchEnvironment(): Promise<NodeJS.ProcessEnv> {
+    await environmentActivation;
+    return (await sourceRosAndWorkspace(false, undefined, false, [], undefined, true))!;
 }
 
 /** Fresh sourcing and read-only CLI checks, never reuse a stale successful activation. */
