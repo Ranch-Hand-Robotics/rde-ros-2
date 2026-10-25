@@ -473,7 +473,6 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Show the Getting Started walkthrough when the extension is first installed or updated."
-
                 },
                 "ROS2.lastShownWelcomeVersion": {
                     "type": "string",
@@ -770,17 +769,33 @@
                         "type": "object",
                         "description": "Linux/macOS task options applied after the ROS environment is ready.",
                         "properties": {
-                            "cwd": { "type": "string" },
+                            "cwd": {
+                                "type": "string"
+                            },
                             "env": {
                                 "type": "object",
-                                "additionalProperties": { "type": ["string", "null"] }
+                                "additionalProperties": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
                             },
                             "shell": {
                                 "type": "object",
-                                "required": ["executable"],
+                                "required": [
+                                    "executable"
+                                ],
                                 "properties": {
-                                    "executable": { "type": "string" },
-                                    "args": { "type": "array", "items": { "type": "string" } }
+                                    "executable": {
+                                        "type": "string"
+                                    },
+                                    "args": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -805,17 +820,33 @@
                         "type": "object",
                         "description": "Linux/macOS task options applied after the ROS environment is ready.",
                         "properties": {
-                            "cwd": { "type": "string" },
+                            "cwd": {
+                                "type": "string"
+                            },
                             "env": {
                                 "type": "object",
-                                "additionalProperties": { "type": ["string", "null"] }
+                                "additionalProperties": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
                             },
                             "shell": {
                                 "type": "object",
-                                "required": ["executable"],
+                                "required": [
+                                    "executable"
+                                ],
                                 "properties": {
-                                    "executable": { "type": "string" },
-                                    "args": { "type": "array", "items": { "type": "string" } }
+                                    "executable": {
+                                        "type": "string"
+                                    },
+                                    "args": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -831,7 +862,10 @@
                             "env": {
                                 "type": "object",
                                 "additionalProperties": {
-                                    "type": ["string", "null"]
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
                                 },
                                 "description": "Environment overrides applied before compiler preflight. Null removes a variable."
                             }
@@ -903,7 +937,6 @@
         "@ranchhandrobotics/rde-common": "^1.0.0",
         "@vscode/debugadapter": "^1.68.0",
         "@vscode/extension-telemetry": "^1.2.0",
-        "@vscode/vsce": "^3.7.0",
         "assert": "^2.1.0",
         "buffer": "^6.0.3",
         "console-browserify": "^1.2.0",
@@ -911,23 +944,22 @@
         "crypto-browserify": "^3.12.1",
         "domain-browser": "^5.7.0",
         "https-browserify": "^1.0.0",
-        "js-yaml": "^4.1.1",
+        "js-yaml": "^4.3.2",
         "os-browserify": "^0.3.0",
         "path-browserify": "^1.0.1",
         "portfinder": "^1.0.38",
         "querystring-es3": "^0.2.1",
-        "shell-quote": "^1.8.3",
+        "shell-quote": "^1.11.0",
         "stream-browserify": "^3.0.0",
         "stream-http": "^3.2.0",
         "string_decoder": "^1.3.0",
         "sudo-prompt": "^9.2.1",
         "timers-browserify": "^2.0.12",
-        "tmp": "^0.2.5",
+        "tmp": "^0.2.7",
         "tslib": "^2.8.1",
         "xmlrpc": "^1.3.2"
     },
     "devDependencies": {
-        "@types/glob": "^9.0.0",
         "@types/js-yaml": "^4.0.9",
         "@types/mocha": "^10.0.10",
         "@types/node": "^24.0.6",
@@ -941,11 +973,11 @@
         "@webgpu/types": "^0.1.74",
         "glob": "^13.0.0",
         "jsonc-parser": "^3.3.1",
-        "mocha": "^11.7.5",
+        "mocha": "^12.0.3",
         "mocha-junit-reporter": "^2.2.1",
         "ts-loader": "^9.5.4",
         "typescript": "^5.9.3",
-        "webpack": "^5.103.0",
+        "webpack": "^5.112.0",
         "webpack-cli": "^6.0.1"
     }
 }
