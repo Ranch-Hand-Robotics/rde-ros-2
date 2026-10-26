@@ -983,6 +983,20 @@ async function runPreflight(diagnostics: InstallDiagnostics): Promise<boolean> {
     return false;
   }
 
+  const emulation = report.checks.find((check) => check.id === "windows-arch" && check.status === "warning");
+  if (emulation) {
+    const choice = await vscode.window.showWarningMessage(
+      `${emulation.detail}\n\n${emulation.remediation}\n\nInstall x64 ROS 2 using Prism?`,
+      { modal: true }, "Use x64 Emulation", "Stop"
+    );
+    await diagnostics.log(`Windows x64 emulation choice: ${choice ?? "Stop"}.\n`);
+    if (choice !== "Use x64 Emulation") {
+      diagnostics.report.recovery = ["Installation stopped before Pixi bootstrap, target writes or package installation. Experimental x64 emulation was not approved."];
+      await diagnostics.finish("blocked", "Installation stopped; experimental Windows ARM64 x64 emulation was not approved.");
+      return false;
+    }
+  }
+
   const windowsRecommendations = report.checks.filter((check) =>
     check.status === "warning" && ["windows-developer-mode", "windows-long-paths"].includes(check.id)
   );

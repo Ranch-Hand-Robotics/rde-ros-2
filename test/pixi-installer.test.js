@@ -33,6 +33,10 @@ test("manifest solves only the selected distro and host without a nonexistent ov
   assert.equal(pixiPlatform("darwin", "arm64"), "osx-arm64");
   assert.equal(pixiPlatform("darwin", "x64"), "osx-64");
   assert.equal(pixiPlatform("win32", "x64"), "win-64");
+  assert.equal(pixiPlatform("win32", "arm64"), "win-64");
+  assert.throws(() => pixiPlatform("win32", "ia32"));
+  assert.equal(pixiManifest("lyrical", pixiPlatform("win32", "arm64")),
+    pixiManifest("lyrical", pixiPlatform("win32", "x64")));
   assert.throws(() => pixiPlatform("darwin", "ia32"));
   const manifest = pixiManifest("jazzy", "osx-arm64", "26.6.2");
   assert.match(manifest, /platforms = \[\{ platform = "osx-arm64", macos = "26\.6\.2" \}\]/);

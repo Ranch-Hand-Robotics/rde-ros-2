@@ -298,6 +298,19 @@ describe("ROS installation preflight", () => {
     assert.strictEqual(report.checks.find((check) => check.id === "target").status, "blocked");
   });
 
+  it("recognizes an incomplete win-64 target on an ARM64 Prism host", async () => {
+    prepareIncompleteWindowsTarget();
+    services.arch = "arm64";
+    const original = services.run;
+    services.run = (command, args) => command === "cmd.exe"
+      ? Promise.resolve({ exitCode: 0, stdout: "Microsoft Windows [Version 10.0.28000]", stderr: "" })
+      : original(command, args);
+    const report = await preflightInstallation(target, services);
+    assert.strictEqual(report.ready, true, JSON.stringify(report));
+    assert.strictEqual(report.checks.find(check => check.id === "target")?.status, "warning");
+    assert.strictEqual(report.checks.find(check => check.id === "windows-arch")?.status, "warning");
+  });
+
   it("removes a confirmed incomplete target but refuses unrelated contents", async () => {
     const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "incomplete-pixi-"));
     const targetDirectory = path.join(directory, "jazzy");

@@ -110,7 +110,10 @@ async function harness(t) {
     "./ros/launch-link-provider": { registerLaunchLinkProvider: disposable },
     "./test-provider/ros-test-provider": { RosTestProvider: class {} },
     "./ros/launch-tree/launch-tree-provider": { LaunchTreeDataProvider: class {} },
-    "./ros/ros-distributions-provider": { RosDistributionsProvider: class {} },
+    "./ros/ros-distributions-provider": { RosDistributionsProvider: class {
+      onDidChangeLoading = disposable;
+      refresh() {}
+    } },
     "./ros/topic-tree/topic-tree-provider": provider,
     "./ros/ros2/topic-webview": { TopicWebviewManager: class {
       topics = new Set();
@@ -329,4 +332,74 @@ test("Stop All returns completion and closes the selected monitors", async t => 
   assert.equal(typeof completion?.then, "function");
   await completion;
   assert.deepEqual(h.provider.getSubscribedTopics(), []);
+});
+
+for (const staleFailure of [false, true]) {
+test(`environment activation replaces an in-flight topic query (${staleFailure ? "failure" : "success"})`, async t => {
+  const h = await harness(t);
+  const oldList = deferred();
+  const installedEnv = { ...readyEnv, PATH: "newly installed ROS" };
+  h.list = () => h.extension.env === installedEnv ? Promise.resolve([topic]) : oldList.promise;
+  t.after(() => oldList.resolve([]));
+  const refresh = h.run("refresh");
+  await flush();
+  assert.deepEqual(h.lists, [readyEnv]);
+
+  h.source = async () => installedEnv;
+  await h.extension.refreshRosEnvironment("fixture");
+  assert.ok(h.lists.includes(installedEnv), "The new environment must not wait for the old query");
+  await flush();
+  if (staleFailure) {
+    oldList.reject(new Error("Old ROS installation unavailable"));
+  } else {
+    oldList.resolve([]);
+  }
+  await refresh;
+  await flush();
+
+  assert.ok(h.lists.includes(installedEnv), "The old request must not consume the new environment's refresh");
+  assert.equal((await h.provider.getChildren())[0].label, topic.name);
+  h.assertState(false);
+});
+}
+
+test("a retired query cannot clear the new environment's pending request", async t => {
+  const h = await harness(t);
+  const oldList = deferred();
+  const newList = deferred();
+  const installedEnv = { ...readyEnv, PATH: "newly installed ROS" };
+  h.list = () => h.extension.env === installedEnv ? newList.promise : oldList.promise;
+  t.after(() => { oldList.resolve([]); newList.resolve([]); });
+  const refresh = h.run("refresh");
+  await flush();
+  h.source = async () => installedEnv;
+  await h.extension.refreshRosEnvironment("fixture");
+  oldList.resolve([]);
+  await refresh;
+
+  const queries = h.lists.length;
+  const pendingRefresh = h.provider.refreshTopics();
+  assert.equal(h.lists.length, queries, "The new environment's query must still be coalesced");
+  newList.resolve([topic]);
+  await pendingRefresh;
+  assert.equal((await h.provider.getChildren())[0].label, topic.name);
+});
+
+test("environment activation invalidates hidden topics without starting a query", async t => {
+  const h = await harness(t);
+  h.list = async () => [topic];
+  await h.run("refresh");
+  assert.equal((await h.provider.getChildren())[0].label, topic.name);
+  h.setVisible(false);
+  h.lists.length = 0;
+  h.source = async () => ({ ...readyEnv, PATH: "another ROS installation" });
+  await h.extension.refreshRosEnvironment("fixture");
+
+  assert.deepEqual(h.lists, []);
+  assert.notEqual((await h.provider.getChildren())[0].label, topic.name, "Hidden cache must be invalidated");
+  h.list = async () => [{ name: "/new", type: "std_msgs/msg/String" }];
+  h.setVisible(true);
+  await flush();
+  assert.equal((await h.provider.getChildren())[0].label, "/new");
+  h.assertState(false);
 });

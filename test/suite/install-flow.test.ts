@@ -12,6 +12,7 @@ import * as preflight from "../../src/ros/installer/install-preflight";
 import * as vscodeUtils from "../../src/vscode-utils";
 import * as rosUtils from "../../src/ros/utils";
 import * as rosBuildUtils from "../../src/ros/build-env-utils";
+import * as windowsToolchain from "../../src/ros/windows-toolchain";
 import * as ros from "../../src/ros/ros";
 import * as buildTool from "../../src/build-tool/build-tool";
 import * as rosShell from "../../src/build-tool/ros-shell";
@@ -299,6 +300,42 @@ describe("ROS installation completion and validation", () => {
     assert.strictEqual(report.status, "passed");
     assert.match(await fs.promises.readFile(report.artifacts.log, "utf8"), /Windows settings recommendation choice: Continue Now/);
   });
+
+  for (const choice of [undefined, "Stop", "Use x64 Emulation"]) {
+    it(`requires explicit experimental Windows x64 emulation approval: ${choice}`, async () => {
+      replace(process, "platform", "win32");
+      replace(process, "arch", "arm64");
+      replace(vscode.window, "showOpenDialog", async () => [vscode.Uri.file(directory)]);
+      replace(pixiLocation, "cachePixiInstallRoot", async () => {});
+      replace(preflight, "preflightInstallation", async () => ({
+        ready: true, checks: [{ id: "windows-arch", status: "warning", detail: "Experimental win-64 ROS via Prism." }],
+      }));
+      let prompt: unknown[];
+      let compilerCalls = 0;
+      replace(vscode.window, "showWarningMessage", async (...args: unknown[]) => {
+        if (args.includes("Use x64 Emulation")) {
+          prompt = args;
+          return choice;
+        }
+        return undefined;
+      });
+      replace(windowsToolchain, "activateWindowsToolchain", async () => {
+        compilerCalls++;
+        throw new Error("test stop before Pixi bootstrap");
+      });
+      await installRos();
+      assert.deepStrictEqual(prompt.slice(2), ["Use x64 Emulation", "Stop"]);
+      assert.match(prompt[0] as string, /Prism/);
+      assert.strictEqual(compilerCalls, choice === "Use x64 Emulation" ? 1 : 0);
+      assert.strictEqual(terminalCount, 0);
+      assert.strictEqual(fs.existsSync(path.join(directory, "jazzy")), false);
+      const report = JSON.parse(await fs.promises.readFile(reportPath, "utf8"));
+      if (choice !== "Use x64 Emulation") {
+        assert.strictEqual(report.status, "blocked");
+        assert.match(report.error, /not approved/);
+      }
+    });
+  }
 
   it("asks for a Pixi install folder and uses and caches the selected root", async () => {
     replace(process, "platform", "win32");

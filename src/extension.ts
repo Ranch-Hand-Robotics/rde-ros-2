@@ -299,7 +299,8 @@ export async function activate(context: vscode.ExtensionContext) {
     // Query topics only after sourceRosAndWorkspace has atomically replaced env.
     // This avoids the initial placeholder render consuming the refresh before ROS is ready.
     context.subscriptions.push(onDidChangeEnv(() => {
-        if (topicTreeView?.visible === true) {
+        topicTreeProvider?.invalidateEnvironment();
+        if (topicTreeView?.visible === true && env?.ROS_VERSION === "2") {
             void topicTreeProvider?.refreshTopics();
         }
     }));

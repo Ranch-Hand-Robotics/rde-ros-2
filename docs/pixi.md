@@ -76,6 +76,39 @@ The default shell is `/bin/sh`; explicit shells must use POSIX quoting. Commands
 and arguments are literal words. For pipelines, invoke `sh` with `-c` explicitly.
 These task terminals use piped input/output, not a full interactive shell or TTY.
 
+### Windows ARM64 with Prism (experimental)
+
+On Windows 11 24H2 or later (build 26100+), **ROS2: Install ROS 2** can
+install RoboStack's `win-64` (x64) packages on an ARM64 machine using Windows'
+built-in Prism emulator. This is not native Windows ARM64 ROS support and is
+not supported by upstream RoboStack. Compatibility and performance may vary;
+drivers still need native ARM64 support.
+
+Keep using native ARM64 VS Code or Cursor. Select a distribution and install
+folder as usual, then explicitly choose **Use x64 Emulation** at the experimental
+support warning. Cancelling stops before Pixi bootstrap or ROS target writes.
+Windows versions older than 24H2 remain blocked on ARM64.
+
+The generated manifest selects only `win-64`, never `win-arm64`. Use a current
+Pixi release: Pixi supports falling back to `win-64` on Windows ARM64 for
+installation, shell activation and `pixi run`. Pixi itself may be ARM64 or x64;
+ROS Python, native libraries and workspace build targets must all remain x64.
+Install the x64 MSVC/SDK components described below, not ARM64-only tools.
+The installer still checks compiler prerequisites, solves dependencies before
+creating the ROS target, and requires the ROS runtime health checks to pass.
+A successful dependency solve alone does not establish emulation compatibility.
+
+Prism's first run can take longer while translating x64 code. Windows ARM64
+runtime validation allows up to 180 seconds, including up to 30 seconds each for
+CLI startup and the local publish/subscribe check. Other hosts retain the
+45-second overall limit and 8-second individual checks. Timeout reports include
+stage markers to distinguish startup, imports, middleware and cleanup stalls.
+
+If package installation succeeded but validation timed out, do not reinstall or
+delete the environment. Run **ROS2: Check ROS 2 Installation Health**, select the
+distribution, then **Choose a Pixi manifest (pixi.toml)** and select the installed
+distribution's manifest to retry validation without reinstalling packages.
+
 ### Windows compiler prerequisites
 
 WinGet package `Microsoft.VisualStudio.2022.BuildTools` supplies the standalone
@@ -267,6 +300,3 @@ If you encounter issues with Pixi or the Robot Developer Extensions, consider th
 - If you are using RoboStack, ensure that the ROS 2 packages are installed correctly and the environment is set up properly outside of the extension.
 - Verify that the `ROS2.pixiRoot` setting points to the correct Pixi installation directory.
 - For issues related to Pixi, refer to the [Pixi documentation](https://pixi.sh/latest/docs/) or the [Pixi Discord server](https://discord.gg/kKV8ZxyzY4) for community support.
-
-
-

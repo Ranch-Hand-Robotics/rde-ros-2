@@ -65,11 +65,43 @@ describe("nativePreflight - Windows", () => {
   it("blocks unsupported architecture immediately without running other checks", async () => {
     let ran = false;
     const run: PreflightRunner = async () => { ran = true; return { exitCode: 0, stdout: "", stderr: "" }; };
-    const checks = await nativePreflight("win32", "arm64", run);
+    const checks = await nativePreflight("win32", "ia32", run);
     assert.ok(!ran, "should not run any commands for unsupported arch");
     assert.strictEqual(checks.length, 1);
     assert.strictEqual(checks[0].id, "windows-arch");
     assert.strictEqual(checks[0].status, "blocked");
+  });
+
+  it("warns about experimental x64 packages on ARM64 and still runs all readiness checks", async () => {
+    const run = makeRunner({
+      "cmd.exe": { exitCode: 0, stdout: "Microsoft Windows [Version 10.0.26100.1]", stderr: "" },
+      "powershell.exe": { exitCode: 0, stdout: HEALTHY_WIN_PS_OUTPUT, stderr: "" },
+    });
+    const checks = await nativePreflight("win32", "arm64", run);
+    assert.strictEqual(checks.find(c => c.id === "windows-arch")?.status, "warning");
+    assert.match(checks.find(c => c.id === "windows-arch").detail, /win-64.*Prism/);
+    assert.ok(checks.filter(c => c.id !== "windows-arch").every(c => c.status === "passed"), JSON.stringify(checks));
+    assert.strictEqual(checks.find(c => c.id === "windows-installer-busy")?.status, "passed");
+  });
+
+  for (const version of ["10.0.19045.1", "10.0.22000.1", "10.0.26099.1", "unknown"]) {
+    it(`blocks ARM64 without a confirmed Prism-capable Windows version: ${version}`, async () => {
+      const run = makeRunner({
+        "cmd.exe": { exitCode: 0, stdout: `Microsoft Windows [Version ${version}]`, stderr: "" },
+        "powershell.exe": { exitCode: 0, stdout: HEALTHY_WIN_PS_OUTPUT, stderr: "" },
+      });
+      const checks = await nativePreflight("win32", "arm64", run);
+      assert.strictEqual(checks.find(c => c.id === "windows-version")?.status, "blocked");
+    });
+  }
+
+  it("does not bypass reboot blockers on ARM64", async () => {
+    const run = makeRunner({
+      "cmd.exe": { exitCode: 0, stdout: "Microsoft Windows [Version 10.0.28000]", stderr: "" },
+      "powershell.exe": { exitCode: 0, stdout: JSON.stringify({ ...HEALTHY_WIN_PS_STATE, wuRebootRequired: true }), stderr: "" },
+    });
+    const checks = await nativePreflight("win32", "arm64", run);
+    assert.strictEqual(checks.find(c => c.id === "windows-reboot")?.status, "blocked");
   });
 
   it("blocks when CBS reboot-pending flag is set", async () => {

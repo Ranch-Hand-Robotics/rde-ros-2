@@ -50,13 +50,13 @@ class HealthProbeTests(unittest.TestCase):
     def subscribe(self, message_type, topic, callback, queue):
         self.callback = callback
 
-    def run_probe(self, cli_error=None, distro="jazzy", kind="setup"):
+    def run_probe(self, cli_error=None, distro="jazzy", kind="setup", check_timeout=8):
         with patch.dict(os.environ, self.environment, clear=True), \
                 patch.dict(sys.modules, self.modules), \
                 patch.object(health.shutil, "which", return_value=str(Path(self.prefix) / "bin/ros2")), \
                 patch.object(health.subprocess, "run", return_value=types.SimpleNamespace(returncode=0),
                              side_effect=cli_error):
-            result = health.inspect_installation(distro, self.prefix, kind)
+            result = health.inspect_installation(distro, self.prefix, kind, check_timeout)
             self.assertNotIn("ROS_DISCOVERY_SERVER", os.environ)
             self.assertNotIn("RMW_IMPLEMENTATION", os.environ)
             self.assertNotIn("FASTRTPS_DEFAULT_PROFILES_FILE", os.environ)
@@ -94,6 +94,8 @@ class HealthProbeTests(unittest.TestCase):
         checks = self.run_probe()
         self.assertIn("outside the requested prefix", checks["rclpy-import"]["detail"])
         self.rclpy.init.assert_not_called()
+        if sys.platform == "win32":
+            self.environment["AMENT_PREFIX_PATH"] = str(Path(self.prefix) / "Library")
         checks = self.run_probe(kind="pixi")
         self.assertIn("Python resolved outside", checks["prefix"]["detail"])
 
@@ -121,6 +123,44 @@ class HealthProbeTests(unittest.TestCase):
             checks = self.run_probe()
         self.assertIn("within 8 seconds", checks["pub-sub"]["detail"])
         self.context.try_shutdown.assert_called_once()
+
+    def test_emulated_probe_uses_longer_cli_and_pubsub_deadlines_without_skipping_failures(self):
+        self.node.create_publisher.return_value.publish.side_effect = None
+        with patch.object(health.time, "monotonic", side_effect=range(0, 1000, 10)), \
+                patch.object(health.subprocess, "run", return_value=types.SimpleNamespace(returncode=0)) as cli:
+            with patch.dict(os.environ, self.environment, clear=True), \
+                    patch.dict(sys.modules, self.modules), \
+                    patch.object(health.shutil, "which", return_value=str(Path(self.prefix) / "bin/ros2")):
+                result = health.inspect_installation("jazzy", self.prefix, "setup", check_timeout=30)
+        cli.assert_called_once_with([str(Path(self.prefix) / "bin/ros2"), "--help"], timeout=30, check=False)
+        checks = {check["id"]: check for check in result["checks"]}
+        self.assertEqual(checks["pub-sub"]["status"], "failed")
+        self.assertIn("within 30 seconds", checks["pub-sub"]["detail"])
+        self.context.try_shutdown.assert_called_once()
+
+    def test_progress_identifies_stages_and_cleanup_before_the_final_result(self):
+        with patch.object(health, "print", create=True) as progress:
+            self.run_probe()
+        messages = [call.args[0] for call in progress.call_args_list]
+        for check_id in health.CHECK_IDS:
+            self.assertIn("RDE_ROS_HEALTH_STAGE:{}:started".format(check_id), messages)
+            self.assertIn("RDE_ROS_HEALTH_STAGE:{}:passed".format(check_id), messages)
+        self.assertEqual(messages[-2:], ["RDE_ROS_HEALTH_STAGE:cleanup:started",
+                                         "RDE_ROS_HEALTH_STAGE:cleanup:passed"])
+        self.assertTrue(all(call.kwargs["flush"] for call in progress.call_args_list))
+        self.assertTrue(all(call.kwargs["file"] is sys.stderr for call in progress.call_args_list))
+
+    def test_slow_startup_flag_sets_the_deadline_and_preserves_failure_exit_status(self):
+        for slow, timeout in ((False, 8), (True, 30)):
+            args = ["probe", "--distro", "jazzy", "--prefix", self.prefix, "--kind", "pixi"]
+            if slow:
+                args.append("--slow-startup")
+            result = {"checks": [{"status": "failed"}]}
+            with patch.object(sys, "argv", args), \
+                    patch.object(health, "inspect_installation", return_value=result) as inspect, \
+                    patch.object(health, "print", create=True):
+                self.assertEqual(health.main(), 1)
+            inspect.assert_called_once_with("jazzy", self.prefix, "pixi", timeout)
 
     def test_packages_must_be_from_the_requested_prefix(self):
         self.modules["ament_index_python.packages"].get_package_prefix = lambda name: "/other/ros"

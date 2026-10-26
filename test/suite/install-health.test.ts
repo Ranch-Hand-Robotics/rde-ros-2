@@ -7,7 +7,7 @@ import * as os from "os";
 import * as path from "path";
 import {
   buildHealthCommand, HEALTH_SENTINEL, HealthTarget, parseHealthOutput,
-  runHealthProcess, validateInstallation,
+  healthProbeTimeout, runHealthProcess, validateInstallation,
 } from "../../src/ros/installer/health-check";
 
 const ids = ["environment", "prefix", "ros2-cli", "package-discovery", "rclpy-import", "rmw-init", "pub-sub"];
@@ -41,6 +41,28 @@ describe("ROS installation health checking", () => {
     assert.throws(() => parseHealthOutput("Installation complete!", target), /structured/);
     assert.throws(() => parseHealthOutput(`${structured()}\n${structured()}`, target), /exactly one/);
     assert.throws(() => parseHealthOutput(HEALTH_SENTINEL + "not json", target));
+  });
+
+  it("extends only Windows ARM64 validation without changing native host deadlines", () => {
+    assert.strictEqual(healthProbeTimeout("win32", "arm64"), 180000);
+    for (const [platform, arch] of [["win32", "x64"], ["darwin", "arm64"], ["linux", "arm64"]] as const) {
+      assert.strictEqual(healthProbeTimeout(platform, arch), 45000);
+    }
+  });
+
+  it("requests longer inner probe deadlines only for Windows ARM64 Pixi environments", async () => {
+    await fs.promises.writeFile(path.join(directory, "pixi.toml"), "");
+    await fs.promises.writeFile(path.join(directory, "pixi.lock"), "");
+    const prefix = path.join(directory, ".pixi", "envs", "jazzy");
+    await fs.promises.mkdir(prefix, { recursive: true });
+    await fs.promises.writeFile(path.join(prefix, "python.exe"), "");
+    const pixi = path.join(directory, "pixi.exe");
+    await fs.promises.writeFile(pixi, "");
+    const pixiTarget: HealthTarget = { kind: "pixi", distro: "jazzy", workspace: directory, pixiExecutable: pixi };
+    const emulated = await buildHealthCommand(pixiTarget, probe, "win32", {}, "arm64");
+    const native = await buildHealthCommand(pixiTarget, probe, "win32", {}, "x64");
+    assert.strictEqual(emulated.args[emulated.args.length - 1], "--slow-startup");
+    assert.deepStrictEqual(emulated.args.slice(0, -1), native.args);
   });
 
   it("rejects distribution mismatches, missing checks, duplicates and malformed statuses", () => {

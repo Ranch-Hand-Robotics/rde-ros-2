@@ -22,6 +22,7 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
   private topicMetricsRequests = new Map<string, Promise<void>>();
   private topics: TopicInfo[] | undefined;
   private topicListRequest?: Promise<void>;
+  private environmentVersion = 0;
   private refreshInterval?: NodeJS.Timeout;
   private isWindowFocused = true;
   private readonly watchState = new TopicWatchState();
@@ -90,22 +91,40 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
     return true;
   }
 
+  /** Retire requests and cached graph data belonging to the previous environment. */
+  public invalidateEnvironment(): void {
+    this.environmentVersion++;
+    this.topics = undefined;
+    this.topicListRequest = undefined;
+    this.topicMetricsCache.clear();
+    this.topicMetricsRequests.clear();
+    this.refresh();
+  }
+
   /** Queries ROS immediately and caches results before requesting a tree redraw. */
   public async refreshTopics(): Promise<void> {
     if (this.topicListRequest) {
       return this.topicListRequest;
     }
 
+    const version = this.environmentVersion;
     this.topicListRequest = (async () => {
       try {
-        this.topics = await topicMonitor.listTopics();
+        const topics = await topicMonitor.listTopics();
+        if (version === this.environmentVersion) {
+          this.topics = topics;
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         this.outputChannel.appendLine(`Error getting topics: ${errorMessage}`);
-        this.topics = undefined;
+        if (version === this.environmentVersion) {
+          this.topics = undefined;
+        }
       } finally {
-        this.topicListRequest = undefined;
-        this.refresh();
+        if (version === this.environmentVersion) {
+          this.topicListRequest = undefined;
+          this.refresh();
+        }
       }
     })();
 
@@ -181,9 +200,10 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
       return existingRequest;
     }
 
+    const version = this.environmentVersion;
     const request = (async () => {
       const info = await topicMonitor.getTopicInfo(topicName);
-      if (info) {
+      if (info && version === this.environmentVersion) {
         this.topicMetricsCache.set(topicName, {
           publisherCount: info.publisherCount,
           subscriberCount: info.subscriberCount,
@@ -197,7 +217,9 @@ export class TopicTreeDataProvider implements vscode.TreeDataProvider<TopicTreeI
     try {
       await request;
     } finally {
-      this.topicMetricsRequests.delete(topicName);
+      if (this.topicMetricsRequests.get(topicName) === request) {
+        this.topicMetricsRequests.delete(topicName);
+      }
     }
   }
 
