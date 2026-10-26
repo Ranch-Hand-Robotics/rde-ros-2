@@ -22,6 +22,15 @@ The `test/launch/` directory contains various ROS 2 launch files used to test th
 
 ## Running Tests
 
+### VS Code extension suite
+
+Run `npm test`, or `npm run headless-test` on Linux with Xvfb installed.
+Both commands build the extension and compile the test runner before launching
+VS Code. These steps are explicit because the repository's `.npmrc` disables
+automatic lifecycle hooks, including `pretest`, with `ignore-scripts=true`.
+Keep Mocha on 11.x while using `mocha-junit-reporter` 2.x; that reporter is
+incompatible with Mocha 12's reporter base class.
+
 ### Image and point-cloud transport
 
 Run the standalone routing, binary framing, rate-control, and watcher regressions:
