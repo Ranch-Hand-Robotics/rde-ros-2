@@ -2,11 +2,11 @@
 // Licensed under the MIT License.
 
 import * as child_process from "child_process";
-import * as os from "os";
 import * as util from "util";
 import * as yaml from "js-yaml";
 
 import * as extension from "../../extension";
+import { resolveRosPython } from "../python";
 import { ImageSubscriptionManager, PointCloudSubscriptionManager } from "./image-subscription";
 import {
   isImageType,
@@ -19,12 +19,33 @@ import {
 
 const promisifiedExecFile = util.promisify(child_process.execFile);
 
+/** Run graph queries without a Windows console launcher or an unbounded child. */
+async function queryTopics(args: string[]): Promise<string> {
+  const env = extension.env;
+  if (env?.ROS_VERSION !== "2") {
+    throw new Error("ROS 2 environment is not ready. Select a ROS installation and refresh topics.");
+  }
+
+  const python = await resolveRosPython(env);
+  const { stdout } = await promisifiedExecFile(python, [
+    "-u", "-c", "from ros2cli.cli import main; raise SystemExit(main())", ...args
+  ], {
+    env,
+    windowsHide: true,
+    // Killing Python directly also closes its pipes; killing a Windows launcher
+    // can leave its Python child alive and the pending tree refresh unresolved.
+    timeout: 10000,
+    maxBuffer: 1024 * 1024
+  });
+  return stdout;
+}
+
 /**
  * Get list of all topics in the ROS 2 system
  */
 export async function listTopics(): Promise<TopicInfo[]> {
   try {
-    const { stdout } = await promisifiedExecFile("ros2", ["topic", "list", "-t"], { env: extension.env });
+    const stdout = await queryTopics(["topic", "list", "-t"]);
     const lines = stdout.trim().split(/\r?\n/);
     
     const topics: TopicInfo[] = [];
@@ -56,7 +77,7 @@ export async function listTopics(): Promise<TopicInfo[]> {
  */
 export async function getTopicInfo(topicName: string): Promise<TopicInfo | null> {
   try {
-    const { stdout } = await promisifiedExecFile("ros2", ["topic", "info", topicName, "-v"], { env: extension.env });
+    const stdout = await queryTopics(["topic", "info", topicName, "-v"]);
     
     const info: TopicInfo = {
       name: topicName,
@@ -75,7 +96,7 @@ export async function getTopicInfo(topicName: string): Promise<TopicInfo | null>
     };
     
     // Parse the verbose output
-    const lines = stdout.split(os.EOL);
+    const lines = stdout.split(/\r?\n/);
     for (const line of lines) {
       const trimmedLine = line.trim();
       

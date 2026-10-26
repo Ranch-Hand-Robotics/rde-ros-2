@@ -40,6 +40,7 @@
     "activationEvents": [
         "onLanguage:cpp",
         "onLanguage:python",
+        "onLanguage:csharp",
         "onCommand",
         "workspaceContains:**/package.xml",
         "workspaceContains:**/test_*.py",
@@ -53,11 +54,6 @@
         "onDebugDynamicConfigurations:ros2"
     ],
     "contributes": {
-        "chatSkills": [
-            {
-                "path": "./assets/skills/rosdep/SKILL.md"
-            }
-        ],
         "commands": [
             {
                 "command": "ROS2.createTerminal",
@@ -114,17 +110,6 @@
                 "title": "Install ROS 2",
                 "category": "ROS2",
                 "icon": "$(add)"
-            },
-            {
-                "command": "ROS2.addInstallation",
-                "title": "Add ROS 2 Installation",
-                "category": "ROS2",
-                "icon": "$(add)"
-            },
-            {
-                "command": "ROS2.installRosContainer",
-                "title": "Create ROS 2 Devcontainer for This Workspace",
-                "category": "ROS2"
             },
             {
                 "command": "ROS2.checkInstallation",
@@ -382,7 +367,7 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "ROS2.addInstallation",
+                    "command": "ROS2.installRos",
                     "when": "view == ros2Distributions",
                     "group": "navigation@1"
                 }
@@ -920,9 +905,6 @@
         "build:openvsx": "node scripts/build-openvsx.js",
         "reset:ros:macos": "node scripts/reset-ros-macos.js",
         "test:installer": "npm run test-compile && node --test test/pixi-installer.test.js test/reset-ros-macos.test.js",
-        "test:images": "npm run test-compile && node --test test/image-subscription.test.js",
-        "test:topics": "npm run test-compile && node --test test/image-subscription.test.js test/point-cloud-subscription.test.js test/point-cloud-routing.test.js test/topic-watcher-commands.test.js",
-        "test:discovery": "npm run test-compile && node --test test/windows-environment.test.js test/windows-toolchain-installer.test.js test/ros-setup-discovery.test.js test/windows-build-preflight.test.js test/ros-python.test.js test/deferred-ros-task.test.js",
         "lint": "eslint -p ./",
         "test": "npm run build && npm run test-compile && node ./out/test/runTest.js",
         "headless-test": "xvfb-run -a npm test",
@@ -930,7 +912,7 @@
         "webpack": "webpack --mode development",
         "watch": "webpack --mode development --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
-        "test-compile": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && tsc -p ./"
+        "test-compile": "tsc -p ./"
     },
     "dependencies": {
         "@ranchhandrobotics/rde-common": "^1.0.0",
@@ -969,7 +951,6 @@
         "@types/xmlrpc": "^1.3.10",
         "@vscode/dts": "^0.4.1",
         "@vscode/test-electron": "^2.5.2",
-        "@webgpu/types": "^0.1.74",
         "glob": "^13.0.0",
         "jsonc-parser": "^3.3.1",
         "mocha": "^11.7.5",

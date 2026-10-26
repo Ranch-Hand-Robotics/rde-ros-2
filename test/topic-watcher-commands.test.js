@@ -58,6 +58,7 @@ async function harness(t) {
     setInterval: callback => { timers.add(callback); return callback; },
     clearInterval: callback => timers.delete(callback),
   };
+  h.tickTimers = () => { for (const callback of [...timers]) { callback(); } };
   const setup = path.join(__dirname, "fixture-setup");
   const config = { get: (key, fallback) => ({ rosSetupScript: setup, showROS2WelcomeOnStartup: false })[key] ?? fallback };
   const context = { subscriptions: [], extensionPath: path.dirname(__dirname) };
@@ -324,6 +325,47 @@ test("missing ROS environment does not enable the watcher or start subscribers",
   assert.deepEqual(h.starts, []);
   assert.deepEqual(h.lists, []);
   assert.match(h.errors.join("\n"), /ROS 2 environment/);
+});
+
+for (const command of ["refresh", "startWatcher"]) {
+  test(`${command}: failed discovery renders a stable error and explicit refresh recovers`, async t => {
+    const h = await harness(t);
+    h.list = async () => { throw new Error("ROS graph query timed out"); };
+    await h.run(command);
+    const queries = h.lists.length;
+    for (let redraw = 0; redraw < 3; redraw++) {
+      const items = await h.provider.getChildren();
+      assert.equal(items[0].type, "error", "Do not disguise a failed query as a paused watcher");
+      assert.match(items[0].label, /Failed to retrieve topics/);
+    }
+    assert.equal(h.lists.length, queries, "Rendering an error must not launch an immediate retry loop");
+    h.list = async () => [topic];
+    await h.run("refresh");
+    assert.equal((await h.provider.getChildren())[0].label, topic.name);
+    assert.equal(h.lists.length, queries + 1);
+  });
+}
+
+test("automatic refresh retries a failed query, coalesces pending retries, and respects Pause", async t => {
+  const h = await harness(t);
+  h.list = async () => { throw new Error("ROS graph query timed out"); };
+  await h.run("startWatcher");
+  assert.equal((await h.provider.getChildren())[0].type, "error");
+  const queries = h.lists.length;
+  const retry = deferred();
+  t.after(() => retry.resolve([]));
+  h.list = () => retry.promise;
+  h.tickTimers();
+  h.tickTimers();
+  await flush();
+  assert.equal(h.lists.length, queries + 1, "Only one retry can be in flight");
+  retry.resolve([topic]);
+  await flush();
+  assert.equal((await h.provider.getChildren())[0].label, topic.name);
+  await h.run("pauseWatcher");
+  h.tickTimers();
+  await flush();
+  assert.equal(h.lists.length, queries + 1, "Pause prevents further automatic queries");
 });
 
 test("Stop All returns completion and closes the selected monitors", async t => {
