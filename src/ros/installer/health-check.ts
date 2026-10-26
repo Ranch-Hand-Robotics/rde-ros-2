@@ -46,6 +46,10 @@ const requiredChecks = [
 const outputLimit = 128 * 1024;
 const timeoutMs = 45000;
 
+export function healthProbeTimeout(platform = process.platform, arch = process.arch): number {
+  return platform === "win32" && arch === "arm64" ? 180000 : timeoutMs;
+}
+
 /** Start with only OS essentials: never reuse the extension's activated ROS/Python environment. */
 function cleanEnvironment(platform: NodeJS.Platform, inherited: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
@@ -126,7 +130,8 @@ export async function buildHealthCommand(
   target: HealthTarget,
   probePath: string,
   platform: NodeJS.Platform = process.platform,
-  inherited: NodeJS.ProcessEnv = process.env
+  inherited: NodeJS.ProcessEnv = process.env,
+  arch = process.arch
 ): Promise<HealthCommand> {
   if (!/^[a-z][a-z0-9_-]*$/.test(target.distro)) {
     throw new Error("Invalid ROS distribution name.");
@@ -159,13 +164,15 @@ export async function buildHealthCommand(
         "run", "--frozen", "--no-install", "--executable", "--manifest-path", manifest,
         "-e", target.distro, "python", "-s", probePath,
         "--distro", target.distro, "--prefix", prefix, "--kind", "pixi",
+        ...(platform === "win32" && arch === "arm64" ? ["--slow-startup"] : []),
       ],
       env, cwd: target.workspace,
     };
   }
   await requireFile(target.setupScript);
   const prefix = path.dirname(target.setupScript);
-  const probeArgs = ["--distro", target.distro, "--prefix", prefix, "--kind", "setup"];
+  const probeArgs = ["--distro", target.distro, "--prefix", prefix, "--kind", "setup",
+    ...(platform === "win32" && arch === "arm64" ? ["--slow-startup"] : [])];
   if (platform === "win32") {
     if (!/\.bat$/i.test(target.setupScript)) {
       throw new Error("Windows health checking requires a .bat setup script.");
@@ -311,7 +318,7 @@ export async function validateInstallation(target: HealthTarget, probePath: stri
     if (process.platform === "win32") {
       command.env = await activateWindowsToolchain(command.env);
     }
-    const result = await runHealthProcess(command);
+    const result = await runHealthProcess(command, healthProbeTimeout());
     try {
       report.checks.push(...parseHealthOutput(result.stdout, target));
     } catch (error) {

@@ -122,7 +122,7 @@ async function isIncompletePixiTarget(
   arch: string,
   services: Pick<PreflightServices, "inspectPath" | "readFile">
 ): Promise<boolean> {
-  if (platform !== "win32" || arch !== "x64") {
+  if (platform !== "win32" || (arch !== "x64" && arch !== "arm64")) {
     return false;
   }
   const directory = await services.inspectPath(targetDirectory);

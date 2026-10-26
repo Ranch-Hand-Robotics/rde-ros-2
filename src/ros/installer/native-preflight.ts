@@ -45,16 +45,21 @@ ConvertTo-Json -InputObject $result -Compress
 async function windowsPreflight(arch: string, run: PreflightRunner): Promise<PreflightCheck[]> {
   const checks: PreflightCheck[] = [];
 
-  if (arch !== "x64") {
+  if (arch !== "x64" && arch !== "arm64") {
     checks.push({
       id: "windows-arch",
       status: "blocked",
       detail: `Architecture '${arch}' is not supported on Windows; only x64 is confirmed to have Pixi ROS packages.`,
-      remediation: "Use a Windows x64 machine.",
+      remediation: "Use Windows x64, or Windows 11 24H2 or later on ARM64 with Prism x64 emulation.",
     });
     return checks;
   }
-  checks.push({ id: "windows-arch", status: "passed", detail: `Architecture ${arch} supported.` });
+  checks.push(arch === "arm64" ? {
+    id: "windows-arch",
+    status: "warning",
+    detail: "Experimental: Windows ARM64 will use RoboStack win-64 (x64) ROS packages through Prism emulation, not native ARM64 packages. Upstream RoboStack does not yet support Windows ARM64; compatibility and performance are not guaranteed.",
+    remediation: "Use Windows 11 24H2 or later with Prism and x64 MSVC/SDK tools. Continue only if you accept experimental x64 emulation.",
+  } : { id: "windows-arch", status: "passed", detail: `Architecture ${arch} supported.` });
 
   const verResult = await run("cmd.exe", ["/d", "/c", "ver"], 10_000);
   if (verResult.exitCode !== 0 || verResult.error) {
@@ -65,17 +70,25 @@ async function windowsPreflight(arch: string, run: PreflightRunner): Promise<Pre
       remediation: "Ensure cmd.exe can run and this extension has sufficient permissions.",
     });
   } else {
-    const match = verResult.stdout.match(/\[[^\d]*(\d+)\.\d+/);
+    const match = verResult.stdout.match(/\[[^\d]*(\d+)\.\d+\.(\d+)/);
     if (!match) {
       checks.push({
         id: "windows-version",
         status: "blocked",
         detail: `Windows version output was unrecognizable: ${verResult.stdout.trim()}`,
-        remediation: "Windows 10 or later is required.",
+        remediation: arch === "arm64" ? "Windows 11 24H2 or later is required for Prism x64 emulation." : "Windows 10 or later is required.",
       });
     } else {
       const major = parseInt(match[1], 10);
-      if (major < 10) {
+      const build = parseInt(match[2], 10);
+      if (arch === "arm64" && (major < 10 || (major === 10 && build < 26100))) {
+        checks.push({
+          id: "windows-version",
+          status: "blocked",
+          detail: `Windows ARM64 requires Windows 11 24H2 or later (build 26100+) for Prism x64 emulation; found ${verResult.stdout.trim()}.`,
+          remediation: "Update Windows before retrying the experimental x64 ROS installation.",
+        });
+      } else if (major < 10) {
         checks.push({
           id: "windows-version",
           status: "blocked",

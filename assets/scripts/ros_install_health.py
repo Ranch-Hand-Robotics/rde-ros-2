@@ -50,12 +50,13 @@ def local_environment():
     os.environ["SKIP_DEFAULT_XML"] = "1"
 
 
-def inspect_installation(distro, prefix, kind):
+def inspect_installation(distro, prefix, kind, check_timeout=8):
     checks = []
     state = {}
 
     def check(check_id, action, dependencies=()):
         started = time.monotonic()
+        print("RDE_ROS_HEALTH_STAGE:{}:started".format(check_id), file=sys.stderr, flush=True)
         try:
             for dependency in dependencies:
                 require(state.get(dependency), "Not run: prerequisite {} failed".format(dependency))
@@ -69,6 +70,7 @@ def inspect_installation(distro, prefix, kind):
             "id": check_id, "status": status, "detail": str(detail)[:8192],
             "durationMs": round((time.monotonic() - started) * 1000, 3),
         })
+        print("RDE_ROS_HEALTH_STAGE:{}:{}".format(check_id, status), file=sys.stderr, flush=True)
 
     def environment():
         require(os.environ.get("ROS_VERSION") == "2",
@@ -95,7 +97,7 @@ def inspect_installation(distro, prefix, kind):
 
     def cli():
         # Outer supervisor bounds captured output and kills this process group on timeout.
-        result = subprocess.run([state["ros2"], "--help"], timeout=8, check=False)
+        result = subprocess.run([state["ros2"], "--help"], timeout=check_timeout, check=False)
         require(result.returncode == 0, "ros2 --help exited with code {}".format(result.returncode))
         return "ros2 --help exited with code 0"
 
@@ -153,13 +155,13 @@ def inspect_installation(distro, prefix, kind):
         publisher = node.create_publisher(state["String"], topic, 1)
         message = state["String"]()
         message.data = token
-        deadline = time.monotonic() + 8
+        deadline = time.monotonic() + check_timeout
         while time.monotonic() < deadline:
             publisher.publish(message)
             executor.spin_once(timeout_sec=0.1)
             if token in received:
                 return "std_msgs/String round-trip on a unique localhost topic (domain {})".format(state["domain"])
-        raise RuntimeError("No matching local pub/sub message received within 8 seconds")
+        raise RuntimeError("No matching local pub/sub message received within {} seconds".format(check_timeout))
 
     local_environment()
     check("environment", environment)
@@ -171,6 +173,7 @@ def inspect_installation(distro, prefix, kind):
         check("rmw-init", rmw, ("rclpy-import",))
         check("pub-sub", pubsub, ("rmw-init",))
     finally:
+        print("RDE_ROS_HEALTH_STAGE:cleanup:started", file=sys.stderr, flush=True)
         cleanup_errors = []
         for resource, method in ((executor, "shutdown"), (node, "destroy_node"), (context, "try_shutdown")):
             if resource is not None:
@@ -181,6 +184,8 @@ def inspect_installation(distro, prefix, kind):
         if cleanup_errors:
             checks[-1]["status"] = "failed"
             checks[-1]["detail"] += "; cleanup failed: " + "; ".join(cleanup_errors)[:2048]
+        print("RDE_ROS_HEALTH_STAGE:cleanup:{}".format("failed" if cleanup_errors else "passed"),
+              file=sys.stderr, flush=True)
     return {"version": 1, "distro": distro, "checks": checks}
 
 
@@ -189,8 +194,10 @@ def main():
     parser.add_argument("--distro", required=True)
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--kind", choices=("setup", "pixi"), required=True)
+    parser.add_argument("--slow-startup", action="store_true",
+                        help="Allow 30 seconds for CLI startup and local pub/sub under emulation")
     args = parser.parse_args()
-    result = inspect_installation(args.distro, args.prefix, args.kind)
+    result = inspect_installation(args.distro, args.prefix, args.kind, 30 if args.slow_startup else 8)
     print("\n" + SENTINEL + json.dumps(result), flush=True)
     return 0 if all(item["status"] == "passed" for item in result["checks"]) else 1
 

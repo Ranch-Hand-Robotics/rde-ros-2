@@ -73,7 +73,7 @@ export function pixiPlatform(platform = process.platform, arch = process.arch): 
   if (platform === "darwin" && (arch === "arm64" || arch === "x64")) {
     return arch === "arm64" ? "osx-arm64" : "osx-64";
   }
-  if (platform === "win32" && arch === "x64") {
+  if (platform === "win32" && (arch === "x64" || arch === "arm64")) {
     return "win-64";
   }
   throw new Error(`Unsupported Pixi host: ${platform}/${arch}. Use a native supported VS Code build.`);
